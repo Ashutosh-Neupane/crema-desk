@@ -45,17 +45,30 @@ export function DropdownMenuContent({ children, className = "", align = "start" 
   );
 }
 
-export function DropdownMenuItem({ children, className = "", onClick, ...props }: { children: React.ReactNode; className?: string; onClick?: () => void } & React.HTMLAttributes<HTMLDivElement>) {
+export function DropdownMenuItem({ children, className = "", onClick, disabled, ...props }: { children: React.ReactNode; className?: string; onClick?: () => void; disabled?: boolean } & React.HTMLAttributes<HTMLDivElement>) {
   const { setOpen } = useDropdown();
 
   return (
     <div
       role="menuitem"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
       onClick={() => {
+        if (disabled) return;
         onClick?.();
         setOpen(false);
       }}
-      className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 ${className}`}
+      onKeyDown={(e) => {
+        if (disabled) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+          setOpen(false);
+        }
+      }}
+      className={`flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition-colors dark:text-zinc-300 ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700"
+      } ${className}`}
       {...props}
     >
       {children}

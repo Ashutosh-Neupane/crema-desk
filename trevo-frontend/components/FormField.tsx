@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { DocField } from "@/lib/frappe/types";
 
 const STRUCTURAL_TYPES = new Set([
@@ -27,7 +27,7 @@ export default function FormField({ field, value, onChange, errors }: FormFieldP
   const isReadOnly = !!field.read_only;
   const error = errors?.[fieldName];
 
-  const handleChange = (next: unknown) => onChange(fieldName, next);
+  const handleChange = useCallback((next: unknown) => onChange(fieldName, next), [onChange, fieldName]);
 
   const selectOptions = useMemo(() => {
     if (!field.options) return [];
@@ -161,7 +161,7 @@ export default function FormField({ field, value, onChange, errors }: FormFieldP
           />
         );
     }
-  }, [field, value, isReadOnly, fieldName, handleChange]);
+  }, [field, value, isReadOnly, fieldName, handleChange, selectOptions]);
 
   return (
     <div className="flex flex-col gap-1">

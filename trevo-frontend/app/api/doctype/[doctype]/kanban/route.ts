@@ -183,6 +183,73 @@ export async function POST(
         return NextResponse.json({ message: "Card created", data: newDoc?.data });
       }
 
+      case "add_column": {
+        const colBody = body as { column_name?: string };
+        if (!colBody.column_name) return NextResponse.json({ error: "column_name required" }, { status: 400 });
+        // Find existing board for this doctype
+        const boardsRes = await fetch(
+          `${FRAPPE_BACKEND_URL}/api/resource/Kanban Board?filters=${JSON.stringify(JSON.stringify([["reference_doctype","=",doctype]]))}`,
+          { headers: { Accept: "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) }, cache: "no-store" },
+        );
+        const boardsJson = await boardsRes.json().catch(() => ({ data: [] }));
+        const boardDoc = boardsJson?.data?.[0];
+        if (!boardDoc) return NextResponse.json({ error: "No board found" }, { status: 404 });
+        // Append column
+        const existing: Array<Record<string,unknown>> = boardDoc.columns ?? [];
+        existing.push({ column_name: colBody.column_name, order: existing.length });
+        const upRes = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc.name)}`, {
+          method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
+          body: JSON.stringify({ columns: existing }),
+        });
+        if (!upRes.ok) return NextResponse.json({ error: "Failed to add column" }, { status: 500 });
+        return NextResponse.json({ message: "Column added" });
+      }
+
+      case "archive_column":
+      case "restore_column": {
+        const colBody2 = body as { column_id?: string };
+        if (!colBody2.column_id) return NextResponse.json({ error: "column_id required" }, { status: 400 });
+        const boardsRes2 = await fetch(
+          `${FRAPPE_BACKEND_URL}/api/resource/Kanban Board?filters=${JSON.stringify(JSON.stringify([["reference_doctype","=",doctype]]))}`,
+          { headers: { Accept: "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) }, cache: "no-store" },
+        );
+        const boardsJson2 = await boardsRes2.json().catch(() => ({ data: [] }));
+        const boardDoc2 = boardsJson2?.data?.[0];
+        if (!boardDoc2) return NextResponse.json({ error: "No board found" }, { status: 404 });
+        const newStatus = action === "archive_column" ? "Archived" : "Active";
+        const updatedCols = (boardDoc2.columns ?? []).map((c: Record<string,unknown>) =>
+          c.column_name === colBody2.column_id ? { ...c, status: newStatus } : c,
+        );
+        const upRes2 = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc2.name)}`, {
+          method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
+          body: JSON.stringify({ columns: updatedCols }),
+        });
+        if (!upRes2.ok) return NextResponse.json({ error: "Failed to update column" }, { status: 500 });
+        return NextResponse.json({ message: `Column ${newStatus.toLowerCase()}` });
+      }
+
+      case "create_board": {
+        const createBody = body as { board_name?: string };
+        if (!createBody.board_name) return NextResponse.json({ error: "board_name required" }, { status: 400 });
+        const createRes = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board`, {
+          method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
+          body: JSON.stringify({
+            doctype: "Kanban Board",
+            name: createBody.board_name,
+            reference_doctype: doctype,
+            field_name: "subject",
+            column_field: "status",
+            columns: [
+              { column_name: "Open", order: 0 },
+              { column_name: "In Progress", order: 1 },
+              { column_name: "Done", order: 2 },
+            ],
+          }),
+        });
+        if (!createRes.ok) return NextResponse.json({ error: "Failed to create board" }, { status: 500 });
+        return NextResponse.json({ message: "Board created" });
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }

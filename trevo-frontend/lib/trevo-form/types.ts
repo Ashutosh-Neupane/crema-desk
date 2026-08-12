@@ -18,6 +18,10 @@ export interface TrevoField {
   description?: string;
   placeholder?: string;
   options?: string | null;
+  /** Frappe conditional visibility/behavior expressions */
+  depends_on?: string | null;
+  mandatory_depends_on?: string | null;
+  read_only_depends_on?: string | null;
   /** Frappe DocField.default is string|null|undefined; keep compatible to avoid TS assignability issues */
   default?: string | null;
   length?: number;

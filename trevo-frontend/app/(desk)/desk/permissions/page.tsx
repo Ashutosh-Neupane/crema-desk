@@ -1,5 +1,7 @@
 "use client";
 
+import { RolePermissionEditor } from "@/components/features/permissions";
+
 export default function PermissionsPage() {
   return (
     <div className="space-y-4">
@@ -9,9 +11,7 @@ export default function PermissionsPage() {
           Manage roles, permissions, and user access
         </p>
       </div>
-      <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">Role & Permission editor coming soon</p>
-      </div>
+      <RolePermissionEditor />
     </div>
   );
 }

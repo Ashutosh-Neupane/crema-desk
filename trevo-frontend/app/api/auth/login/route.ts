@@ -15,6 +15,7 @@ import { cookies } from "next/headers";
 import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
 import { checkRateLimit } from "@/lib/services/rateLimiter";
 import { generateCsrfToken } from "@/lib/services/csrf";
+import { loginSchema } from "@/lib/schemas/auth-login.schema";
 
 export async function POST(req: Request) {
   // Check rate limit first
@@ -27,24 +28,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
-    email?: string;
-    password?: string;
-  };
-  const email = body?.email;
-  const password = body?.password;
-
-  if (!email || !password) {
-    return NextResponse.json({ message: "Missing email/password" }, { status: 400 });
+  const rawBody = await req.json().catch(() => ({}));
+  const parsed = loginSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { message: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 400, headers: rateCheck.headers },
+    );
   }
-
-  if (typeof email !== "string" || typeof password !== "string") {
-    return NextResponse.json({ message: "Invalid input types" }, { status: 400 });
-  }
-
-  if (email.length > 254 || password.length > 128) {
-    return NextResponse.json({ message: "Input too long" }, { status: 400 });
-  }
+  const { email, password } = parsed.data;
 
   const cookieJar = await cookies();
   const cookieHeader = cookieJar.toString();

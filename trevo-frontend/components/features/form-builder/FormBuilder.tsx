@@ -23,27 +23,24 @@ import type { FormBuilderField, BuilderLayoutSection } from "./types";
 interface FormBuilderProps {
   doctype: string;
   initialFields?: FormBuilderField[];
+  initialSections?: BuilderLayoutSection[];
   onSave?: (layout: BuilderLayoutSection[]) => Promise<void>;
+  saving?: boolean;
   readOnly?: boolean;
 }
 
-export function FormBuilder({ doctype, initialFields = [], onSave, readOnly = false }: FormBuilderProps) {
-  const [sections, setSections] = useState<BuilderLayoutSection[]>([
-    {
-      id: "section-1",
-      name: "Main Section",
-      columns: [
-        {
-          id: "col-1",
-          fields: [],
-        },
-      ],
-    },
-  ]);
+export function FormBuilder({ doctype, initialFields = [], initialSections, onSave, saving: externalSaving, readOnly = false }: FormBuilderProps) {
+  const [sections, setSections] = useState<BuilderLayoutSection[]>(
+    initialSections ?? [
+      { id: "section-1", name: "Main Section", columns: [{ id: "col-1", fields: [] }] },
+    ],
+  );
   const [selectedField, setSelectedField] = useState<FormBuilderField | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [internalSaving, setInternalSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  const saving = externalSaving ?? internalSaving;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -133,11 +130,11 @@ export function FormBuilder({ doctype, initialFields = [], onSave, readOnly = fa
 
   const handleSave = async () => {
     if (!onSave) return;
-    setSaving(true);
+    setInternalSaving(true);
     try {
       await onSave(sections);
     } finally {
-      setSaving(false);
+      setInternalSaving(false);
     }
   };
 

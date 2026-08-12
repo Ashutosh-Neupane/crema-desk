@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, ExternalLink, Clock } from "lucide-react";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { useMarkNotificationRead } from "@/lib/hooks/useNotifications";
+import { subscribeNotification, subscribeMsgprint } from "@/lib/services/realtime";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -27,8 +30,27 @@ export default function NotificationsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: notifications, isLoading } = useNotifications();
   const markReadMutation = useMarkNotificationRead();
+  const queryClient = useQueryClient();
 
   const unreadCount = notifications?.filter((n) => !n.seen).length ?? 0;
+
+  useEffect(() => {
+    const unsubNotif = subscribeNotification(() => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    const unsubMsg = subscribeMsgprint((data) => {
+      toast[data.indicator === "red" || data.indicator === "error" ? "error" : "info"](
+        data.title || data.message || "Message",
+        { description: data.message || data.title },
+      );
+    });
+
+    return () => {
+      unsubNotif();
+      unsubMsg();
+    };
+  }, [queryClient]);
 
   const handleMarkRead = (name: string) => {
     markReadMutation.mutate(name);
@@ -63,6 +85,7 @@ export default function NotificationsPanel() {
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
+            onKeyDown={(e) => { if (e.key === "Escape") setIsOpen(false); }}
           />
           <div className="absolute right-0 top-14 z-50 w-96 rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
             <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
@@ -95,7 +118,15 @@ export default function NotificationsPanel() {
                   {notifications.map((notification) => (
                     <div
                       key={notification.name}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => notification.name && handleMarkRead(notification.name)}
+                      onKeyDown={(e) => {
+                        if ((e.key === "Enter" || e.key === " ") && notification.name) {
+                          e.preventDefault();
+                          handleMarkRead(notification.name);
+                        }
+                      }}
                       className={[
                         "cursor-pointer px-4 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800",
                         !notification.seen && "bg-blue-50/50 dark:bg-blue-900/10",

@@ -39,7 +39,7 @@ export function SelectTrigger({ className = "", children, ...props }: React.HTML
     <button
       type="button"
       onClick={() => setOpen(!open)}
-      className={`flex h-10 w-full items-center justify-between rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm transition-colors hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600 ${className}`}
+      className={`flex h-7 w-full items-center justify-between rounded-lg border border-[var(--control-bg)] bg-[var(--control-bg)] px-2 py-1 text-sm text-foreground transition-colors focus:outline-none focus:shadow-[var(--focus-default)] disabled:cursor-not-allowed disabled:bg-[var(--disabled-control-bg)] disabled:opacity-70 dark:border-[var(--control-bg)] dark:bg-[var(--control-bg)] dark:text-foreground ${className}`}
       {...props}
     >
       {children}
@@ -72,9 +72,19 @@ export function SelectItem({ value, children, className = "" }: { value: string;
 
   return (
     <div
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
       onClick={() => {
         onValueChange(value);
         setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onValueChange(value);
+          setOpen(false);
+        }
       }}
       className={`flex cursor-pointer items-center px-3 py-2 text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${isSelected ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50" : "text-zinc-700 dark:text-zinc-300"} ${className}`}
     >

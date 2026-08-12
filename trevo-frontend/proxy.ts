@@ -1,3 +1,15 @@
+/**
+ * proxy.ts — Next.js 16+ auth guard (replaces middleware.ts).
+ *
+ * Next.js 16.2+ uses "proxy" as the conventional filename for route-level
+ * middleware (PROXY_FILENAME = 'proxy' in next/dist/lib/constants.js).
+ * This file is FULLY synchronous (no fetch/await) — negligible per-request cost.
+ *
+ * Verified behaviors:
+ *   - Unauthenticated → /desk redirects to /login?redirect=/desk
+ *   - Unauthenticated → /api/* returns 401 JSON (no redirect loop)
+ *   - Authenticated → passes through to the route handler
+ */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 

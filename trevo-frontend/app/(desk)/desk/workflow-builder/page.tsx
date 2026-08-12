@@ -1,17 +1,12 @@
-"use client";
+/**
+ * Workflow Builder page — Server Component for metadata.
+ * Client implementation is in WorkflowBuilderClient.tsx.
+ */
+import type { Metadata } from "next";
 
-import { WorkflowBuilder } from "@/components/features/workflow-builder";
+export const metadata: Metadata = {
+  title: "Workflow Builder | Trevo",
+  description: "Design approval and status workflows",
+};
 
-export default function WorkflowBuilderPage() {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Workflow Builder</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Design and manage workflows
-        </p>
-      </div>
-      <WorkflowBuilder />
-    </div>
-  );
-}
+export { default } from "./WorkflowBuilderClient";

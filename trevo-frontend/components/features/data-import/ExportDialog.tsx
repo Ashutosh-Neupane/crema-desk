@@ -9,8 +9,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/shadcn/dialog";
-import { Download, FileSpreadsheet, FileJson, Clipboard } from "lucide-react";
+import { Download, FileSpreadsheet, FileJson, Clipboard, FileType } from "lucide-react";
 import { exportToCSV, exportToJSON } from "@/lib/frappe/export";
+import * as XLSX from "xlsx";
 
 interface ExportableField {
   fieldname: string;
@@ -27,6 +28,8 @@ interface ExportDialogProps {
   totalRecords?: number;
 }
 
+const SERVER_SIDE_THRESHOLD = 500;
+
 export function ExportDialog({
   open,
   onOpenChange,
@@ -38,14 +41,19 @@ export function ExportDialog({
   const [fields, setFields] = useState<ExportableField[]>(
     initialFields.map((f) => ({ ...f, selected: true })),
   );
-  const [exportFormat, setExportFormat] = useState<"csv" | "json">("csv");
+  const [exportFormat, setExportFormat] = useState<"csv" | "json" | "xlsx">("csv");
   const [exportAll, setExportAll] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [useServerSide] = useState(false);
 
   const selectedFields = useMemo(
     () => fields.filter((f) => f.selected),
     [fields],
   );
+
+  const needsServerSide = useMemo(() => {
+    return exportAll && (totalRecords ?? data.length) > SERVER_SIDE_THRESHOLD;
+  }, [exportAll, totalRecords, data.length]);
 
   const toggleField = useCallback((fieldname: string) => {
     setFields((prev) =>
@@ -70,8 +78,41 @@ export function ExportDialog({
         label: f.label,
       }));
 
-      if (exportFormat === "csv") {
+      if (useServerSide) {
+        const res = await fetch(`/api/doctype/${encodeURIComponent(doctype)}/export`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fields: cols.map((c) => c.fieldname),
+            filters: [],
+            format: exportFormat,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Server-side export failed");
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${doctype}_export.${exportFormat === "xlsx" ? "xlsx" : "csv"}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (exportFormat === "csv") {
         exportToCSV(data, cols, `${doctype}_export.csv`);
+      } else if (exportFormat === "xlsx") {
+        const ws = XLSX.utils.json_to_sheet(
+          data.map((row) => {
+            const obj: Record<string, unknown> = {};
+            cols.forEach((c) => { obj[c.label || c.fieldname] = row[c.fieldname]; });
+            return obj;
+          }),
+        );
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+        XLSX.writeFile(wb, `${doctype}_export.xlsx`);
       } else {
         exportToJSON(data, `${doctype}_export.json`);
       }
@@ -79,7 +120,7 @@ export function ExportDialog({
     } finally {
       setExporting(false);
     }
-  }, [selectedFields, exportFormat, data, doctype, onOpenChange]);
+  }, [selectedFields, exportFormat, data, doctype, onOpenChange, useServerSide]);
 
   const handleCopyToClipboard = useCallback(async () => {
     const cols = selectedFields.map((f) => f.fieldname);
@@ -134,6 +175,17 @@ export function ExportDialog({
                 CSV
               </button>
               <button
+                onClick={() => setExportFormat("xlsx")}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
+                  exportFormat === "xlsx"
+                    ? "border-zinc-900 bg-zinc-50 text-zinc-900 dark:border-zinc-100 dark:bg-zinc-800 dark:text-zinc-100"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400"
+                }`}
+              >
+                <FileType className="h-5 w-5" />
+                Excel
+              </button>
+              <button
                 onClick={() => setExportFormat("json")}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
                   exportFormat === "json"
@@ -159,6 +211,11 @@ export function ExportDialog({
             <label htmlFor="export-all" className="text-sm text-zinc-600 dark:text-zinc-400">
               Export all records (instead of current page)
             </label>
+            {needsServerSide && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                Server-side
+              </span>
+            )}
           </div>
 
           {/* Field selection */}

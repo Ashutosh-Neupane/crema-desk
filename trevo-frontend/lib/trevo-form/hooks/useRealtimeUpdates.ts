@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import {
   connectRealtime,
-  disconnectRealtime,
   subscribeDocUpdate,
   subscribeDocInfoUpdate,
   subscribeNewComment,
@@ -22,8 +21,9 @@ import {
  * - `onComment` → `new_comment` for this doc
  * - `onVersion` → `version` for this doc
  *
- * The shared socket connection is established on first use and torn down when
- * the last subscriber unmounts (see lib/services/realtime.ts).
+ * The shared socket connection is established on first use and persists for
+ * the app lifetime. This hook only unsubscribes its own handlers on cleanup
+ * (it does NOT tear down the shared socket).
  */
 export function useRealtimeUpdates({
   doctype,
@@ -39,7 +39,6 @@ export function useRealtimeUpdates({
   onVersion?: (data: VersionEvent) => void;
 }) {
   // Keep latest callbacks in refs so subscriptions don't churn on every render.
-  // Ref writes happen inside effects only (React 19 eslint rule).
   const onUpdateRef = useRef(onUpdate);
   const onCommentRef = useRef(onComment);
   const onVersionRef = useRef(onVersion);
@@ -83,9 +82,7 @@ export function useRealtimeUpdates({
       unsubDocInfo();
       unsubComment();
       unsubVersion();
-      if (typeof window !== "undefined") {
-        disconnectRealtime();
-      }
+      // Do NOT call disconnectRealtime() here — the socket is shared.
     };
   }, [doctype, docname]);
 }

@@ -67,7 +67,7 @@ export default function CommandPalette() {
           break;
       }
     },
-    [router, uiStore],
+    [router],
   );
 
   const handleLogout = async () => {

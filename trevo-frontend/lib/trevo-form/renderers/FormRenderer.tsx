@@ -8,6 +8,9 @@ import FormControl from "../controls/FormControl";
 import TableField from "../controls/TableField";
 import { useTrevoFormStore } from "../FormStore";
 import { validateFields } from "../validation";
+import { useFormScripts } from "../scriptBridge/useFormScripts";
+import { FormTour } from "../FormTour";
+import { evalDependsOn } from "../dependsOn";
 
 interface FormRendererProps {
   meta: DocTypeMeta | null | undefined;
@@ -64,6 +67,10 @@ export default function FormRenderer({
   const [localValues, setLocalValues] = useState<Record<string, unknown>>(formValues);
   const historyRef = useRef<Array<Record<string, unknown>>>([]);
 
+  // Stable ref for handleFieldChange (used by script bridge before handleFieldChange is defined)
+  const fieldChangeRef = useRef<(fieldname: string, value: unknown) => void>(() => {});
+  const saveRef = useRef<(() => Promise<void>) | undefined>(undefined);
+
   useEffect(() => {
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setLocalValues(formValues);
@@ -75,7 +82,7 @@ export default function FormRenderer({
     return current !== lastSavedValues;
   }, [localValues, lastSavedValues]);
 
-  const handleFieldChange = (fieldname: string, value: unknown) => {
+  const handleFieldChange = useCallback((fieldname: string, value: unknown) => {
     historyRef.current = [...historyRef.current, localValues];
     if (historyRef.current.length > 50) {
       historyRef.current.shift();
@@ -89,7 +96,7 @@ export default function FormRenderer({
       delete next[fieldname];
       return next;
     });
-  };
+  }, [localValues, onChange, store]);
 
   const handleUndo = useCallback(() => {
     if (historyRef.current.length === 0) return;
@@ -120,6 +127,43 @@ export default function FormRenderer({
     setLastSavedValues(JSON.stringify(next));
   }, [runValidation, onSubmit, localValues]);
 
+  // ── Frappe Script Bridge ───────────────────────────────────────────────────
+  const docname = String((doc as FrappeDocument)?.name ?? "");
+
+  // Keep refs in sync with latest callbacks (avoids stale closure in script bridge)
+  useEffect(() => {
+    fieldChangeRef.current = handleFieldChange;
+  }, [handleFieldChange]);
+  useEffect(() => {
+    saveRef.current = onSave ? async () => { await handleSave(); } : undefined;
+  }, [onSave, handleSave]);
+
+  // Stable wrapper so the script bridge always invokes the latest save via ref
+  const saveViaRef = useCallback(async () => {
+    await saveRef.current?.();
+  }, []);
+
+  const { dfOverrides, fireEvent } = useFormScripts(
+    meta?.name ?? "",
+    docname,
+    localValues,
+    (fieldname, value) => fieldChangeRef.current(fieldname, value),
+    onSave ? saveViaRef : undefined,
+  );
+
+  // Wire fireEvent into save/submit: run "validate" hook before saving
+  const handleSaveWithHooks = useCallback(async () => {
+    if (fireEvent("validate") === false) return;
+    await handleSave();
+  }, [fireEvent, handleSave]);
+
+  const handleSubmitWithHooks = useCallback(async () => {
+    if (fireEvent("validate") === false) return;
+    if (fireEvent("before_submit") === false) return;
+    await handleSubmit();
+    fireEvent("after_submit");
+  }, [fireEvent, handleSubmit]);
+
   useEffect(() => {
     if (!editable || isReadOnly) return;
 
@@ -129,7 +173,7 @@ export default function FormRenderer({
       if ((e.metaKey || e.ctrlKey) && e.key === "s" && !isInput && onSave) {
         e.preventDefault();
         if (runValidation()) {
-          void handleSave();
+          void handleSaveWithHooks();
         }
       }
 
@@ -141,23 +185,36 @@ export default function FormRenderer({
 
     window.document.addEventListener("keydown", handler);
     return () => window.document.removeEventListener("keydown", handler);
-  }, [editable, isReadOnly, onSave, runValidation, handleSave, handleUndo]);
+  }, [editable, isReadOnly, onSave, runValidation, handleSaveWithHooks, handleUndo]);
 
   useEffect(() => {
     if (!onSave || !editable || isReadOnly || !isDirty) return;
 
     const interval = setInterval(() => {
       if (runValidation()) {
-        void handleSave();
+        void handleSaveWithHooks();
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [onSave, editable, isReadOnly, isDirty, runValidation, handleSave]);
+  }, [onSave, editable, isReadOnly, isDirty, runValidation, handleSaveWithHooks]);
 
   const renderSection = (section: typeof sections[0]) => {
-    const isCollapsed = store.collapsedSections.has(section.fieldname);
-    const visibleFields = section.fields.filter((f) => !f.hidden);
+    // collapsedSections tracks user toggles; a section's meta may start collapsed (Fold)
+    const toggled = store.collapsedSections.has(section.fieldname);
+    const isCollapsed = section.collapsed ? !toggled : toggled;
+    // Apply dfOverrides from scripts: a script can hide/show/require fields dynamically
+    const visibleFields = section.fields.filter((f) => {
+      const override = dfOverrides[f.fieldname];
+      // If script set hidden=1, hide it; otherwise use original hidden flag
+      if (override?.hidden !== undefined) return !override.hidden;
+      if (f.hidden) return false;
+      // Frappe depends_on: hide the field unless its condition is met
+      if (typeof f.depends_on === "string" && f.depends_on) {
+        return evalDependsOn(f.depends_on, localValues);
+      }
+      return true;
+    });
 
     return (
       <div
@@ -189,16 +246,33 @@ export default function FormRenderer({
                 section.columns === 2 ? "grid-cols-1 md:grid-cols-2" : section.columns === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1"
               }`}
             >
-              {visibleFields.map((field) => (
-                <FormControl
-                  key={field.fieldname}
-                  field={field as DocField}
-                  value={localValues[field.fieldname]}
-                  onChange={(val) => handleFieldChange(field.fieldname, val)}
-                  disabled={!editable || isReadOnly}
-                  error={errors[field.fieldname]}
-                />
-              ))}
+              {visibleFields.map((field) => {
+                // Merge script-level overrides into field meta before rendering
+                const override = dfOverrides[field.fieldname];
+                const mandatoryByDepends =
+                  typeof field.mandatory_depends_on === "string" && field.mandatory_depends_on
+                    ? evalDependsOn(field.mandatory_depends_on, localValues)
+                    : false;
+                const readOnlyByDepends =
+                  typeof field.read_only_depends_on === "string" && field.read_only_depends_on
+                    ? evalDependsOn(field.read_only_depends_on, localValues)
+                    : false;
+                const mergedField = {
+                  ...field,
+                  reqd: override?.reqd !== undefined ? (override.reqd ? 1 : 0) : (field.reqd || mandatoryByDepends ? 1 : 0),
+                  read_only: override?.read_only !== undefined ? (override.read_only ? 1 : 0) : (field.read_only || readOnlyByDepends ? 1 : 0),
+                };
+                return (
+                  <FormControl
+                    key={field.fieldname}
+                    field={mergedField as DocField}
+                    value={localValues[field.fieldname]}
+                    onChange={(val) => handleFieldChange(field.fieldname, val)}
+                    disabled={!editable || isReadOnly || !!mergedField.read_only}
+                    error={errors[field.fieldname]}
+                  />
+                );
+              })}
 
               {section.childTables.map((tableField) => (
                 <div key={tableField.fieldname} className="col-span-full">
@@ -230,6 +304,10 @@ export default function FormRenderer({
 
   return (
     <div className={["space-y-4", className].join(" ")}>
+      {/* Form Tour — shows step-by-step highlights when a Form Tour doc exists for this doctype */}
+      {meta.name && editable && !isReadOnly && (
+        <FormTour doctype={meta.name} enabled={!!docname} />
+      )}
       {(onSave || onSubmit || onCancel || onDiscard) && editable && !isReadOnly && (
         <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800">
           <div className="flex items-center gap-2">
@@ -240,7 +318,7 @@ export default function FormRenderer({
               {onSave && (
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={handleSaveWithHooks}
                   className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors"
                 >
                   Save
@@ -249,7 +327,7 @@ export default function FormRenderer({
               {onSubmit && (
                 <button
                   type="button"
-                  onClick={handleSubmit}
+                  onClick={handleSubmitWithHooks}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
                   Submit

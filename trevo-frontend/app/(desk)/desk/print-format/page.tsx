@@ -1,17 +1,12 @@
-"use client";
+/**
+ * Print Format page — Server Component for metadata.
+ * Client implementation is in PrintFormatClient.tsx.
+ */
+import type { Metadata } from "next";
 
-import { PrintFormatBuilder } from "@/components/features/print-format";
+export const metadata: Metadata = {
+  title: "Print Formats | Trevo",
+  description: "Design print templates for your documents",
+};
 
-export default function PrintFormatPage() {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Print Format Builder</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Design print formats for your documents
-        </p>
-      </div>
-      <PrintFormatBuilder />
-    </div>
-  );
-}
+export { default } from "./PrintFormatClient";

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/shadcn/card";
-import { Button } from "@/components/shadcn/button";
 import { Input } from "@/components/shadcn/input";
-import { MapPin, Search, Navigation, Loader2 } from "lucide-react";
+import { MapPin, Search, Loader2 } from "lucide-react";
+import { Loader } from "@googlemaps/js-api-loader";
 
 interface GeoLocation {
   lat: number;
@@ -28,8 +28,11 @@ export function MapView({
   longitudeField = "longitude",
   titleField = "name",
 }: MapViewProps) {
-const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<GeoLocation | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
 
   const { data: locations = [], isLoading, isError } = useQuery({
     queryKey: ["map-data", doctype, latitudeField, longitudeField],
@@ -58,6 +61,71 @@ const [searchQuery, setSearchQuery] = useState("");
       )
     : locations;
 
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const useGoogleMaps = !!googleMapsApiKey;
+
+  useEffect(() => {
+    if (!useGoogleMaps || !mapRef.current || locations.length === 0) return;
+
+    const loader = new Loader({
+      apiKey: googleMapsApiKey,
+      version: "weekly",
+    });
+
+    const markers: google.maps.Marker[] = [];
+
+    loader.importLibrary("maps").then((maps) => {
+      if (!mapRef.current) return;
+
+      const bounds = new maps.LatLngBounds();
+      locations.forEach((loc) => {
+        bounds.extend({ lat: loc.lat, lng: loc.lng });
+      });
+
+      const map = new maps.Map(mapRef.current, {
+        center: bounds.getCenter() || { lat: 0, lng: 0 },
+        zoom: 2,
+        mapId: "trevo-map",
+      });
+
+      mapInstanceRef.current = map;
+      markersRef.current = [];
+
+      locations.forEach((loc) => {
+        const marker = new google.maps.Marker({
+          position: { lat: loc.lat, lng: loc.lng },
+          map,
+          title: loc.title,
+        });
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px; min-width: 150px;">
+              <strong>${loc.title}</strong>
+              <p style="margin: 4px 0; color: #666; font-size: 12px;">${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}</p>
+              <a href="/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(loc.name ?? '')}" style="color: #2563eb; font-size: 12px;">Open Document</a>
+            </div>
+          `,
+        });
+
+        marker.addListener("click", () => {
+          infoWindow.open(map, marker);
+          setSelectedLocation(loc);
+        });
+
+        markers.push(marker);
+        markersRef.current.push(marker);
+      });
+
+      map.fitBounds(bounds, 50);
+    });
+
+    return () => {
+      mapInstanceRef.current = null;
+      markersRef.current = [];
+    };
+  }, [locations, doctype, useGoogleMaps, googleMapsApiKey]);
+
   const getMapsUrl = useCallback((loc: GeoLocation) => {
     return `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
   }, []);
@@ -84,7 +152,7 @@ const [searchQuery, setSearchQuery] = useState("");
         </span>
       </div>
 
-      {/* Map placeholder with embedded iframe */}
+      {/* Map area */}
       <Card className="flex-1 overflow-hidden relative">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -104,6 +172,8 @@ const [searchQuery, setSearchQuery] = useState("");
               <p className="mt-2 text-sm text-zinc-500">No locations found</p>
             </div>
           </div>
+        ) : useGoogleMaps ? (
+          <div ref={mapRef} className="w-full h-full min-h-[400px]" />
         ) : (
           <div className="flex h-full">
             {/* Location list */}
@@ -136,35 +206,13 @@ const [searchQuery, setSearchQuery] = useState("");
               ))}
             </div>
 
-            {/* Map area */}
-            <div className="flex-1 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
-              {selectedLocation ? (
-                <div className="text-center p-8">
-                  <MapPin className="mx-auto h-12 w-12 text-red-500" />
-                  <p className="mt-2 font-medium text-zinc-900 dark:text-zinc-100">
-                    {selectedLocation.title}
-                  </p>
-                  <p className="text-sm text-zinc-500">
-                    {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openInMaps(selectedLocation)}
-                    className="mt-3"
-                  >
-                    <Navigation className="mr-1 h-4 w-4" />
-                    Open in Google Maps
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center p-8">
-                  <MapPin className="mx-auto h-12 w-12 text-zinc-300" />
-                  <p className="mt-2 text-sm text-zinc-500">
-                    Select a location to view on map
-                  </p>
-                </div>
-              )}
+            {/* OpenStreetMap fallback */}
+            <div className="flex-1">
+              <iframe
+                title="OpenStreetMap"
+                className="w-full h-full min-h-[400px] border-0"
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${filteredLocations.map(l => `${l.lng},${l.lat}`).join(',')}&layer=mapnik`}
+              />
             </div>
           </div>
         )}

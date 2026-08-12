@@ -1,8 +1,17 @@
 "use client";
 
-import { useAuthStore } from "@/lib/stores/auth.store";
+/**
+ * useBootInfo — reads boot data from auth.store (Zustand write-through cache).
+ *
+ * AuthProvider (lib/frappe/auth.tsx) is the single fetch source.
+ * It writes to auth.store after each successful boot fetch.
+ * This hook just reads from the store — zero additional network calls.
+ */
 
-type BootInfoLite = {
+import { useAuthStore } from "@/lib/stores/auth.store";
+import type { FrappeUser, InstalledApp, BootInfo } from "@/lib/frappe/types";
+
+export type BootInfoLite = {
   user: FrappeUser | null;
   installed_apps: InstalledApp[];
   sysdefaults: Record<string, string>;
@@ -10,8 +19,6 @@ type BootInfoLite = {
   desk_theme?: "Light" | "Dark" | "System";
   notification_count: number;
 };
-
-import type { FrappeUser, InstalledApp } from "@/lib/frappe/types";
 
 const emptyBootInfo: BootInfoLite = {
   user: null,
@@ -22,7 +29,12 @@ const emptyBootInfo: BootInfoLite = {
   notification_count: 0,
 };
 
-export function useBootInfo() {
+export function useBootInfo(): {
+  data: BootInfo | BootInfoLite;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
   const bootInfo = useAuthStore((s) => s.bootInfo);
   const bootLoaded = useAuthStore((s) => s.bootLoaded);
 
@@ -30,6 +42,8 @@ export function useBootInfo() {
     data: bootInfo ?? emptyBootInfo,
     isLoading: !bootLoaded,
     isError: false,
-    refetch: () => {},
+    refetch: () => {
+      // Boot is managed by AuthProvider — call refresh() from useAuth() if needed
+    },
   };
 }

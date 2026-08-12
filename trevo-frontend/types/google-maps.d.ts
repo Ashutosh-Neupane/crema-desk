@@ -1,67 +1,35 @@
-declare global {
-  interface Window {
-    google?: {
-      maps: {
-        Map: new (element: HTMLDivElement, options?: google.maps.MapOptions) => google.maps.Map;
-        Marker: new (options?: google.maps.MarkerOptions) => google.maps.Marker;
-        Geocoder: new () => google.maps.Geocoder;
-        event: {
-          addListenerOnce: (instance: unknown, eventName: string, handler: () => void) => void;
-        };
-      };
-    };
-  }
+declare namespace google {
+  namespace maps {
+    class Map {
+      constructor(el: HTMLElement, opts?: { center?: { lat: number; lng: number }; zoom?: number; mapId?: string });
+      fitBounds(bounds: LatLngBounds, padding?: number): void;
+      setCenter(center: { lat: number; lng: number }): void;
+    }
 
-  namespace google {
-    namespace maps {
-      interface MapOptions {
-        center?: { lat: number; lng: number };
-        zoom?: number;
-        disableDefaultUI?: boolean;
-        zoomControl?: boolean;
-      }
+    class Marker {
+      position: { lat: number; lng: number };
+      map: Map | null;
+      title: string;
+      constructor(opts?: { position: { lat: number; lng: number }; map?: Map; title?: string });
+      addListener(event: string, handler: () => void): google.maps.MapsEventListener;
+      setMap(map: Map | null): void;
+      setPosition(position: { lat: number; lng: number }): void;
+    }
 
-      interface Map {
-        setCenter(latLng: { lat: number; lng: number } | google.maps.LatLng): void;
-        setZoom(zoom: number): void;
-      }
+    class InfoWindow {
+      constructor(opts?: { content?: string });
+      open(map: Map, anchor?: Marker): void;
+      close(): void;
+      setContent(content: string): void;
+    }
 
-      interface MarkerOptions {
-        position?: { lat: number; lng: number } | google.maps.LatLng;
-        map?: google.maps.Map | null;
-        draggable?: boolean;
-      }
+    class LatLngBounds {
+      extend(latLng: { lat: number; lng: number }): void;
+      getCenter(): { lat: number; lng: number } | null;
+    }
 
-      interface Marker {
-        setPosition(latLng: { lat: number; lng: number } | google.maps.LatLng): void;
-        getPosition(): google.maps.LatLng | null;
-        addListener(eventName: string, handler: () => void): google.maps.MapsEventListener;
-      }
-
-      interface GeocoderRequest {
-        address?: string;
-      }
-
-      interface GeocoderResult {
-        geometry: {
-          location: google.maps.LatLng;
-        };
-      }
-
-      interface Geocoder {
-        geocode(request: GeocoderRequest, callback: (results: GeocoderResult[] | null, status: string) => void): void;
-      }
-
-      interface LatLng {
-        lat(): number;
-        lng(): number;
-      }
-
-      interface MapsEventListener {
-        remove(): void;
-      }
+    interface MapsEventListener {
+      remove(): void;
     }
   }
 }
-
-export {};

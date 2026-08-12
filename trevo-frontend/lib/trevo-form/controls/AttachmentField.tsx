@@ -59,10 +59,18 @@ export default function AttachmentField({ field, value, onChange: _onChange, dis
   return (
     <div>
       <div
+        role="button"
+        tabIndex={0}
         onDrop={handleDrop}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         className={[
           "relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer",
           dragOver

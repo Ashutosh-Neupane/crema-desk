@@ -100,6 +100,7 @@ export function ImageView({ doctype, docname }: ImageViewProps) {
                   onClick={() => openLightbox(index)}
                   className="group relative aspect-square overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Frappe file URLs */}
                   <img
                     src={img.file_url}
                     alt={img.file_name}
@@ -114,7 +115,7 @@ export function ImageView({ doctype, docname }: ImageViewProps) {
               ))}
             </div>
           ) : lightboxIndex !== null && images[lightboxIndex] ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={closeLightbox}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={closeLightbox} onKeyDown={(e) => { if (e.key === "Escape") closeLightbox(); }}>
               <button
                 onClick={(e) => { e.stopPropagation(); navigateLightbox("prev"); }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
@@ -133,14 +134,25 @@ export function ImageView({ doctype, docname }: ImageViewProps) {
               >
                 <X className="h-6 w-6" />
               </button>
+              {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Frappe file URLs */}
               <img
                 src={images[lightboxIndex].file_url}
                 alt={images[lightboxIndex].file_name}
                 className="max-h-[90vh] max-w-[90vw] object-contain"
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
               />
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-sm text-white">
                 {lightboxIndex + 1} / {images.length} — {images[lightboxIndex].file_name}
+                {doctype && (
+                  <a
+                    href={`/desk/doctype/${encodeURIComponent(doctype)}`}
+                    className="ml-3 text-blue-400 hover:text-blue-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Open Document
+                  </a>
+                )}
               </div>
             </div>
           ) : (
@@ -151,6 +163,7 @@ export function ImageView({ doctype, docname }: ImageViewProps) {
                   onClick={() => openLightbox(index)}
                   className="group relative aspect-square overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Frappe file URLs */}
                   <img
                     src={img.file_url}
                     alt={img.file_name}

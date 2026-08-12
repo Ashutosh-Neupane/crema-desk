@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { frappeMethod } from "@/lib/frappe/client";
 import { Button } from "@/components/shadcn/button";
@@ -43,7 +43,10 @@ export function QuickEntryDialog({ open, onOpenChange, doctype, onCreated }: Qui
     enabled: open,
   });
 
-  const reqdFields = meta?.fields?.filter((f) => f.reqd && !["Section Break", "Column Break", "Tab Break", "Heading"].includes(f.fieldtype)) ?? [];
+  const reqdFields = useMemo(
+    () => meta?.fields?.filter((f) => f.reqd && !["Section Break", "Column Break", "Tab Break", "Heading"].includes(f.fieldtype)) ?? [],
+    [meta?.fields],
+  );
 
   const handleCreate = useCallback(async () => {
     setCreating(true);

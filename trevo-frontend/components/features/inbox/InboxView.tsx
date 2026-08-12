@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
@@ -37,6 +37,7 @@ interface EmailDoc {
   content?: string;
   seen: number;
   status: string;
+  in_reply_to?: string;
   _attachments?: number;
 }
 
@@ -68,7 +69,7 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
         body: JSON.stringify({
           doctype: "Communication",
           filters,
-          fields: ["name", "subject", "sender", "sender_full_name", "recipients", "communication_date", "content", "seen", "status"],
+          fields: ["name", "subject", "sender", "sender_full_name", "recipients", "communication_date", "content", "seen", "status", "in_reply_to"],
           order_by: "communication_date desc",
           limit: 200,
         }),
@@ -80,6 +81,24 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+
+  const threads = useMemo(() => {
+    const threadMap = new Map<string, EmailDoc[]>();
+
+    emails.forEach((email) => {
+      const threadId = email.in_reply_to || email.name;
+      if (!threadMap.has(threadId)) {
+        threadMap.set(threadId, []);
+      }
+      threadMap.get(threadId)!.push(email);
+    });
+
+    return Array.from(threadMap.entries()).map(([threadId, msgs]) => ({
+      threadId,
+      messages: msgs.sort((a, b) => new Date(a.communication_date).getTime() - new Date(b.communication_date).getTime()),
+      latest: msgs.reduce((a, b) => new Date(a.communication_date) > new Date(b.communication_date) ? a : b),
+    })).sort((a, b) => new Date(b.latest.communication_date).getTime() - new Date(a.latest.communication_date).getTime());
+  }, [emails]);
 
   const markAsRead = useMutation({
     mutationFn: async (emailName: string) => {
@@ -96,20 +115,20 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
     },
   });
 
-  const filteredEmails = searchQuery
-    ? emails.filter((e) =>
-        e.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.sender?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.content?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredThreads = searchQuery
+    ? threads.filter((t) =>
+        t.latest.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.latest.sender?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.latest.content?.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : emails;
+    : threads;
 
   const unreadCount = emails.filter((e) => !e.seen).length;
 
-  const handleSelectEmail = useCallback((email: EmailDoc) => {
-    setSelectedEmail(email);
-    if (!email.seen) {
-      markAsRead.mutate(email.name);
+  const handleSelectThread = useCallback((thread: typeof threads[0]) => {
+    setSelectedEmail(thread.latest);
+    if (!thread.latest.seen) {
+      markAsRead.mutate(thread.latest.name);
     }
   }, [markAsRead]);
 
@@ -147,7 +166,7 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
         </div>
 
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-zinc-500">{filteredEmails.length} emails</span>
+          <span className="text-xs text-zinc-500">{filteredThreads.length} threads</span>
           {unreadCount > 0 && (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
               {unreadCount} unread
@@ -160,18 +179,18 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
             </div>
-          ) : filteredEmails.length === 0 ? (
+          ) : filteredThreads.length === 0 ? (
             <div className="p-8 text-center">
               <Mail className="mx-auto h-6 w-6 text-zinc-300" />
               <p className="mt-2 text-sm text-zinc-500">No emails found</p>
             </div>
           ) : (
-            filteredEmails.map((email) => (
+            filteredThreads.map((thread) => (
               <button
-                key={email.name}
-                onClick={() => handleSelectEmail(email)}
+                key={thread.threadId}
+                onClick={() => handleSelectThread(thread)}
                 className={`w-full rounded-lg p-3 text-left transition-colors ${
-                  selectedEmail?.name === email.name
+                  selectedEmail?.name === thread.latest.name
                     ? "bg-zinc-100 dark:bg-zinc-700"
                     : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 }`}
@@ -179,17 +198,22 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      {!email.seen && <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
-                      <p className={`truncate text-sm ${!email.seen ? "font-semibold" : "font-medium"} text-zinc-900 dark:text-zinc-100`}>
-                        {email.sender_full_name || email.sender || "Unknown"}
+                      {!thread.latest.seen && <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+                      <p className={`truncate text-sm ${!thread.latest.seen ? "font-semibold" : "font-medium"} text-zinc-900 dark:text-zinc-100`}>
+                        {thread.latest.sender_full_name || thread.latest.sender || "Unknown"}
                       </p>
+                      {thread.messages.length > 1 && (
+                        <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
+                          {thread.messages.length}
+                        </span>
+                      )}
                     </div>
-                    <p className={`mt-0.5 truncate text-xs ${!email.seen ? "font-medium" : ""} text-zinc-600 dark:text-zinc-400`}>
-                      {email.subject || "(No subject)"}
+                    <p className={`mt-0.5 truncate text-xs ${!thread.latest.seen ? "font-medium" : ""} text-zinc-600 dark:text-zinc-400`}>
+                      {thread.latest.subject || "(No subject)"}
                     </p>
                   </div>
                   <span className="shrink-0 text-[10px] text-zinc-400">
-                    {formatDistanceToNow(new Date(email.communication_date), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(thread.latest.communication_date), { addSuffix: true })}
                   </span>
                 </div>
               </button>

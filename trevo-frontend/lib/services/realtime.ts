@@ -11,11 +11,14 @@
  *   - `list_update`    — list view data changed (create/delete/etc.)
  *   - `new_comment`    — a comment was added to a document
  *   - `version`        — a new version was created
+ *   - `notification`   — a new notification was created
+ *   - `msgprint`       — a server-side message was printed
  *
  * The socket is a module-level singleton so multiple hooks/views share one
  * connection.
  */
 
+import React from "react";
 import { io, type Socket } from "socket.io-client";
 
 const BACKEND_URL =
@@ -26,6 +29,30 @@ const BACKEND_URL =
 let socket: Socket | null = null;
 let connecting = false;
 let pendingHandlers = 0;
+
+type RealtimeStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
+let currentStatus: RealtimeStatus = "disconnected";
+const statusListeners = new Set<(status: RealtimeStatus) => void>();
+
+function setStatus(status: RealtimeStatus) {
+  currentStatus = status;
+  statusListeners.forEach((fn) => fn(status));
+}
+
+export function useRealtimeStatus() {
+  // External store subscription — no effect/setState dance needed
+  return React.useSyncExternalStore<RealtimeStatus>(
+    (onStoreChange) => {
+      const handler = (_s: RealtimeStatus) => onStoreChange();
+      statusListeners.add(handler);
+      return () => {
+        statusListeners.delete(handler);
+      };
+    },
+    () => currentStatus,
+    () => "disconnected",
+  );
+}
 
 /** Read the Frappe `sid` cookie (set by /api/auth/login via the BFF). */
 function getSid(): string | null {
@@ -61,16 +88,48 @@ export function getRealtimeSocket(): Socket {
 
   socket.on("connect", () => {
     connecting = false;
+    setStatus("connected");
     console.debug("[realtime] connected to Frappe socket.io");
   });
 
   socket.on("disconnect", (reason) => {
     console.debug("[realtime] disconnected:", reason);
+    if (reason === "io server disconnect") {
+      setStatus("disconnected");
+    } else {
+      setStatus("reconnecting");
+    }
   });
 
   socket.on("connect_error", (err) => {
-    // Non-fatal — the app keeps working with polling/refetch fallbacks.
+    // If we get a 401/403, the session is dead — clear auth and redirect.
+    const status = (err as Error & { statusCode?: number }).statusCode;
+    if (status === 401 || status === 403) {
+      console.warn("[realtime] auth error — clearing session and redirecting to login");
+      if (typeof document !== "undefined") {
+        document.cookie.split(";").forEach((c) => {
+          const name = c.trim().split("=")[0];
+          if (name === "sid" || name === "user_id" || name === "full_name") {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+          }
+        });
+      }
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
     console.debug("[realtime] connect error:", err.message);
+    setStatus("reconnecting");
+  });
+
+  socket.on("reconnect", () => {
+    setStatus("connected");
+    console.debug("[realtime] reconnected");
+  });
+
+  socket.on("reconnect_attempt", () => {
+    setStatus("reconnecting");
   });
 
   return socket;
@@ -80,13 +139,16 @@ export function connectRealtime(): void {
   if (typeof window === "undefined") return;
   if (socket || connecting) return;
   connecting = true;
+  setStatus("connecting");
   try {
     const s = getRealtimeSocket();
-    // Bump the reference counter so the socket is not torn down mid-session.
-    pendingHandlers += 0;
-    if (s.connected) connecting = false;
+    if (s.connected) {
+      connecting = false;
+      setStatus("connected");
+    }
   } catch {
     connecting = false;
+    setStatus("disconnected");
   }
 }
 
@@ -94,6 +156,8 @@ export function disconnectRealtime(): void {
   if (!socket) return;
   socket.disconnect();
   socket = null;
+  connecting = false;
+  setStatus("disconnected");
 }
 
 /** Subscribe to a Frappe realtime event. Returns an unsubscribe function. */
@@ -108,8 +172,6 @@ export function subscribeToRealtime<T = unknown>(
     pendingHandlers -= 1;
     s.off(event, handler as (...args: unknown[]) => void);
     if (pendingHandlers <= 0) {
-      // Leave the socket connected; it's cheap and shared. Call
-      // disconnectRealtime() explicitly if you need to fully tear down.
       pendingHandlers = 0;
     }
   };
@@ -156,6 +218,19 @@ export interface VersionEvent {
   [key: string]: unknown;
 }
 
+export interface NotificationEvent {
+  subject?: string;
+  seen?: number;
+  [key: string]: unknown;
+}
+
+export interface MsgprintEvent {
+  message?: string;
+  title?: string;
+  indicator?: string;
+  [key: string]: unknown;
+}
+
 export function subscribeDocUpdate(handler: (data: DocUpdateEvent) => void) {
   return subscribeToRealtime<DocUpdateEvent>("doc_update", handler);
 }
@@ -174,5 +249,13 @@ export function subscribeNewComment(handler: (data: NewCommentEvent) => void) {
 
 export function subscribeVersion(handler: (data: VersionEvent) => void) {
   return subscribeToRealtime<VersionEvent>("version", handler);
+}
+
+export function subscribeNotification(handler: (data: NotificationEvent) => void) {
+  return subscribeToRealtime<NotificationEvent>("notification", handler);
+}
+
+export function subscribeMsgprint(handler: (data: MsgprintEvent) => void) {
+  return subscribeToRealtime<MsgprintEvent>("msgprint", handler);
 }
 

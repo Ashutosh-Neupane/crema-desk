@@ -1,5 +1,7 @@
 "use client";
 
+import { UserOnboarding } from "@/components/features/onboarding";
+
 export default function OnboardingPage() {
   return (
     <div className="space-y-4">
@@ -9,9 +11,7 @@ export default function OnboardingPage() {
           Setup wizard and form tours
         </p>
       </div>
-      <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">Onboarding wizard coming soon</p>
-      </div>
+      <UserOnboarding />
     </div>
   );
 }

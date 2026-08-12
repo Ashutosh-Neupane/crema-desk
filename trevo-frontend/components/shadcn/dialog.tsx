@@ -9,7 +9,7 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
     <DialogContext.Provider value={{ open, setOpen: onOpenChange }}>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} onKeyDown={(e) => { if (e.key === "Escape") onOpenChange(false); }} />
           <div className="relative z-50 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900 mx-4 max-h-[90vh] overflow-y-auto">
             {children}
           </div>

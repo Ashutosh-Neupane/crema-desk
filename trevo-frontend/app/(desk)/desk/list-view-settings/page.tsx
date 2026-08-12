@@ -1,5 +1,7 @@
 "use client";
 
+import { ListViewSettings } from "@/components/features/list-view-settings";
+
 export default function ListViewSettingsPage() {
   return (
     <div className="space-y-4">
@@ -9,9 +11,7 @@ export default function ListViewSettingsPage() {
           Configure list columns, sorting, and grouping
         </p>
       </div>
-      <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">List view settings coming soon</p>
-      </div>
+      <ListViewSettings />
     </div>
   );
 }

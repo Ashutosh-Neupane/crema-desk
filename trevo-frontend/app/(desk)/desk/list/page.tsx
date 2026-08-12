@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "List | Trevo",
+    description: "Browse and manage records across all DocTypes",
+  };
+}
+
 import Link from "next/link";
 import { FileText, Users } from "lucide-react";
 

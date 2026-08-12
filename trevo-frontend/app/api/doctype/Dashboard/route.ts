@@ -86,3 +86,44 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+/**
+ * POST /api/doctype/Dashboard/[name]
+ * Handles { action: "update_widgets", charts: [...], number_cards: [...] }
+ */
+export async function POST(req: NextRequest) {
+  const name = new URL(req.url).pathname.split("/").pop();
+  const cookie = req.headers.get("cookie") || "";
+  const backendUrl = process.env.FRAPPE_BACKEND_URL || "http://localhost:8000";
+
+  try {
+    const body = await req.json() as {
+      action?: string;
+      charts?: Array<{ chart_name: string }>;
+      number_cards?: Array<{ number_card_name: string }>;
+    };
+
+    if (body.action !== "update_widgets") {
+      return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400 });
+    }
+
+    const res = await fetch(`${backendUrl}/api/resource/Dashboard/${encodeURIComponent(name ?? "")}`, {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Frappe-CSRF-Token": "fetch",
+        Cookie: cookie,
+      },
+      body: JSON.stringify({
+        charts: (body.charts ?? []).map((c, i) => ({ chart_name: c.chart_name, order: i })),
+        number_cards: (body.number_cards ?? []).map((n, i) => ({ number_card_name: n.number_card_name, order: i })),
+      }),
+    });
+
+    const text = await res.text();
+    return new Response(text, { status: res.status, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+  }
+}

@@ -1,0 +1,1 @@
+export { RolePermissionEditor } from "./RolePermissionEditor";

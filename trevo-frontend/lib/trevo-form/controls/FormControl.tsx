@@ -25,6 +25,18 @@ import BarcodeField from "./BarcodeField";
 import DurationField from "./DurationField";
 import JSONField from "./JSONField";
 import TableMultiSelectField from "./TableMultiSelectField";
+import ColorField from "./ColorField";
+import IconField from "./IconField";
+import MarkdownField from "./MarkdownField";
+import HTMLEditorField from "./HTMLEditorField";
+import PhoneField from "./PhoneField";
+import AutocompleteField from "./AutocompleteField";
+import MultiselectPillsField from "./MultiselectPillsField";
+import AddressField from "./AddressField";
+import TimeField from "./TimeField";
+import PercentField from "./PercentField";
+import ImageField from "./ImageField";
+import ButtonField from "./ButtonField";
 
 function FieldControl({ field, value, onChange, error, disabled = false }: FieldControlProps) {
   const props = {
@@ -38,8 +50,11 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
   const renderInput = () => {
     switch (field.fieldtype) {
       case "Select":
-      case "Autocomplete":
         return <SelectField {...props} />;
+      case "Autocomplete":
+        return <AutocompleteField {...props} />;
+      case "MultiSelect":
+        return <MultiselectPillsField {...props} />;
       case "Date":
         return <DateField {...props} />;
       case "Datetime":
@@ -85,17 +100,42 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
         return <JSONField {...props} />;
       case "Table MultiSelect":
         return <TableMultiSelectField {...props} />;
+      case "Color":
+        return <ColorField {...props} />;
+      case "Icon":
+        return <IconField {...props} />;
+      case "Markdown Editor":
+        return <MarkdownField {...props} />;
+      case "HTML Editor":
+        return <HTMLEditorField {...props} />;
+      case "Phone":
+        return <PhoneField {...props} />;
+      case "Address":
+        return <AddressField {...props} />;
+      case "Time":
+        return <TimeField {...props} />;
+      case "Percent":
+        return <PercentField {...props} />;
+      case "Image":
+        return <ImageField {...props} />;
+      case "Button":
+        return <ButtonField {...props} />;
       default:
         return <FormField {...props} />;
     }
   };
 
+  // Layout-only fieldtypes don't render a field label
+  const showLabel = field.fieldtype !== "HTML" && field.fieldtype !== "Button";
+
   return (
     <div className={`flex flex-col gap-1.5 ${field.fullWidth ? "col-span-full" : ""}`}>
-      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        {field.label || field.fieldname}
-        {field.reqd && <span className="ml-1 text-red-500">*</span>}
-      </label>
+      {showLabel && (
+        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {field.label || field.fieldname}
+          {field.reqd && <span className="ml-1 text-red-500">*</span>}
+        </label>
+      )}
       {renderInput()}
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
       {field.description && !error && (

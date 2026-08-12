@@ -8,7 +8,7 @@ import type { TrevoField, FormSection, FormLayout } from "../types";
 
 
 const STRUCTURAL_TYPES = new Set([
-  "Section Break", "Column Break", "Tab Break", "Heading", "Read Only", "Button", "HTML",
+  "Section Break", "Column Break", "Tab Break", "Fold", "Heading",
 ]);
 
 interface ParsedMeta {
@@ -49,7 +49,9 @@ function enhanceField(f: DocField): TrevoField {
     fieldname: f.fieldname,
     label: f.label ?? f.fieldname,
     fieldtype: f.fieldtype,
+    reqd: !!f.reqd,
     required: !!f.reqd,
+    read_only: !!f.read_only,
     readOnly: !!f.read_only,
     hidden: !!f.hidden,
     collapsed: !!f.collapsed,
@@ -57,6 +59,9 @@ function enhanceField(f: DocField): TrevoField {
     placeholder: (typeof f.placeholder === "string" ? f.placeholder : undefined),
 
     options: f.options ?? null,
+    depends_on: typeof f.depends_on === "string" ? f.depends_on : null,
+    mandatory_depends_on: typeof f.mandatory_depends_on === "string" ? f.mandatory_depends_on : null,
+    read_only_depends_on: typeof f.read_only_depends_on === "string" ? f.read_only_depends_on : null,
     default: f.default ?? null,
     length: typeof f.length === "number" ? f.length : undefined,
     precision: typeof f.precision === "number" ? f.precision : undefined,
@@ -79,15 +84,34 @@ function enhanceField(f: DocField): TrevoField {
 
 function buildSections(allFields: DocField[], dataFields: TrevoField[]): FormSection[] {
   const sections: FormSection[] = [];
+  const pendingFields: TrevoField[] = [];
+  const pendingChildTables: TrevoField[] = [];
   let currentSection: FormSection | null = null;
   let currentColumns = 1;
+
+  const flushCurrentSection = () => {
+    if (!currentSection) return;
+    sections.push(currentSection);
+    currentSection = null;
+  };
+
+  const flushPendingAsDefaultSection = () => {
+    if (pendingFields.length === 0 && pendingChildTables.length === 0) return;
+    sections.push({
+      label: "Details",
+      fieldname: "_default",
+      collapsed: false,
+      columns: 1,
+      fields: pendingFields.splice(0),
+      childTables: pendingChildTables.splice(0),
+    });
+  };
 
   for (const f of allFields) {
     if (f.fieldtype === "Section Break") {
       // Start new section
-      if (currentSection) {
-        sections.push(currentSection);
-      }
+      flushPendingAsDefaultSection();
+      flushCurrentSection();
       currentSection = {
         label: f.label ?? f.fieldname,
         fieldname: f.fieldname,
@@ -107,9 +131,8 @@ function buildSections(allFields: DocField[], dataFields: TrevoField[]): FormSec
 
     } else if (f.fieldtype === "Tab Break") {
       // Each tab becomes its own section
-      if (currentSection) {
-        sections.push(currentSection);
-      }
+      flushPendingAsDefaultSection();
+      flushCurrentSection();
       currentSection = {
         label: f.label ?? f.fieldname,
         fieldname: f.fieldname,
@@ -119,29 +142,46 @@ function buildSections(allFields: DocField[], dataFields: TrevoField[]): FormSec
         childTables: [],
       };
       currentColumns = 1;
+    } else if (f.fieldtype === "Fold") {
+      // Fold — a collapsible section; everything after it folds up
+      flushPendingAsDefaultSection();
+      flushCurrentSection();
+      currentSection = {
+        label: f.label ?? "Details",
+        fieldname: f.fieldname,
+        collapsed: true,
+        columns: 1,
+        fields: [],
+        childTables: [],
+      };
+      currentColumns = 1;
     } else if (f.fieldtype === "Table") {
       // Child table
+      const tableField = (dataFields.find((df) => df.fieldname === f.fieldname) ?? {
+        ...(f as unknown as TrevoField),
+        label: f.label ?? f.fieldname,
+      }) as TrevoField;
       if (currentSection) {
-        currentSection.childTables.push({
-          ...(f as unknown as TrevoField),
-          label: f.label ?? f.fieldname,
-        });
+        currentSection.childTables.push(tableField);
+      } else {
+        pendingChildTables.push(tableField);
       }
     } else if (!STRUCTURAL_TYPES.has(f.fieldtype)) {
       // Data field — add to current section
-      if (currentSection) {
-        const enhanced = dataFields.find((df) => df.fieldname === f.fieldname);
-        if (enhanced) {
+      const enhanced = dataFields.find((df) => df.fieldname === f.fieldname);
+      if (enhanced) {
+        if (currentSection) {
           currentSection.fields.push(enhanced);
+        } else {
+          pendingFields.push(enhanced);
         }
       }
     }
   }
 
   // Don't forget the last section
-  if (currentSection) {
-    sections.push(currentSection);
-  }
+  flushCurrentSection();
+  flushPendingAsDefaultSection();
 
   // If no sections were created, create a default one
   if (sections.length === 0) {
@@ -150,8 +190,8 @@ function buildSections(allFields: DocField[], dataFields: TrevoField[]): FormSec
       fieldname: "_default",
       collapsed: false,
       columns: 1,
-      fields: dataFields,
-      childTables: [],
+      fields: pendingFields.length > 0 ? pendingFields : dataFields.filter((field) => field.fieldtype !== "Table"),
+      childTables: pendingChildTables.length > 0 ? pendingChildTables : dataFields.filter((field) => field.fieldtype === "Table"),
     });
   }
 
@@ -223,22 +263,28 @@ export function formatFieldValue(value: unknown, fieldtype: string): string {
     case "Check":
       return value ? "Yes" : "No";
     case "Date":
-      return typeof value === "string" ? value : String(value);
     case "Datetime":
+    case "Time":
       return typeof value === "string" ? value : String(value);
     case "Int":
-    case "Float":
-    case "Currency":
-    case "Percent": {
+    case "Float": {
       const num = typeof value === "number" ? value : Number(value);
       if (Number.isNaN(num)) return String(value);
       return new Intl.NumberFormat("en-US").format(num);
     }
-    case "Currency":
+    case "Percent": {
+      const num = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(num)) return String(value);
+      return `${new Intl.NumberFormat("en-US").format(num)}%`;
+    }
+    case "Currency": {
+      const num = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(num)) return String(value);
       return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",
-      }).format(Number(value));
+      }).format(num);
+    }
     default:
       return String(value);
   }

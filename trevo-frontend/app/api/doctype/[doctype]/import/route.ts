@@ -27,13 +27,8 @@ export async function POST(
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Convert file to buffer for the Frappe API
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Forward to Frappe's data import endpoint
     const frappeFormData = new FormData();
-    const blob = new Blob([buffer], { type: file.type || "text/csv" });
-    frappeFormData.append("file", blob, file.name);
+    frappeFormData.append("file", file, file.name);
     frappeFormData.append("doctype", doctype);
     frappeFormData.append("import_type", importType);
     frappeFormData.append("submit_after", String(submitAfter));
@@ -46,42 +41,10 @@ export async function POST(
           Accept: "application/json",
           ...(cookieHeader ? { Cookie: cookieHeader } : {}),
         },
-        body: (() => {
-          // Build multipart form data manually for the fetch to Frappe
-          const boundary = `----FormBoundary${Math.random().toString(36).substring(2)}`;
-          const parts: string[] = [];
-
-          // Helper to add a field
-          const addField = (name: string, value: string) => {
-            parts.push(`--${boundary}`);
-            parts.push(`Content-Disposition: form-data; name="${name}"`);
-            parts.push("");
-            parts.push(value);
-          };
-
-          // Add the file
-          const fileName = file.name;
-          const fileContent = buffer.toString("base64");
-          parts.push(`--${boundary}`);
-          parts.push(`Content-Disposition: form-data; name="file"; filename="${fileName}"`);
-          parts.push(`Content-Type: ${file.type || "text/csv"}`);
-          parts.push("");
-          parts.push(fileContent);
-
-          addField("doctype", doctype);
-          addField("import_type", importType);
-          addField("submit_after", String(submitAfter));
-
-          parts.push(`--${boundary}--`);
-          const body = parts.join("\r\n");
-
-          return new TextEncoder().encode(body);
-        })(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+        body: frappeFormData,
+      },
     );
 
-    // Try to parse the response
     const responseText = await res.text();
     let json;
     try {

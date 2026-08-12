@@ -12,7 +12,7 @@ export function useDocument<T extends FrappeDocument = FrappeDocument>(
   pollMs?: number,
 ) {
   return useQuery<T>({
-    queryKey: ["doc", doctype, name],
+    queryKey: ["document", doctype, name],
     queryFn: () => fetchDocument<T>(doctype, name, fields),
     enabled: !!doctype && !!name && name !== "new",
     refetchInterval: pollMs && pollMs > 0 ? pollMs : undefined,
@@ -34,6 +34,7 @@ export function useSaveDocument(doctype: string) {
     },
     onSuccess: (_data, vars) => {
       // Invalidate document cache
+      queryClient.invalidateQueries({ queryKey: ["document", doctype] });
       queryClient.invalidateQueries({ queryKey: ["doc", doctype] });
       queryClient.invalidateQueries({ queryKey: ["list", doctype] });
       // Track recent doc
@@ -53,6 +54,7 @@ export function useCancelDocument(doctype: string) {
   return useMutation({
     mutationFn: (name: string) => cancelDoc(doctype, name),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document", doctype] });
       queryClient.invalidateQueries({ queryKey: ["doc", doctype] });
       queryClient.invalidateQueries({ queryKey: ["list", doctype] });
     },
@@ -64,6 +66,7 @@ export function useDiscardDocument(doctype: string) {
   return useMutation({
     mutationFn: (name: string) => discardDoc(doctype, name),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document", doctype] });
       queryClient.invalidateQueries({ queryKey: ["doc", doctype] });
       queryClient.invalidateQueries({ queryKey: ["list", doctype] });
     },

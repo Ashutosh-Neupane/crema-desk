@@ -5,23 +5,31 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/frappe/auth";
 import { useUIStore } from "@/lib/stores/ui.store";
-import { useWorkspaces } from "@/lib/hooks/useWorkspaces";
+import { useNavigation } from "@/lib/hooks/useNavigation";
 import CommandPalette from "@/components/CommandPalette";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import { useRealtimeStatus } from "@/lib/services/realtime";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import type { DeskNavigation } from "@/lib/navigation";
 import {
   Moon,
   Sun,
+  Monitor,
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
   Home,
   FileText,
-  Layout,
   BarChart3,
   Settings,
   Calendar,
-  Plus,
   FolderOpen,
   Tag,
   Bell,
@@ -37,194 +45,400 @@ import {
   Puzzle,
   Settings2,
   Globe,
+  Layout,
+  ChevronDown,
+  User,
+  Lock,
+  Users,
+  ScrollText,
+  StickyNote,
+  ClipboardList,
+  Wrench,
+  Search,
+  ChevronsUpDown,
+  Boxes,
 } from "lucide-react";
 
-function NavItem({
+/** Fallback navigation used when /api/navigation is unavailable (offline/backend down). */
+const FALLBACK_NAV: DeskNavigation = {
+  sections: [
+    {
+      type: "section",
+      id: "home",
+      label: "Home",
+      items: [
+        { type: "link", label: "Dashboard", href: "/desk", icon: "Home" },
+      ],
+    },
+    {
+      type: "section",
+      id: "tools",
+      label: "Tools",
+      items: [
+        { type: "link", label: "DocTypes", href: "/desk/doctype", icon: "FileText" },
+        { type: "link", label: "Reports", href: "/desk/reports", icon: "BarChart3" },
+        { type: "link", label: "Calendar", href: "/desk/calendar", icon: "Calendar" },
+        { type: "link", label: "Files", href: "/desk/files", icon: "FolderOpen" },
+        { type: "link", label: "Tags", href: "/desk/tags", icon: "Tag" },
+        { type: "link", label: "Inbox", href: "/desk/inbox", icon: "Mail" },
+        { type: "link", label: "Map", href: "/desk/map", icon: "MapPin" },
+        { type: "link", label: "Image View", href: "/desk/image", icon: "Image" },
+        { type: "link", label: "Translations", href: "/desk/translations", icon: "Languages" },
+      ],
+    },
+    {
+      type: "section",
+      id: "developer",
+      label: "Developer",
+      items: [
+        { type: "link", label: "Print Format Builder", href: "/desk/print-format", icon: "Printer" },
+        { type: "link", label: "Workflow Builder", href: "/desk/workflow-builder", icon: "GitBranch" },
+        { type: "link", label: "Web Forms", href: "/desk/web-forms", icon: "Globe" },
+        { type: "link", label: "Website Pages (www)", href: "/www", icon: "Globe" },
+        { type: "link", label: "Modules", href: "/desk/modules", icon: "Puzzle" },
+        { type: "link", label: "Permissions", href: "/desk/permissions", icon: "Shield" },
+        { type: "link", label: "System Console", href: "/desk/system-console", icon: "Terminal" },
+        { type: "link", label: "Onboarding", href: "/desk/onboarding", icon: "UserPlus" },
+      ],
+    },
+    {
+      type: "section",
+      id: "settings",
+      label: "Settings",
+      items: [
+        { type: "link", label: "List View Settings", href: "/desk/list-view-settings", icon: "Settings2" },
+        { type: "link", label: "Settings", href: "/desk/settings", icon: "Settings" },
+      ],
+    },
+  ],
+  apps: [],
+  modules: [],
+};
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  Home,
+  FileText,
+  BarChart3,
+  Settings,
+  Calendar,
+  FolderOpen,
+  Tag,
+  Bell,
+  Printer,
+  GitBranch,
+  MapPin,
+  Image,
+  Mail,
+  Languages,
+  Shield,
+  Terminal,
+  UserPlus,
+  Puzzle,
+  Settings2,
+  Globe,
+  Users,
+  ScrollText,
+  StickyNote,
+  ClipboardList,
+  Wrench,
+  Search,
+  Layout,
+  Boxes,
+};
+
+function NavIcon({ icon, color }: { icon?: string | null; color?: string }) {
+  const Icon = icon ? ICON_MAP[icon] : undefined;
+  if (Icon) return <Icon className="h-4 w-4 shrink-0 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />;
+  return (
+    <span
+      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ backgroundColor: color ? mapColor(color) : undefined }}
+    />
+  );
+}
+
+function NavLink({
   href,
   label,
-  icon: Icon,
+  icon,
+  depth = 0,
+  color,
 }: {
   href: string;
   label: string;
-  icon: React.ElementType;
+  icon?: string | null;
+  depth?: number;
+  color?: string;
 }) {
   const pathname = usePathname();
   const isActive = pathname === href || pathname.startsWith(href + "/");
 
   return (
     <Link
-      className={[
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        isActive
-          ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100",
-      ].join(" ")}
       href={href}
+      style={depth > 0 ? { paddingLeft: 12 + depth * 8 } : undefined}
+      className={[
+        // Frappe sidebar item: 13px, rounded-lg, active = white pill w/ shadow
+        "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
+        isActive
+          ? "bg-card text-foreground shadow-[var(--shadow-xs)] dark:bg-zinc-800"
+          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100",
+      ].join(" ")}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <NavIcon icon={icon} color={color} />
+      <span className="truncate">{label}</span>
     </Link>
+  );
+}
+
+function mapColor(color: string): string {
+  const palette: Record<string, string> = {
+    blue: "#3b82f6",
+    green: "#22c55e",
+    purple: "#a855f7",
+    yellow: "#eab308",
+    red: "#ef4444",
+    orange: "#f97316",
+    cyan: "#06b6d4",
+    gray: "#6b7280",
+  };
+  return palette[color?.toLowerCase()] ?? color ?? "#6b7280";
+}
+
+function NavSection({ section, depth = 0 }: { section: DeskNavigation["sections"][number]; depth?: number }) {
+  const pathname = usePathname();
+  const sectionActive = section.href
+    ? pathname === section.href || pathname.startsWith(section.href + "/")
+    : false;
+
+  return (
+    <div className="mb-4">
+      {section.href ? (
+        <Link
+          href={section.href}
+          className={[
+            "mb-1 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider",
+            sectionActive
+              ? "text-primary"
+              : "text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300",
+          ].join(" ")}
+        >
+          {section.label}
+        </Link>
+      ) : (
+        <div className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+          {section.label}
+        </div>
+      )}
+      <nav className="flex flex-col gap-0.5">
+        {section.items.map((item, i) =>
+          item.type === "link" ? (
+            <NavLink key={i} href={item.href} label={item.label} icon={item.icon} color={item.color} depth={depth} />
+          ) : (
+            <NavSection key={item.id} section={item} depth={depth + 1} />
+          ),
+        )}
+      </nav>
+    </div>
   );
 }
 
 export default function TrevoShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { sidebarOpen, toggleSidebar, theme, setTheme } = useUIStore();
-  const [, setCommandOpen] = useState(false);
-  const { data: workspaces } = useWorkspaces();
+  const { data: navigation } = useNavigation();
+  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const realtimeStatus = useRealtimeStatus();
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setCommandOpen(true);
+        document.dispatchEvent(new CustomEvent("trevo:command-palette"));
       }
     };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  const navItems = [
-    { href: "/desk", label: "Dashboard", icon: Home },
-    { href: "/desk/doctype", label: "DocTypes", icon: FileText },
-    { href: "/desk/forms", label: "New", icon: Plus },
-    { href: "/desk/reports", label: "Reports", icon: BarChart3 },
-    { href: "/desk/calendar", label: "Calendar", icon: Calendar },
-    { href: "/desk/files", label: "Files", icon: FolderOpen },
-    { href: "/desk/tags", label: "Tags", icon: Tag },
-    { href: "/desk/follow", label: "Follow", icon: Bell },
-    { href: "/desk/print-format", label: "Print Formats", icon: Printer },
-    { href: "/desk/workflow-builder", label: "Workflow Builder", icon: GitBranch },
-    { href: "/desk/map", label: "Map", icon: MapPin },
-    { href: "/desk/image", label: "Image View", icon: Image },
-    { href: "/desk/inbox", label: "Inbox", icon: Mail },
-    { href: "/desk/translations", label: "Translations", icon: Languages },
-    { href: "/desk/permissions", label: "Permissions", icon: Shield },
-    { href: "/desk/system-console", label: "System Console", icon: Terminal },
-    { href: "/desk/onboarding", label: "Onboarding", icon: UserPlus },
-    { href: "/desk/modules", label: "Modules", icon: Puzzle },
-    { href: "/desk/list-view-settings", label: "List Settings", icon: Settings2 },
-    { href: "/desk/web-forms", label: "Web Forms", icon: Globe },
-    { href: "/desk/settings", label: "Settings", icon: Settings },
-  ];
+  const sections = navigation?.sections?.length ? navigation.sections : FALLBACK_NAV.sections;
+  const apps = navigation?.apps ?? [];
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      {/* Header */}
-      <header className="sticky top-0 z-40 h-14 border-b border-zinc-200 bg-white/80 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/80">
-        <div className="flex h-full items-center justify-between px-4">
-          {/* Left section */}
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[var(--bg-color)]">
+      {/* Header — Frappe navbar: 48px tall, surface-base bg, outline-gray-1 border */}
+      <header className="sticky top-0 z-40 h-12 border-b border-[var(--border-color)] bg-[var(--bg-color)]">
+        {realtimeStatus === "reconnecting" && (
+          <div className="flex items-center justify-center gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-1 text-xs text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
+            Reconnecting to server…
+          </div>
+        )}
+        <div className="flex h-full items-center justify-between px-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={toggleSidebar}
-              className="rounded-lg p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             >
               {sidebarOpen ? (
-                <PanelLeftClose className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
+                <PanelLeftClose className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
               ) : (
-                <PanelLeftOpen className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
+                <PanelLeftOpen className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
               )}
             </button>
 
             <Link href="/desk" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 dark:bg-zinc-100">
-                <Layout className="h-5 w-5 text-white dark:text-zinc-900" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <Layout className="h-4 w-4" />
               </div>
-              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Trevo</span>
+              <span className="text-base font-semibold text-foreground">Trevo</span>
             </Link>
+
+            <DropdownMenu open={appMenuOpen} onOpenChange={setAppMenuOpen}>
+              <DropdownMenuTrigger>
+                <span className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors">
+                  <Layout className="h-4 w-4 text-zinc-400" />
+                  {apps.length > 0 ? apps[0].app_title ?? apps[0].app_name : "trevo"}
+                  <ChevronsUpDown className="h-3 w-3 text-zinc-400" />
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {apps.length === 0 && (
+                  <DropdownMenuItem>No apps detected</DropdownMenuItem>
+                )}
+                {apps.map((app) => (
+                  <DropdownMenuItem key={app.app_name}>
+                    <Layout className="mr-2 h-4 w-4" />
+                    {app.app_title ?? app.app_name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          {/* Right section */}
-          <div className="flex items-center gap-2">
-            {/* Command palette trigger */}
+          <div className="flex items-center gap-0.5">
             <CommandPalette />
 
-            {/* Theme toggle */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="rounded-lg p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-              ) : (
-                <Moon className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-              )}
-            </button>
+            {/* Theme switcher */}
+            <DropdownMenu open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
+              <DropdownMenuTrigger>
+                <span className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors inline-flex" aria-label="Theme" title="Theme">
+                  {theme === "dark" ? (
+                    <Moon className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                  ) : theme === "light" ? (
+                    <Sun className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                  ) : (
+                    <Monitor className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                  )}
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <button
+                  onClick={() => setTheme("light")}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
+                >
+                  <Sun className="mr-1 h-4 w-4" /> Light
+                </button>
+                <button
+                  onClick={() => setTheme("dark")}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
+                >
+                  <Moon className="mr-1 h-4 w-4" /> Dark
+                </button>
+                <button
+                  onClick={() => setTheme("system")}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
+                >
+                  <Monitor className="mr-1 h-4 w-4" /> System
+                </button>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            {/* Notifications */}
             <NotificationsPanel />
 
             {/* User menu */}
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:block text-right">
-                <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {user?.name || user?.full_name || "User"}
+            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+              <DropdownMenuTrigger>
+                <span className="flex items-center gap-1.5 rounded-lg p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                    {(user?.full_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {user?.full_name || user?.email || "User"}
+                  </div>
+                  <div className="truncate text-xs text-zinc-500">{user?.email}</div>
                 </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {user?.email}
+                <div className="py-1">
+                  <DropdownMenuItem>
+                    <Link href="/desk/profile" className="flex items-center gap-2">
+                      <User className="h-4 w-4" /> Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/desk/update-password" className="flex items-center gap-2">
+                      <Lock className="h-4 w-4" /> Change Password
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/desk/settings" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" /> Settings
+                    </Link>
+                  </DropdownMenuItem>
                 </div>
-              </div>
-              <button
-                onClick={logout}
-                className="rounded-lg p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                aria-label="Logout"
-                title="Logout"
-              >
-                <LogOut className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-              </button>
-            </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
       <div className="flex">
-        {/* Sidebar */}
+        {/* Mobile overlay — click to close sidebar */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 mt-12 bg-black/30 md:hidden"
+            onClick={toggleSidebar}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Sidebar — Frappe: gray-50 sidebar surface, 220px wide */}
         <aside
           className={[
-            "fixed inset-y-0 left-0 z-30 mt-14 border-r border-zinc-200 bg-white transition-all duration-300 ease-in-out dark:border-zinc-800 dark:bg-zinc-900",
-            sidebarOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full overflow-hidden",
+            "fixed inset-y-0 left-0 z-30 mt-12 w-[var(--sidebar-width)] border-r border-[var(--border-color)] bg-[var(--navbar-bg)] transition-all duration-300 ease-in-out",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
+          aria-label="Sidebar navigation"
+          aria-hidden={!sidebarOpen}
         >
           <div className="flex h-full flex-col overflow-y-auto p-3">
-            <nav className="flex flex-col gap-1">
-              {navItems.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                />
-              ))}
-            </nav>
-
-            {workspaces && workspaces.length > 0 && (
-              <>
-                <div className="my-3 border-t border-zinc-200 dark:border-zinc-800" />
-                <div className="mb-2 px-3 text-xs font-medium text-zinc-500 dark:text-zinc-400">Workspaces</div>
-                <nav className="flex flex-col gap-1">
-                  {workspaces.map((ws) => (
-                    <Link
-                      key={ws.name}
-                      href={`/desk/workspace/${encodeURIComponent(ws.name)}`}
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                    >
-                      {ws.title}
-                    </Link>
-                  ))}
-                </nav>
-              </>
-            )}
+            {sections.map((section) => (
+              <NavSection key={section.id} section={section} />
+            ))}
           </div>
         </aside>
 
         {/* Main content */}
         <main
           className={[
-            "flex-1 p-4 transition-all duration-300 ease-in-out",
-            sidebarOpen ? "md:ml-64" : "md:ml-0",
+            "flex-1 p-4 transition-all duration-300 ease-in-out min-w-0",
+            sidebarOpen ? "md:ml-[var(--sidebar-width)]" : "ml-0",
           ].join(" ")}
+          id="main-content"
         >
           <div className="mb-4">
             <Breadcrumbs />
@@ -235,3 +449,4 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
     </div>
   );
 }
+

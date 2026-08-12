@@ -1,5 +1,7 @@
 "use client";
 
+import { SystemConsole } from "@/components/features/system-console";
+
 export default function SystemConsolePage() {
   return (
     <div className="space-y-4">
@@ -9,9 +11,7 @@ export default function SystemConsolePage() {
           SQL console and system tools
         </p>
       </div>
-      <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">System console coming soon</p>
-      </div>
+      <SystemConsole />
     </div>
   );
 }
