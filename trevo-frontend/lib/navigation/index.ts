@@ -166,6 +166,7 @@ export const SYSTEM_NAV: NavSection[] = [
       { type: "link", label: "Print Format Builder", href: "/desk/print-format" },
       { type: "link", label: "Workflow Builder", href: "/desk/workflow-builder" },
       { type: "link", label: "Web Forms", href: "/desk/web-forms" },
+      { type: "link", label: "Website Builder", href: "/desk/website-builder" },
       { type: "link", label: "Onboarding", href: "/desk/onboarding" },
       { type: "link", label: "Module Onboarding", href: "/desk/module-onboarding" },
     ],

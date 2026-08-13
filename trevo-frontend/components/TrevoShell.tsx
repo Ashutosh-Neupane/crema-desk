@@ -98,6 +98,7 @@ const FALLBACK_NAV: DeskNavigation = {
         { type: "link", label: "Workflow Builder", href: "/desk/workflow-builder", icon: "GitBranch" },
         { type: "link", label: "Web Forms", href: "/desk/web-forms", icon: "Globe" },
         { type: "link", label: "Website Pages (www)", href: "/www", icon: "Globe" },
+        { type: "link", label: "Website Builder", href: "/desk/website-builder", icon: "Layout" },
         { type: "link", label: "Modules", href: "/desk/modules", icon: "Puzzle" },
         { type: "link", label: "Permissions", href: "/desk/permissions", icon: "Shield" },
         { type: "link", label: "System Console", href: "/desk/system-console", icon: "Terminal" },
