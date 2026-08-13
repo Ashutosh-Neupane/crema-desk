@@ -57,6 +57,7 @@ import {
   Search,
   ChevronsUpDown,
   Boxes,
+  Activity,
 } from "lucide-react";
 
 /** Fallback navigation used when /api/navigation is unavailable (offline/backend down). */
@@ -84,6 +85,8 @@ const FALLBACK_NAV: DeskNavigation = {
         { type: "link", label: "Map", href: "/desk/map", icon: "MapPin" },
         { type: "link", label: "Image View", href: "/desk/image", icon: "Image" },
         { type: "link", label: "Translations", href: "/desk/translations", icon: "Languages" },
+        { type: "link", label: "Route History", href: "/desk/route-history", icon: "ScrollText" },
+        { type: "link", label: "System Health", href: "/desk/system-health", icon: "Activity" },
       ],
     },
     {
@@ -108,6 +111,9 @@ const FALLBACK_NAV: DeskNavigation = {
       items: [
         { type: "link", label: "List View Settings", href: "/desk/list-view-settings", icon: "Settings2" },
         { type: "link", label: "Settings", href: "/desk/settings", icon: "Settings" },
+        { type: "link", label: "Notification Settings", href: "/desk/notification-settings", icon: "Bell" },
+        { type: "link", label: "Global Search Settings", href: "/desk/global-search-settings", icon: "Search" },
+        { type: "link", label: "Dashboard Settings", href: "/desk/dashboard-settings", icon: "Layout" },
       ],
     },
   ],
@@ -144,6 +150,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Search,
   Layout,
   Boxes,
+  Activity,
 };
 
 function NavIcon({ icon, color }: { icon?: string | null; color?: string }) {

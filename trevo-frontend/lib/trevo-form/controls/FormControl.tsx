@@ -37,6 +37,12 @@ import TimeField from "./TimeField";
 import PercentField from "./PercentField";
 import ImageField from "./ImageField";
 import ButtonField from "./ButtonField";
+import DateRangeField from "./DateRangeField";
+import MulticheckField from "./MulticheckField";
+import MultiselectListField from "./MultiselectListField";
+import SwitchField from "./SwitchField";
+import CommentField from "./CommentField";
+import HeadingField from "./HeadingField";
 
 function FieldControl({ field, value, onChange, error, disabled = false }: FieldControlProps) {
   const props = {
@@ -120,6 +126,18 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
         return <ImageField {...props} />;
       case "Button":
         return <ButtonField {...props} />;
+      case "Date Range":
+        return <DateRangeField {...props} />;
+      case "MultiCheck":
+        return <MulticheckField {...props} />;
+      case "MultiSelect List":
+        return <MultiselectListField {...props} />;
+      case "Switch":
+        return <SwitchField {...props} />;
+      case "Comment":
+        return <CommentField {...props} />;
+      case "Heading":
+        return <HeadingField {...props} />;
       default:
         return <FormField {...props} />;
     }

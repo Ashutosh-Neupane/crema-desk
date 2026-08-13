@@ -8,6 +8,9 @@ import { Input } from "@/components/shadcn/input";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import { Settings2, Save, RotateCcw, GripVertical } from "lucide-react";
 import { useDoctype } from "@/lib/hooks/useDoctype";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { frappeGet, frappePost } from "@/lib/frappe/client";
+import { toast } from "sonner";
 
 interface ColumnConfig {
   fieldname: string;
@@ -31,9 +34,20 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
   const params = useParams<{ doctype: string }>();
   const doctype = decodeURIComponent(params.doctype);
   const { data: meta } = useDoctype(doctype);
+  const qc = useQueryClient();
 
   const storageKey = `trevo-list-settings-${doctype}`;
   const metaFields = meta?.fields ?? [];
+
+  const { data: savedView } = useQuery({
+    queryKey: ["list-view-settings", doctype],
+    queryFn: async () => {
+      const res = await frappeGet<{ message: Array<{ name: string; columns?: string; group_by?: string }> }>(
+        `/api/doctype/${encodeURIComponent(doctype)}/views`,
+      );
+      return res.message?.[0] ?? null;
+    },
+  });
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     if (typeof window === "undefined") return [];
@@ -55,8 +69,6 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
 
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
 
-  // One-time initialization from meta once fields load
-  // (adjust-state-during-render pattern; runs only when nothing was persisted)
   if (initializedFor !== doctype && columns.length === 0 && metaFields.length > 0) {
     const listFields = metaFields
       .filter((f) => f.in_list_view && !["Section Break", "Column Break", "Tab Break", "Heading"].includes(f.fieldtype))
@@ -70,6 +82,21 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
     setInitializedFor(doctype);
     setColumns(listFields);
   }
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      await frappePost(`/api/doctype/${encodeURIComponent(doctype)}/views`, {
+        name: savedView?.name,
+        columns: JSON.stringify(columns),
+        group_by: group ? JSON.stringify(group) : "",
+      });
+    },
+    onSuccess: () => {
+      toast.success("List view settings saved");
+      qc.invalidateQueries({ queryKey: ["list-view-settings", doctype] });
+    },
+    onError: () => toast.error("Failed to save settings"),
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -137,9 +164,9 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset
           </Button>
-          <Button size="sm" onClick={() => {}}>
+          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
             <Save className="h-4 w-4 mr-1" />
-            Save
+            {saveMutation.isPending ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>

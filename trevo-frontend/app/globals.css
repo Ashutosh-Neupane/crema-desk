@@ -269,3 +269,19 @@ a:focus-visible,
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-500);
 }
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+  .print-format {
+    padding: 0;
+    margin: 0;
+  }
+}

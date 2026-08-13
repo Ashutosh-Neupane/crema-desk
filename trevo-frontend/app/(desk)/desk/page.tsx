@@ -11,6 +11,7 @@ import { useListCount } from "@/lib/hooks/useList";
 import { useWorkspaces } from "@/lib/hooks/useWorkspaces";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/shadcn/card";
+import { UserOnboarding } from "@/components/features/onboarding";
 import dynamic from "next/dynamic";
 
 // Lazy-load DashboardView — only rendered when a default dashboard exists
@@ -29,6 +30,17 @@ const COLOR_MAP = {
 export default function DeskHomePage() {
   const { data: bootInfo } = useBootInfo();
   const { data: workspaces } = useWorkspaces();
+
+  const { data: onboardingDone } = useQuery<boolean>({
+    queryKey: ["onboarding-done"],
+    queryFn: async () => {
+      if (typeof window === "undefined") return true;
+      return window.localStorage.getItem("trevo-onboarding-done") === "true";
+    },
+    staleTime: Infinity,
+  });
+
+  const showOnboarding = bootInfo && !onboardingDone;
 
   // Check whether a default Dashboard document exists for this user's home module
   const { data: defaultDashboard } = useQuery<{ name: string } | null>({
@@ -92,6 +104,14 @@ export default function DeskHomePage() {
 
   return (
     <div className="space-y-6">
+      {showOnboarding && (
+        <UserOnboarding
+          onComplete={() => {
+            window.localStorage.setItem("trevo-onboarding-done", "true");
+          }}
+        />
+      )}
+
       {/* Welcome header */}
       <div className="flex items-center justify-between">
         <div>

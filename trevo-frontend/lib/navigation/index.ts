@@ -132,7 +132,25 @@ export const SYSTEM_NAV: NavSection[] = [
     type: "section",
     id: "system",
     label: "System",
-    items: [],
+    items: [
+      { type: "link", label: "Users", href: "/desk/users" },
+      { type: "link", label: "Roles", href: "/desk/roles" },
+      { type: "link", label: "Permissions", href: "/desk/permissions" },
+      { type: "link", label: "Notes", href: "/desk/notes" },
+      { type: "link", label: "Assignments", href: "/desk/assignments" },
+      { type: "link", label: "Backups", href: "/desk/backups" },
+      { type: "link", label: "Profile", href: "/desk/profile" },
+      { type: "link", label: "Update Password", href: "/desk/update-password" },
+      { type: "link", label: "System Health", href: "/desk/system-health" },
+      { type: "link", label: "Route History", href: "/desk/route-history" },
+      { type: "link", label: "Console Logs", href: "/desk/console-log" },
+      { type: "link", label: "Changelog Feed", href: "/desk/changelog-feed" },
+      { type: "link", label: "Document Templates", href: "/desk/document-template" },
+      { type: "link", label: "Desktop Icons", href: "/desk/desktop-icon" },
+      { type: "link", label: "Desktop Layout", href: "/desk/desktop-layout" },
+      { type: "link", label: "Custom HTML Blocks", href: "/desk/custom-html-block" },
+      { type: "link", label: "Dashboard Chart Sources", href: "/desk/dashboard-chart-source" },
+    ],
   },
   {
     type: "section",
@@ -149,6 +167,7 @@ export const SYSTEM_NAV: NavSection[] = [
       { type: "link", label: "Workflow Builder", href: "/desk/workflow-builder" },
       { type: "link", label: "Web Forms", href: "/desk/web-forms" },
       { type: "link", label: "Onboarding", href: "/desk/onboarding" },
+      { type: "link", label: "Module Onboarding", href: "/desk/module-onboarding" },
     ],
   },
   {
@@ -165,6 +184,18 @@ export const SYSTEM_NAV: NavSection[] = [
       { type: "link", label: "Tags", href: "/desk/tags" },
     ],
   },
+  {
+    type: "section",
+    id: "settings",
+    label: "Settings",
+    items: [
+      { type: "link", label: "List View Settings", href: "/desk/list-view-settings" },
+      { type: "link", label: "Settings", href: "/desk/settings" },
+      { type: "link", label: "Notification Settings", href: "/desk/notification-settings" },
+      { type: "link", label: "Global Search Settings", href: "/desk/global-search-settings" },
+      { type: "link", label: "Dashboard Settings", href: "/desk/dashboard-settings" },
+    ],
+  },
 ];
 
 export const SYSTEM_DOCTYPES: Array<{ label: string; doctype: string }> = [
@@ -175,5 +206,8 @@ export const SYSTEM_DOCTYPES: Array<{ label: string; doctype: string }> = [
   { label: "System Settings", doctype: "System Settings" },
   { label: "Customize Form", doctype: "Customize Form" },
   { label: "Roles & Profiles", doctype: "Role Profile" },
+  { label: "Server Scripts", doctype: "Server Script" },
+  { label: "Translations", doctype: "Translation" },
+  { label: "Backups", doctype: "Backup" },
 ];
 

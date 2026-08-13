@@ -1,9 +1,47 @@
 "use client";
 
+import { useState } from "react";
 import { useBootInfo } from "@/lib/hooks/useBootInfo";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { frappePost } from "@/lib/frappe/client";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/shadcn/card";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import { Label } from "@/components/shadcn/label";
+import { Skeleton } from "@/components/Skeleton";
+import { toast } from "sonner";
+import { Mail, User as UserIcon, Globe, Shield, ImageIcon } from "lucide-react";
 
 export function SettingsClient() {
   const { data: bootInfo, isLoading } = useBootInfo();
+  const qc = useQueryClient();
+  const user = bootInfo?.user;
+
+  const [language, setLanguage] = useState(bootInfo?.lang ?? "");
+  const [timezone, setTimezone] = useState("");
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      await frappePost("api/resource/User", {
+        name: user?.name,
+        ...payload,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Settings saved");
+      qc.invalidateQueries({ queryKey: ["boot-info"] });
+    },
+    onError: () => toast.error("Failed to save settings"),
+  });
+
+  const handleSaveLanguage = () => {
+    saveMutation.mutate({ language });
+  };
+
+  const handleSaveTimezone = () => {
+    saveMutation.mutate({ timezone });
+  };
 
   if (isLoading) {
     return (
@@ -13,54 +51,74 @@ export function SettingsClient() {
     );
   }
 
-  const user = bootInfo?.user;
-
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Settings</h1>
+      <PageHeader title="Settings" description="Manage your account preferences" />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+          <Card className="p-6">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Profile</h2>
             <p className="mt-1 text-sm text-zinc-500">Your account information from Frappe.</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-zinc-500">Full Name</label>
-                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{user?.full_name || user?.first_name || "—"}</p>
+                <Label className="text-xs font-medium text-zinc-500">Full Name</Label>
+                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">
+                  {user?.full_name || user?.first_name || "—"}
+                </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500">Email</label>
+                <Label className="text-xs font-medium text-zinc-500">Email</Label>
                 <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{user?.email || "—"}</p>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500">Username</label>
+                <Label className="text-xs font-medium text-zinc-500">Username</Label>
                 <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{user?.name || "—"}</p>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500">Language</label>
-                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{bootInfo?.lang || "—"}</p>
+                <Label className="text-xs font-medium text-zinc-500">Language</Label>
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    placeholder="e.g. en, es, fr"
+                  />
+                  <Button size="sm" onClick={handleSaveLanguage} disabled={saveMutation.isPending}>
+                    Save
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+          <Card className="p-6">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">System</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-zinc-500">Theme</label>
-                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{bootInfo?.desk_theme || "System"}</p>
+                <Label className="text-xs font-medium text-zinc-500">Theme</Label>
+                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">
+                  {bootInfo?.desk_theme || "System"}
+                </p>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500">Timezone</label>
-                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">—</p>
+                <Label className="text-xs font-medium text-zinc-500">Timezone</Label>
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    placeholder="e.g. Asia/Kathmandu"
+                  />
+                  <Button size="sm" onClick={handleSaveTimezone} disabled={saveMutation.isPending}>
+                    Save
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+          <Card className="p-6">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Preferences</h2>
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -72,7 +130,7 @@ export function SettingsClient() {
                 <span className="text-xs text-zinc-500">{bootInfo?.notification_count ?? 0} unread</span>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>
