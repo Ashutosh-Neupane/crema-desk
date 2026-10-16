@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
 import { Input } from "@/components/shadcn/input";
-import { Label } from "@/components/shadcn/label";
 import { Skeleton } from "@/components/Skeleton";
 import { LayoutDashboard } from "lucide-react";
 

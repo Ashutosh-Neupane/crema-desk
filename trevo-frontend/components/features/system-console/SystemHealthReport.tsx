@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
-import { Activity, Database, Cpu, HardDrive, Wifi, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface HealthCheck {
   status: "healthy" | "warning" | "error";

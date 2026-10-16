@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { frappeMethod } from "@/lib/frappe/client";
 import { Card } from "@/components/shadcn/card";
-import { Button } from "@/components/shadcn/button";
 import { Badge } from "@/components/shadcn/badge";
 import { CheckCircle2, Loader2 } from "lucide-react";
 

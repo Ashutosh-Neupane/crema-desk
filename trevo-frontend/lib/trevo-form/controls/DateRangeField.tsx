@@ -4,11 +4,38 @@ import { useState, useCallback } from "react";
 import { CalendarIcon, X } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
 import { Card } from "@/components/shadcn/card";
-import { FieldControlProps } from "@/lib/trevo-form/controls";
+import type { FieldControlProps } from "@/lib/trevo-form/controls";
+
+/** Stored value is `{from, to}`, possibly JSON-encoded by the backend. */
+function parseRange(value: unknown): { from: string; to: string } {
+  let v = value;
+  if (typeof v === "string" && v.trim().startsWith("{")) {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      v = null;
+    }
+  }
+  if (v && typeof v === "object") {
+    const r = v as Record<string, unknown>;
+    return { from: String(r.from ?? ""), to: String(r.to ?? "") };
+  }
+  return { from: "", to: "" };
+}
 
 export default function DateRangeField({ field, value, onChange, disabled }: FieldControlProps) {
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
+  const [from, setFrom] = useState<string>(() => parseRange(value).from);
+  const [to, setTo] = useState<string>(() => parseRange(value).to);
+
+  // Re-sync when the document reloads or another control/script sets the value
+  const valueKey = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  const [syncedKey, setSyncedKey] = useState(valueKey);
+  if (syncedKey !== valueKey) {
+    const r = parseRange(value);
+    setSyncedKey(valueKey);
+    setFrom(r.from);
+    setTo(r.to);
+  }
 
   const applyRange = useCallback(() => {
     const range: Record<string, string> = {};

@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
-import { History, Trash2 } from "lucide-react";
+import { History } from "lucide-react";
 
 interface RouteHistoryDoc {
   name: string;

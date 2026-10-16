@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { FieldControlProps } from "@/lib/trevo-form/controls";
+import type { FieldControlProps } from "@/lib/trevo-form/controls";
 
 export default function MulticheckField({ field, value, onChange, disabled }: FieldControlProps) {
   const options = (field.options ?? "").split("\n").filter(Boolean);

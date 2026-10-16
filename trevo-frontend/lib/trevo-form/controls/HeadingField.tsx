@@ -1,6 +1,6 @@
 "use client";
 
-import { FieldControlProps } from "@/lib/trevo-form/controls";
+import type { FieldControlProps } from "@/lib/trevo-form/controls";
 
 export default function HeadingField({ field }: FieldControlProps) {
   return (

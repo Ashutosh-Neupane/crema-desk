@@ -12,7 +12,7 @@ import { Textarea } from "@/components/shadcn/textarea";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { toast } from "sonner";
-import { Plus, Trash2, ExternalLink, GripVertical } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 interface WebPageDoc {
   name: string;
@@ -78,7 +78,7 @@ export function WebsiteBuilder() {
         await frappePost("api/resource/Web Page", payload);
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast.success("Page saved");
       qc.invalidateQueries({ queryKey: ["web-pages"] });
     },

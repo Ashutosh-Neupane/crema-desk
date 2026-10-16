@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText } from "lucide-react";
 
 interface TemplateDoc {
   name: string;

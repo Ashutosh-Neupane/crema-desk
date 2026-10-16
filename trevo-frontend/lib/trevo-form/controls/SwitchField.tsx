@@ -1,6 +1,6 @@
 "use client";
 
-import { FieldControlProps } from "@/lib/trevo-form/controls";
+import type { FieldControlProps } from "@/lib/trevo-form/controls";
 
 export default function SwitchField({ field, value, onChange, disabled }: FieldControlProps) {
   const checked = value === true || value === 1 || value === "1";
