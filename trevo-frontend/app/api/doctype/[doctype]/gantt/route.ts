@@ -7,7 +7,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function GET(
   req: NextRequest,
@@ -29,7 +29,7 @@ export async function GET(
       ? `&filters=${encodeURIComponent(filters)}`
       : "";
 
-    const res = await fetch(
+    const res = await backendFetch(
       `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}?fields=["${titleField}","${startField}","${endField}","${progressField}","name","docstatus","modified"]&limit=500${filterParam}`,
       {
         headers: {

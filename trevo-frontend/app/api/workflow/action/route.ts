@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { backendFetch } from "@/lib/frappe/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const url = new URL(`${backendUrl}/api/method/frappe.model.workflow.apply`);
 
-    const res = await fetch(url.toString(), {
+    const res = await backendFetch(url.toString(), {
       method: "POST",
       headers: {
         Accept: "application/json",

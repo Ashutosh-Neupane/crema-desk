@@ -6,7 +6,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function POST(
   req: NextRequest,
@@ -26,7 +26,7 @@ export async function POST(
   const fileFormat = body.file_format ?? "CSV";
 
   try {
-    const res = await fetch(`${FRAPPE_BACKEND_URL}/api/method/frappe.desk.reportview.export_query`, {
+    const res = await backendFetch(`${FRAPPE_BACKEND_URL}/api/method/frappe.desk.reportview.export_query`, {
       method: "POST",
       headers: {
         Accept: "application/json, text/csv, application/vnd.ms-excel",

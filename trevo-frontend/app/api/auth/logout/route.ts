@@ -6,14 +6,14 @@
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function POST() {
   const cookieJar = await cookies();
   const cookieHeader = cookieJar.toString();
 
   try {
-    await fetch(`${FRAPPE_BACKEND_URL}/api/method/logout`, {
+    await backendFetch(`${FRAPPE_BACKEND_URL}/api/method/logout`, {
       method: "POST",
       headers: {
         Accept: "application/json",

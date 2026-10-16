@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function GET() {
   const cookieJar = await cookies();
@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(
+    const res = await backendFetch(
       `${FRAPPE_BACKEND_URL}/api/method/frappe.auth.get_logged_user`,
       {
         method: "GET",

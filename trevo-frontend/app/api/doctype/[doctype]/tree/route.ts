@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { backendFetch } from "@/lib/frappe/server";
 
 export async function GET(req: NextRequest) {
   const doctype = new URL(req.url).pathname.split("/").pop();
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     url.searchParams.set("order_by", "name asc");
     url.searchParams.set("limit", "1000");
 
-    const res = await fetch(url.toString(), {
+    const res = await backendFetch(url.toString(), {
       headers: {
         Accept: "application/json",
         "X-Frappe-CSRF-Token": "fetch",

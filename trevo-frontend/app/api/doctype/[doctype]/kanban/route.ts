@@ -9,7 +9,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function GET(
   _req: NextRequest,
@@ -21,7 +21,7 @@ export async function GET(
 
   // Fetch kanban boards for this doctype from Frappe
   try {
-    const res = await fetch(
+    const res = await backendFetch(
       `${FRAPPE_BACKEND_URL}/api/resource/Kanban Board?filters=${JSON.stringify(
         JSON.stringify([["reference_doctype", "=", doctype]]),
       )}&fields=["*"]`,
@@ -57,7 +57,7 @@ export async function GET(
     }));
 
     // Fetch cards for this board
-    const cardRes = await fetch(
+    const cardRes = await backendFetch(
       `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}?filters=${JSON.stringify(
         JSON.stringify([["kanban_board", "=", board.name]]),
       )}&limit=1000`,
@@ -117,7 +117,7 @@ export async function POST(
           return NextResponse.json({ error: "Missing card_id or column" }, { status: 400 });
         }
         // Fetch the current doc to get the column field name
-        const metaRes = await fetch(
+        const metaRes = await backendFetch(
           `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(card_id)}`,
           {
             headers: {
@@ -132,7 +132,7 @@ export async function POST(
         }
 
         // Update the column field
-        const updateRes = await fetch(
+        const updateRes = await backendFetch(
           `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(card_id)}`,
           {
             method: "PUT",
@@ -158,7 +158,7 @@ export async function POST(
         if (!data) {
           return NextResponse.json({ error: "Missing card data" }, { status: 400 });
         }
-        const createRes = await fetch(
+        const createRes = await backendFetch(
           `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}`,
           {
             method: "POST",
@@ -187,7 +187,7 @@ export async function POST(
         const colBody = body as { column_name?: string };
         if (!colBody.column_name) return NextResponse.json({ error: "column_name required" }, { status: 400 });
         // Find existing board for this doctype
-        const boardsRes = await fetch(
+        const boardsRes = await backendFetch(
           `${FRAPPE_BACKEND_URL}/api/resource/Kanban Board?filters=${JSON.stringify(JSON.stringify([["reference_doctype","=",doctype]]))}`,
           { headers: { Accept: "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) }, cache: "no-store" },
         );
@@ -197,7 +197,7 @@ export async function POST(
         // Append column
         const existing: Array<Record<string,unknown>> = boardDoc.columns ?? [];
         existing.push({ column_name: colBody.column_name, order: existing.length });
-        const upRes = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc.name)}`, {
+        const upRes = await backendFetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc.name)}`, {
           method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
           body: JSON.stringify({ columns: existing }),
         });
@@ -209,7 +209,7 @@ export async function POST(
       case "restore_column": {
         const colBody2 = body as { column_id?: string };
         if (!colBody2.column_id) return NextResponse.json({ error: "column_id required" }, { status: 400 });
-        const boardsRes2 = await fetch(
+        const boardsRes2 = await backendFetch(
           `${FRAPPE_BACKEND_URL}/api/resource/Kanban Board?filters=${JSON.stringify(JSON.stringify([["reference_doctype","=",doctype]]))}`,
           { headers: { Accept: "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) }, cache: "no-store" },
         );
@@ -220,7 +220,7 @@ export async function POST(
         const updatedCols = (boardDoc2.columns ?? []).map((c: Record<string,unknown>) =>
           c.column_name === colBody2.column_id ? { ...c, status: newStatus } : c,
         );
-        const upRes2 = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc2.name)}`, {
+        const upRes2 = await backendFetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board/${encodeURIComponent(boardDoc2.name)}`, {
           method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
           body: JSON.stringify({ columns: updatedCols }),
         });
@@ -231,7 +231,7 @@ export async function POST(
       case "create_board": {
         const createBody = body as { board_name?: string };
         if (!createBody.board_name) return NextResponse.json({ error: "board_name required" }, { status: 400 });
-        const createRes = await fetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board`, {
+        const createRes = await backendFetch(`${FRAPPE_BACKEND_URL}/api/resource/Kanban Board`, {
           method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json", ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
           body: JSON.stringify({
             doctype: "Kanban Board",

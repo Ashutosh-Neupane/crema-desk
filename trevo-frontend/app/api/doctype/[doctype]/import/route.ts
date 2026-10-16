@@ -7,7 +7,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function POST(
   req: NextRequest,
@@ -33,7 +33,7 @@ export async function POST(
     frappeFormData.append("import_type", importType);
     frappeFormData.append("submit_after", String(submitAfter));
 
-    const res = await fetch(
+    const res = await backendFetch(
       `${FRAPPE_BACKEND_URL}/api/method/frappe.data_import.importer.import_file`,
       {
         method: "POST",

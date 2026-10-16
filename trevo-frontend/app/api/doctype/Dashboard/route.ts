@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { backendFetch } from "@/lib/frappe/server";
 
 interface ReportResult {
   result: Array<Record<string, unknown>>;
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(`${backendUrl}/api/method/frappe.desk.dashboard.get`);
     url.searchParams.set("name", name || "default");
     
-    const res = await fetch(url.toString(), {
+    const res = await backendFetch(url.toString(), {
       headers: {
         Accept: "application/json",
         "X-Frappe-CSRF-Token": "fetch",
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
           const reportUrl = new URL(`${backendUrl}/api/method/frappe.desk.query_report.run`);
           reportUrl.searchParams.set("report_name", chartName);
           
-          const reportRes = await fetch(reportUrl.toString(), {
+          const reportRes = await backendFetch(reportUrl.toString(), {
             headers: {
               Accept: "application/json",
               "X-Frappe-CSRF-Token": "fetch",
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400 });
     }
 
-    const res = await fetch(`${backendUrl}/api/resource/Dashboard/${encodeURIComponent(name ?? "")}`, {
+    const res = await backendFetch(`${backendUrl}/api/resource/Dashboard/${encodeURIComponent(name ?? "")}`, {
       method: "PUT",
       headers: {
         Accept: "application/json",

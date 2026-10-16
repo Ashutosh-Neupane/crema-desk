@@ -7,7 +7,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 
 export async function POST(
   req: NextRequest,
@@ -37,7 +37,7 @@ export async function POST(
         // Delete multiple documents
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
               {
                 method: "DELETE",
@@ -61,7 +61,7 @@ export async function POST(
         // Submit multiple documents
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
               {
                 method: "PUT",
@@ -87,7 +87,7 @@ export async function POST(
         // Cancel multiple documents
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/method/frappe.client.cancel`,
               {
                 method: "POST",
@@ -120,7 +120,7 @@ export async function POST(
         }
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
               {
                 method: "PUT",
@@ -150,7 +150,7 @@ export async function POST(
         }
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/method/frappe.desk.form.assign_to.add`,
               {
                 method: "POST",
@@ -180,7 +180,7 @@ export async function POST(
         // Export selected documents as JSON
         const results = await Promise.allSettled(
           docnames.map((name) =>
-            fetch(
+            backendFetch(
               `${FRAPPE_BACKEND_URL}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
               {
                 method: "GET",
