@@ -10,7 +10,7 @@ build/
 dist/
 
 # Frappe backend (not part of frontend repo)
-frappe/
+/frappe/
 
 # Environment and secrets
 .env*
@@ -40,3 +40,6 @@ yarn-error.log*
 .idea/
 .vscode/
 *.pem
+
+# graphify code graph (rebuilt locally by git hooks)
+graphify-out/

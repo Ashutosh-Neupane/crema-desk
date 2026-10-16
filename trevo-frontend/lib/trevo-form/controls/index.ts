@@ -38,6 +38,7 @@ export { default as HTMLEditorField } from "./HTMLEditorField";
 export { default as PhoneField } from "./PhoneField";
 export { default as AutocompleteField } from "./AutocompleteField";
 export { default as MultiselectPillsField } from "./MultiselectPillsField";
+export { default as MultiselectField } from "./MultiselectField";
 export { default as AddressField } from "./AddressField";
 export { default as TimeField } from "./TimeField";
 export { default as PercentField } from "./PercentField";

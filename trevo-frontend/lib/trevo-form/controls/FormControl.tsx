@@ -31,7 +31,7 @@ import MarkdownField from "./MarkdownField";
 import HTMLEditorField from "./HTMLEditorField";
 import PhoneField from "./PhoneField";
 import AutocompleteField from "./AutocompleteField";
-import MultiselectPillsField from "./MultiselectPillsField";
+import MultiselectField from "./MultiselectField";
 import AddressField from "./AddressField";
 import TimeField from "./TimeField";
 import PercentField from "./PercentField";
@@ -60,7 +60,7 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
       case "Autocomplete":
         return <AutocompleteField {...props} />;
       case "MultiSelect":
-        return <MultiselectPillsField {...props} />;
+        return <MultiselectField {...props} />;
       case "Date":
         return <DateField {...props} />;
       case "Datetime":
