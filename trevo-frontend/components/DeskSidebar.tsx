@@ -23,11 +23,36 @@ import type { DeskNavigation, NavLinkItem, NavSection } from "@/lib/navigation";
 
 const ICONS = new Set<string>(iconNames);
 
-/** Frappe icon names are lucide names, sometimes with a style suffix. */
+/** Frappe's own module icons (v16 duotone set) → closest lucide icon */
+const FRAPPE_ICON_ALIASES: Record<string, string> = {
+  "asset-hand": "hand-coins",
+  "automation-cycle": "repeat",
+  "code-app": "code-xml",
+  "contacts-cards": "contact",
+  "data-table": "table",
+  "email-envelope": "mail",
+  "geo-globe": "globe",
+  "integrations-puzzle": "puzzle",
+  "printing-printer": "printer",
+  "quality-seal": "badge-check",
+  storefront: "store",
+  "shelf-rack": "package",
+  "system-monitor": "monitor-cog",
+  "website-browser": "app-window",
+  "workflow-builder": "workflow",
+  "gantt-chart": "chart-gantt",
+  sliders: "sliders-horizontal",
+};
+
+/** Frappe icon names are lucide names, sometimes with a style suffix, or Frappe-specific (aliased). */
 function toLucide(name?: string | null): IconName | null {
   if (!name) return null;
   const base = name.replace(/-(duotone|soft|fill|bold|light|thin)$/, "");
-  return ICONS.has(base) ? (base as IconName) : null;
+  const candidate = FRAPPE_ICON_ALIASES[base] ?? base;
+  if (ICONS.has(candidate)) return candidate as IconName;
+  // last resort: the most specific word ("shopping-cart" → "shopping-cart", "users-x" → "users")
+  const first = base.split("-")[0];
+  return ICONS.has(first) ? (first as IconName) : null;
 }
 
 export function SidebarIcon({ name, className = "h-4 w-4" }: { name?: string | null; className?: string }) {

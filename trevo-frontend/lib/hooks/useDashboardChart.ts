@@ -3,20 +3,36 @@
 import { useQuery } from "@tanstack/react-query";
 
 export interface ChartResult {
-  chart_type: "line" | "bar" | "percentage" | "donut" | string;
-  rows: Array<Record<string, unknown>>;
-  xKey: string;
-  yKey: string;
-  datasetNames?: string[];
-  title: string;
+  name: string;
+  /** visual: line | bar | donut | pie | percentage | heatmap */
+  type: string;
+  chart_type: string;
+  labels: string[];
+  datasets: Array<{ name: string; values: number[] }>;
+  timespan?: string;
+  time_interval?: string;
+  time_series?: boolean;
+  fieldtype?: string;
 }
 
 export interface NumberCardResult {
-  card_name: string;
+  name: string;
   label: string;
-  value: number | string | null;
-  doctype?: string;
-  color?: string;
+  value: number | null;
+  fieldtype: string;
+  currency: string | null;
+  color: string | null;
+  /** % change vs previous interval (show_percentage_stats) */
+  change: number | null;
+  interval: string;
+  doctype: string | null;
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as { error?: string }).error ?? "Request failed");
+  return json as T;
 }
 
 export function useDashboardChart(
@@ -25,29 +41,25 @@ export function useDashboardChart(
 ) {
   return useQuery<ChartResult>({
     queryKey: ["dashboard-chart", chartName, opts?.timespan, opts?.timegrain],
-    queryFn: async () => {
-      const params = new URLSearchParams({ chart_name: chartName! });
+    queryFn: () => {
+      const params = new URLSearchParams({ name: chartName! });
       if (opts?.timespan) params.set("timespan", opts.timespan);
-      if (opts?.timegrain) params.set("timegrain", opts.timegrain);
-      const res = await fetch(`/api/doctype/Dashboard/chart?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch chart");
-      return res.json();
+      if (opts?.timegrain) params.set("time_interval", opts.timegrain);
+      return getJson<ChartResult>(`/api/desk/chart?${params}`);
     },
     enabled: !!chartName,
     staleTime: 60_000,
+    retry: false,
   });
 }
 
 export function useNumberCard(cardName: string | null | undefined) {
   return useQuery<NumberCardResult>({
     queryKey: ["number-card", cardName],
-    queryFn: async () => {
-      const res = await fetch(`/api/doctype/Dashboard/number-card?card_name=${encodeURIComponent(cardName!)}`);
-      if (!res.ok) throw new Error("Failed to fetch number card");
-      return res.json();
-    },
+    queryFn: () => getJson<NumberCardResult>(`/api/desk/number-card?name=${encodeURIComponent(cardName!)}`),
     enabled: !!cardName,
     staleTime: 60_000,
-    refetchInterval: 120_000, // auto-refresh every 2 min
+    refetchInterval: 120_000,
+    retry: false,
   });
 }

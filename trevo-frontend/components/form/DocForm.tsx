@@ -23,6 +23,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/components/DocumentActions";
+import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { FormSkeleton } from "@/components/Skeleton";
@@ -129,6 +130,7 @@ export default function DocForm({ doctype, name }: Props) {
     if (!name) return;
     try {
       const { doc: d, docinfo: info } = await getDoc(doctype, name);
+      addRecentDoc({ doctype, name: d.name, title: typeof d.title === "string" ? d.title : undefined });
       setDoc(d);
       setDocinfo(info);
       setDirty(false);

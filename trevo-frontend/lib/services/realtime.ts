@@ -21,10 +21,14 @@
 import React from "react";
 import { io, type Socket } from "socket.io-client";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_FRAPPE_BASE_URL ??
-  process.env.FRAPPE_BACKEND_URL ??
-  "http://localhost:8000";
+/**
+ * Frappe's socket.io server (the bench's `socketio` process, port 9000 by
+ * default) and the site namespace it serves. Realtime is off — no connection
+ * attempts, no console noise — unless NEXT_PUBLIC_SOCKETIO_URL is set.
+ */
+const SOCKETIO_URL = process.env.NEXT_PUBLIC_SOCKETIO_URL ?? "";
+const SITE_NAME = process.env.NEXT_PUBLIC_FRAPPE_SITE_NAME ?? "";
+export const REALTIME_ENABLED = !!SOCKETIO_URL;
 
 let socket: Socket | null = null;
 let connecting = false;
@@ -58,36 +62,31 @@ export function useRealtimeStatus() {
   );
 }
 
-/** Read the Frappe `sid` cookie (set by /api/auth/login via the BFF). */
-function getSid(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)sid=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function getSocketHost(): string {
-  // Frappe serves socket.io on the backend host. Try to derive it from the
-  // backend URL (strip any path).
-  try {
-    const u = new URL(BACKEND_URL);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return "http://localhost:8000";
-  }
+function getSocketUrl(): string {
+  // v15+: one namespace per site — io("<socketio>/<site>")
+  const base = SOCKETIO_URL.replace(/\/$/, "");
+  const site = SITE_NAME || (() => {
+    try {
+      return new URL(base).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  return site ? `${base}/${site}` : base;
 }
 
 export function getRealtimeSocket(): Socket {
   if (socket) return socket;
 
-  const sid = getSid();
-  socket = io(getSocketHost(), {
+  // Auth is the `sid` cookie (same hostname, so the browser sends it to the socket port too)
+  socket = io(getSocketUrl(), {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     withCredentials: true,
-    query: sid ? { sid } : {},
     reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 30000,
   });
 
   socket.on("connect", () => {
@@ -141,7 +140,7 @@ export function getRealtimeSocket(): Socket {
 }
 
 export function connectRealtime(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !REALTIME_ENABLED) return;
   if (socket || connecting) return;
   connecting = true;
   setStatus("connecting");
@@ -170,6 +169,7 @@ export function subscribeToRealtime<T = unknown>(
   event: string,
   handler: (data: T) => void,
 ): () => void {
+  if (!REALTIME_ENABLED || typeof window === "undefined") return () => {};
   const s = getRealtimeSocket();
   pendingHandlers += 1;
   s.on(event, handler as (...args: unknown[]) => void);
