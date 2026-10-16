@@ -22,7 +22,9 @@ export function useNavigation() {
       return (await res.json()) as DeskNavigation;
     },
     staleTime: 5 * 60 * 1000,
-    initialData: EMPTY_NAV,
+    // placeholder, not initialData: initialData counts as fresh and would
+    // suppress the real fetch for the whole staleTime
+    placeholderData: EMPTY_NAV,
   });
 }
 

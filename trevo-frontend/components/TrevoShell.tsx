@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/frappe/auth";
 import { useUIStore } from "@/lib/stores/ui.store";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import CommandPalette from "@/components/CommandPalette";
+import DeskSidebar from "@/components/DeskSidebar";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useRealtimeStatus } from "@/lib/services/realtime";
@@ -433,11 +434,7 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
           aria-label="Sidebar navigation"
           aria-hidden={!sidebarOpen}
         >
-          <div className="flex h-full flex-col overflow-y-auto p-3">
-            {sections.map((section) => (
-              <NavSection key={section.id} section={section} />
-            ))}
-          </div>
+          <DeskSidebar navigation={{ ...(navigation ?? FALLBACK_NAV), sections }} />
         </aside>
 
         {/* Main content */}

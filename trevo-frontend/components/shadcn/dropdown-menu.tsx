@@ -10,12 +10,57 @@ function useDropdown() {
   return ctx;
 }
 
-export function DropdownMenu({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode }) {
+/**
+ * Controlled (`open` + `onOpenChange`) or uncontrolled. Closes on outside
+ * click and Escape.
+ */
+export function DropdownMenu({
+  open: openProp,
+  onOpenChange,
+  children,
+  className = "",
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [openState, setOpenState] = React.useState(false);
+  const open = openProp ?? openState;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (openProp === undefined) setOpenState(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, setOpen]);
+
   return (
-    <DropdownContext.Provider value={{ open, setOpen: onOpenChange }}>
-      <div className="relative">{children}</div>
+    <DropdownContext.Provider value={{ open, setOpen }}>
+      <div ref={ref} className={`relative ${className}`}>{children}</div>
     </DropdownContext.Provider>
   );
+}
+
+export function DropdownMenuLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`px-3 pb-1 pt-2 text-xs font-medium text-zinc-500 ${className}`}>{children}</div>;
 }
 
 export function DropdownMenuTrigger({ children, ...props }: { children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
