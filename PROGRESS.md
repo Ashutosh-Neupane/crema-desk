@@ -2,6 +2,28 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
+Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):
+- `e2e/form.salesorder.mjs` — new SO: customer → party details, item → rate (get_item_details), live totals,
+  Link validation, delivery date to rows, save (server totals), submit, cancel, amend, delete
+- `e2e/scripts.salesorder.mjs` — Client Script (refresh intro/button, customer, child qty, validate throw) and
+  Server Scripts (Before Validate sets po_date, Before Save throws) all behave like Desk
+- `e2e/list.salesorder.mjs`, `e2e/crud.todo.mjs`, `e2e/doctype.create.mjs` (Frappe's Create New DocType dialog →
+  form builder → record)
+Built: desk runtime (runs app __js/__list_js/Client Scripts), FormController, Grid, FormBody, ERPNext transaction
+adapter, frappe.ui.Dialog host, Form Builder, calendar picker, Desk shortcuts, dashboards/workspaces/home.
+React Doctor: 0 errors (from 10), score 33 → 65; 70 dead files removed.
+Bench config: developer_mode, server_script_enabled, socketio (:9001) — see bench-vendor/docker/init.sh.
+
+Next
+1. Tree view route (/desk/doctype/X/view/tree) — list already offers it for tree DocTypes
+2. /desk/query-report/<name> (Script/Query reports with filters + chart) — sidebar/⌘K link there
+3. Report view (editable grid of a DocType) and saved list settings
+4. Rebuild removed prototypes properly when needed: Kanban, Gantt, workflow actions on forms, bulk edit,
+   data import/export, Inbox compose (currently not wired)
+5. Remaining React Doctor warnings (112): component complexity, positional keys
+6. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
+
 ## 2026-10-16 — session 1 (cont.): v16 compatibility + Desk-style forms
 Verified in browser (Playwright) against vendor1.localhost
 - Login (username or email), sidebar = Desk v16 module tree, ⌘K awesomebar (lists/new/reports/workspaces/docs)
