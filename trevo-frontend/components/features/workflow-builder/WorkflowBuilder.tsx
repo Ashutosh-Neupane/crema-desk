@@ -331,7 +331,7 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             </div>
             <div>
               <Label>Color</Label>
-              <input
+              <input aria-label="State color"
                 type="color"
                 value={editingState?.color ?? "#3b82f6"}
                 onChange={(e) => setEditingState((prev) => prev ? { ...prev, color: e.target.value } : null)}
@@ -384,7 +384,7 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>From State</Label>
-                <select
+                <select aria-label="From state"
                   value={editingTransition?.fromState ?? ""}
                   onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, fromState: e.target.value } : null)}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
@@ -396,7 +396,7 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               </div>
               <div>
                 <Label>To State</Label>
-                <select
+                <select aria-label="To state"
                   value={editingTransition?.toState ?? ""}
                   onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, toState: e.target.value } : null)}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"

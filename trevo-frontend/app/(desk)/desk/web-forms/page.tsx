@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -15,6 +15,15 @@ import { toast } from "sonner";
  * - ?edit=<name>: shows WebFormBuilder for that web form
  */
 export default function WebFormsPage() {
+  // useSearchParams needs a Suspense boundary or the whole route renders client-side
+  return (
+    <Suspense>
+      <WebFormsContent />
+    </Suspense>
+  );
+}
+
+function WebFormsContent() {
   const searchParams = useSearchParams();
   const editName = searchParams.get("edit") ?? "";
 

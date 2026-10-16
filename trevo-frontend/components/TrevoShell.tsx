@@ -245,9 +245,9 @@ function NavSection({ section, depth = 0 }: { section: DeskNavigation["sections"
         </div>
       )}
       <nav className="flex flex-col gap-0.5">
-        {section.items.map((item, i) =>
+        {section.items.map((item) =>
           item.type === "link" ? (
-            <NavLink key={i} href={item.href} label={item.label} icon={item.icon} color={item.color} depth={depth} />
+            <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} color={item.color} depth={depth} />
           ) : (
             <NavSection key={item.id} section={item} depth={depth + 1} />
           ),

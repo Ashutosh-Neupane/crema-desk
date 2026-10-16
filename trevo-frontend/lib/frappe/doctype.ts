@@ -78,10 +78,11 @@ export async function fetchDoctypeMetaClient(doctype: string): Promise<DocTypeMe
     cache: "no-store", // meta changes as soon as a DocType / Customize Form is saved
     headers: { Accept: "application/json" },
   });
-  const json = (await res.json().catch(() => null)) as (GetDoctypeResponse & { exception?: string }) | null;
   if (!res.ok) {
-    throw new Error(json?.exception?.split("\n").filter(Boolean).pop() ?? `Failed to load DocType "${doctype}"`);
+    const err = (await res.json().catch(() => null)) as { exception?: string } | null;
+    throw new Error(err?.exception?.split("\n").filter(Boolean).pop() ?? `Failed to load DocType "${doctype}"`);
   }
+  const json = (await res.json().catch(() => null)) as GetDoctypeResponse | null;
   primeDoctypeMetaCache(json?.docs ?? []);
   return pickMeta(json, doctype);
 }

@@ -25,12 +25,15 @@ export default async function WwwCatchAllPage({ params }: WwwRouteProps) {
   return (
     <>
       {/* Backend stylesheets for this page (bootstrap / frappe.css / page css) */}
+      {/* Frappe website pages are site-authored content rendered as-is, exactly like Frappe's own /www */}
+      {/* react-doctor-disable-next-line dangerous-html-sink */}
       <div aria-hidden="true" dangerouslySetInnerHTML={{ __html: result.stylesHtml }} />
       {!result.ok && (
         <div className="border-b border-yellow-200 bg-yellow-50 px-4 py-1.5 text-xs text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300">
           {result.error ?? `Backend responded with ${result.status}`}
         </div>
       )}
+      {/* react-doctor-disable-next-line dangerous-html-sink */}
       <div className="frappe-www-body" dangerouslySetInnerHTML={{ __html: result.bodyHtml }} />
     </>
   );

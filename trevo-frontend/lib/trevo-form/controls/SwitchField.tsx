@@ -8,12 +8,12 @@ export default function SwitchField({ field, value, onChange, disabled }: FieldC
   return (
     <div className="flex flex-col gap-1.5">
       {field.label && (
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label}
           {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
-        </label>
+        </span>
       )}
-      <button
+      <button aria-label={field.label || field.fieldname}
         type="button"
         role="switch"
         aria-checked={checked}

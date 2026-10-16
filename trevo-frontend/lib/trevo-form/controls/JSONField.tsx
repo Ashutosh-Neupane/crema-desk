@@ -25,7 +25,7 @@ export default function JSONField({ field, value, onChange, disabled }: FieldCon
 
   return (
     <div className="space-y-1">
-      <textarea
+      <textarea aria-label={field.label || field.fieldname}
         value={text}
         onChange={(e) => handleChange(e.target.value)}
         disabled={disabled || !!field.read_only}

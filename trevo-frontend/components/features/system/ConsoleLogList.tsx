@@ -7,6 +7,7 @@ import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { Terminal } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface ConsoleLogDoc {
   name: string;
@@ -70,7 +71,7 @@ export function ConsoleLogList() {
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs text-zinc-500">{log.log_type}</span>
                 <span className="text-xs text-zinc-400">
-                  {new Date(log.creation).toLocaleString()}
+                  {formatDateTime(log.creation)}
                 </span>
               </div>
               <p className="mt-1 text-zinc-700 dark:text-zinc-300 line-clamp-2">

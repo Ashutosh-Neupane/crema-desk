@@ -22,6 +22,7 @@ import {
   Languages,
   Edit3,
 } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface TranslationDoc {
   name: string;
@@ -174,7 +175,7 @@ const { data: languages = [] } = useQuery({
             className="h-8 pl-8 text-xs"
           />
         </div>
-        <select
+        <select aria-label="Filter by language"
           value={selectedLanguage}
           onChange={(e) => setSelectedLanguage(e.target.value)}
           className="h-8 rounded-lg border border-zinc-300 px-3 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -208,7 +209,7 @@ const { data: languages = [] } = useQuery({
             placeholder="Translation"
             className="h-8 text-xs"
           />
-          <select
+          <select aria-label="Language"
             value={newTranslation.language}
             onChange={(e) => setNewTranslation((prev) => ({ ...prev, language: e.target.value }))}
             className="h-8 rounded-lg border border-zinc-300 px-3 text-xs dark:border-zinc-700 dark:bg-zinc-800"
@@ -258,7 +259,7 @@ const { data: languages = [] } = useQuery({
                   </td>
                   <td className="px-4 py-2 text-zinc-700 dark:text-zinc-300 max-w-xs truncate">{t.source_text}</td>
                   <td className="px-4 py-2 text-zinc-700 dark:text-zinc-300 max-w-xs truncate">{t.translated_text}</td>
-                  <td className="px-4 py-2 text-xs text-zinc-500">{new Date(t.modified).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-xs text-zinc-500">{formatDateTime(t.modified, false)}</td>
                   <td className="px-4 py-2">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(t)}>
                       <Edit3 className="h-3 w-3" />

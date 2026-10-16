@@ -1,5 +1,6 @@
 /** Cell formatting for list/report views (Desk: frappe.format with doc context). */
 import type { DocField } from "@/lib/frappe/types";
+import { numberFormat } from "@/lib/utils/formatNumber";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -36,7 +37,7 @@ export function formatCell(
       const cur = (opt && (typeof doc[opt] === "string" ? (doc[opt] as string) : opt.includes(":") ? "" : undefined)) || (doc.currency as string) || ctx.currency;
       const n = Number(value);
       try {
-        return cur ? new Intl.NumberFormat("en", { style: "currency", currency: cur, maximumFractionDigits: 2 }).format(n) : n.toLocaleString("en", { maximumFractionDigits: 2 });
+        return cur ? numberFormat({ style: "currency", currency: cur, maximumFractionDigits: 2 }).format(n) : numberFormat({ maximumFractionDigits: 2 }).format(n);
       } catch {
         return `${cur ?? ""} ${n.toLocaleString("en", { maximumFractionDigits: 2 })}`.trim();
       }

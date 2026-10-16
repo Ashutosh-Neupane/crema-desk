@@ -278,7 +278,7 @@ export function PrintFormatBuilder({
                         </p>
                         <p className="truncate text-[10px] text-zinc-500">{field.fieldname}</p>
                       </div>
-                      <button
+                      <button aria-label="Remove field"
                         onClick={() => removeField(section.id, fieldIndex)}
                         className="opacity-0 group-hover:opacity-100 text-red-500 transition-opacity"
                       >
@@ -307,7 +307,7 @@ export function PrintFormatBuilder({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Page Size</Label>
-                <select
+                <select aria-label="Page size"
                   value={config.pageSize}
                   onChange={(e) => setConfig((prev) => ({ ...prev, pageSize: e.target.value as "A4" | "Letter" | "Legal" }))}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -319,7 +319,7 @@ export function PrintFormatBuilder({
               </div>
               <div>
                 <Label>Orientation</Label>
-                <select
+                <select aria-label="Orientation"
                   value={config.orientation}
                   onChange={(e) => setConfig((prev) => ({ ...prev, orientation: e.target.value as "portrait" | "landscape" }))}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -344,7 +344,7 @@ export function PrintFormatBuilder({
         <TabsContent value="css">
           <Card className="p-4">
             <Label>Custom CSS</Label>
-            <textarea
+            <textarea aria-label="Custom HTML"
               value={config.css ?? ""}
               onChange={(e) => setConfig((prev) => ({ ...prev, css: e.target.value }))}
               className="mt-1 h-64 w-full rounded-lg border border-zinc-300 p-3 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -363,7 +363,7 @@ export function PrintFormatBuilder({
           <div className="space-y-4">
             <div>
               <Label>Field Type</Label>
-              <select
+              <select aria-label="Field type"
                 value={editingField?.type ?? "field"}
                 onChange={(e) => setEditingField((prev) => prev ? { ...prev, type: e.target.value as PrintField["type"] } : null)}
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -386,7 +386,7 @@ export function PrintFormatBuilder({
             {editingField?.type === "field" && (
               <div>
                 <Label>DocField</Label>
-                <select
+                <select aria-label="DocField"
                   value={editingField?.fieldname ?? ""}
                   onChange={(e) => {
                     const field = fields.find((f) => f.fieldname === e.target.value);
@@ -415,7 +415,7 @@ export function PrintFormatBuilder({
               </div>
               <div>
                 <Label>Align</Label>
-                <select
+                <select aria-label="Alignment"
                   value={editingField?.align ?? "left"}
                   onChange={(e) => setEditingField((prev) => prev ? { ...prev, align: e.target.value as "left" | "center" | "right" } : null)}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -448,6 +448,7 @@ export function PrintFormatBuilder({
           </DialogHeader>
           <div className="flex-1 overflow-auto border rounded-lg">
             <iframe
+              sandbox=""
               srcDoc={previewHtml}
               className="w-full h-full min-h-[60vh]"
               title="Print Preview"

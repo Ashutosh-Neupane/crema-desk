@@ -286,13 +286,13 @@ export function FileBrowser({ doctype, docname }: FileBrowserProps) {
             </div>
 
             <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
-              <button
+              <button aria-label="List view"
                 onClick={() => setViewMode("list")}
                 className={`p-1.5 ${viewMode === "list" ? "bg-zinc-100 dark:bg-zinc-700" : ""}`}
               >
                 <List className="h-4 w-4" />
               </button>
-              <button
+              <button aria-label="Grid view"
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 ${viewMode === "grid" ? "bg-zinc-100 dark:bg-zinc-700" : ""}`}
               >
@@ -435,7 +435,7 @@ export function FileBrowser({ doctype, docname }: FileBrowserProps) {
                           >
                             <span className="text-xs">R</span>
                           </Button>
-                          <a href={file.file_url} download target="_blank" rel="noopener noreferrer">
+                          <a aria-label={`Download ${file.file_name ?? "file"}`} href={file.file_url} download target="_blank" rel="noopener noreferrer">
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                               <Download className="h-3 w-3" />
                             </Button>
@@ -469,7 +469,7 @@ export function FileBrowser({ doctype, docname }: FileBrowserProps) {
             <p className="text-sm text-zinc-500">
               Upload to folder: <strong>{currentFolder}</strong>
             </p>
-            <input
+            <input aria-label="File to upload"
               type="file"
               onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-zinc-600 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-800 dark:file:bg-zinc-100 dark:file:text-zinc-900 dark:hover:file:bg-zinc-200"
@@ -569,11 +569,10 @@ export function FileBrowser({ doctype, docname }: FileBrowserProps) {
                 className="w-full rounded-lg"
               />
             ) : previewFile?.file_type === "application/pdf" ? (
-              <iframe
-                src={previewFile.file_url}
-                className="h-96 w-full rounded-lg border"
-                title={previewFile.file_name}
-              />
+              // <object> renders PDFs without giving an embedded page script access to Trevo
+              <object data={previewFile.file_url} type="application/pdf" className="h-96 w-full rounded-lg border" aria-label={previewFile.file_name}>
+                <a href={previewFile.file_url} target="_blank" rel="noopener noreferrer" className="text-sm underline">Open {previewFile.file_name}</a>
+              </object>
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 p-8">
                 <FileText className="h-12 w-12 text-zinc-400" />

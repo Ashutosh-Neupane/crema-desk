@@ -201,7 +201,7 @@ export function ShareDialog({ open, onOpenChange, doctype, name }: ShareDialogPr
                 <span className="flex-1 truncate text-sm text-zinc-700 dark:text-zinc-300">
                   {selectedUser}
                 </span>
-                <button
+                <button aria-label="Clear selected user"
                   onClick={() => {
                     setSelectedUser("");
                     setUserQuery("");

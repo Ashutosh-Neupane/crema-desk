@@ -187,7 +187,7 @@ export function WebFormBuilder({ initialConfig, onSave, onPublish }: WebFormBuil
                       onChange={(e) => updateField(index, { label: e.target.value, fieldname: field.fieldname || e.target.value.toLowerCase().replace(/\s+/g, "_") })}
                       placeholder="Field label"
                     />
-                    <select
+                    <select aria-label="Field type"
                       value={field.fieldtype}
                       onChange={(e) => updateField(index, { fieldtype: e.target.value })}
                       className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
@@ -206,13 +206,13 @@ export function WebFormBuilder({ initialConfig, onSave, onPublish }: WebFormBuil
                     Required
                   </label>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => moveField(index, "up")} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" disabled={index === 0}>
+                    <button aria-label="Move field up" onClick={() => moveField(index, "up")} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" disabled={index === 0}>
                       ↑
                     </button>
-                    <button onClick={() => moveField(index, "down")} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" disabled={index === config.fields.length - 1}>
+                    <button aria-label="Move field down" onClick={() => moveField(index, "down")} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" disabled={index === config.fields.length - 1}>
                       ↓
                     </button>
-                    <button onClick={() => removeField(index)} className="p-1 hover:bg-red-50 text-red-600 dark:hover:bg-red-900/20 rounded">
+                    <button aria-label="Remove field" onClick={() => removeField(index)} className="p-1 hover:bg-red-50 text-red-600 dark:hover:bg-red-900/20 rounded">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -238,19 +238,19 @@ export function WebFormBuilder({ initialConfig, onSave, onPublish }: WebFormBuil
                 </Label>
                 <div className="mt-1">
                   {field.fieldtype === "Text" || field.fieldtype === "Small Text" ? (
-                    <textarea className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" rows={3} readOnly />
+                    <textarea aria-label={field.label || "Preview"} className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" rows={3} readOnly />
                   ) : field.fieldtype === "Check" ? (
-                    <input type="checkbox" className="rounded" disabled />
+                    <input aria-label={field.label || "Preview"} type="checkbox" className="rounded" disabled />
                   ) : field.fieldtype === "Select" ? (
-                    <select className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled>
+                    <select aria-label={field.label || "Preview"} className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled>
                       <option>Select an option</option>
                     </select>
                   ) : field.fieldtype === "Date" ? (
-                    <input type="date" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
+                    <input aria-label={field.label || "Preview"} type="date" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
                   ) : field.fieldtype === "Int" || field.fieldtype === "Float" ? (
-                    <input type="number" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
+                    <input aria-label={field.label || "Preview"} type="number" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
                   ) : field.fieldtype === "Email" ? (
-                    <input type="email" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
+                    <input aria-label={field.label || "Preview"} type="email" className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" disabled />
                   ) : (
                     <Input disabled />
                   )}
@@ -278,7 +278,7 @@ export function WebFormBuilder({ initialConfig, onSave, onPublish }: WebFormBuil
             </div>
             <div>
               <Label>Description</Label>
-              <textarea
+              <textarea aria-label="Description"
                 value={config.description}
                 onChange={(e) => setConfig((c) => ({ ...c, description: e.target.value }))}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
@@ -291,7 +291,7 @@ export function WebFormBuilder({ initialConfig, onSave, onPublish }: WebFormBuil
             </div>
             <div>
               <Label>Success Message</Label>
-              <textarea
+              <textarea aria-label="Success message"
                 value={config.successMessage}
                 onChange={(e) => setConfig((c) => ({ ...c, successMessage: e.target.value }))}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"

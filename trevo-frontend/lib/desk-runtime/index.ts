@@ -340,7 +340,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       // `with` resolves every free identifier through the scope proxy (sloppy-mode Function body).
       // Running the site's own app/client JS is the point here — Desk evals the same code.
       // eslint-disable-next-line no-new-func
-      const fn = new Function("__scope", `with (__scope) {\n${code}\n}`);
+      const fn = new Function("__scope", `with (__scope) {\n${code}\n}`); // react-doctor-disable-line no-eval
       fn(scope);
       return true;
     } catch (err) {

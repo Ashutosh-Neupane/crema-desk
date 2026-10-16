@@ -10,7 +10,7 @@ export default function SelectField({ field, inputId, value, onChange, disabled,
   const selected = typeof value === "string" ? value : "";
 
   return (
-    <select
+    <select aria-label={field.label || field.fieldname}
       id={inputId ?? field.fieldname}
       value={selected}
       onChange={(e) => onChange(e.target.value || null)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useSyncExternalStore } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useList } from "@/lib/hooks/useList";
@@ -9,7 +9,13 @@ import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { CalendarSkeleton } from "@/components/Skeleton";
 
+const subscribeNoop = () => () => {};
+const getToday = () => new Date().toDateString();
+
 export default function CalendarPage() {
+  // server and first client render agree (no "today" highlight until hydrated)
+  const todayKey = useSyncExternalStore(subscribeNoop, getToday, () => "");
+  const today = todayKey ? new Date(todayKey) : null;
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -25,11 +31,12 @@ export default function CalendarPage() {
   const monthStartStr = format(monthStart, "yyyy-MM-dd");
   const monthEndStr = format(monthEnd, "yyyy-MM-dd");
 
-  const calendarFilters = [["start", "Between", [monthStartStr, monthEndStr] as unknown]] as FilterCondition[];
+  // Frappe Event: starts_on / ends_on (there is no start/end column)
+  const calendarFilters = [["starts_on", "Between", [monthStartStr, monthEndStr] as unknown]] as FilterCondition[];
   const { data: events, isLoading: eventsLoading } = useList("Event", {
-    fields: ["name", "subject", "event_type", "start", "end", "color"],
+    fields: ["name", "subject", "event_type", "starts_on", "ends_on", "color"],
     filters: calendarFilters,
-    order_by: "start asc",
+    order_by: "starts_on asc",
     limit: 100,
   });
 
@@ -46,7 +53,8 @@ export default function CalendarPage() {
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Array<Record<string, unknown>>>();
     for (const ev of events ?? []) {
-      const dateStr = format(parseISO(String(ev.start ?? "")), "yyyy-MM-dd");
+      if (!ev.starts_on) continue;
+      const dateStr = format(parseISO(String(ev.starts_on).replace(" ", "T")), "yyyy-MM-dd");
       const list = map.get(dateStr) ?? [];
       list.push(ev);
       map.set(dateStr, list);
@@ -88,7 +96,7 @@ export default function CalendarPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Calendar</h1>
             <div className="flex items-center gap-2">
-              <button
+              <button aria-label="Previous month"
                 onClick={prevMonth}
                 className="rounded-lg border border-zinc-300 p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
@@ -97,7 +105,7 @@ export default function CalendarPage() {
               <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 min-w-[140px] text-center">
                 {format(currentMonth, "MMMM yyyy")}
               </span>
-              <button
+              <button aria-label="Next month"
                 onClick={nextMonth}
                 className="rounded-lg border border-zinc-300 p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
@@ -123,7 +131,7 @@ export default function CalendarPage() {
                   ))}
 
                   {days.map((day) => {
-                    const isToday = isSameDay(day, new Date());
+                    const isToday = !!today && isSameDay(day, today);
                     const dayEvents = getEventsForDay(day);
 
                     return (

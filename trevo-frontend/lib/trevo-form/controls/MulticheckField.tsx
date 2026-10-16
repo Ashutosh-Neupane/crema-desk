@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { FieldControlProps } from "@/lib/trevo-form/controls";
 
 export default function MulticheckField({ field, value, onChange, disabled }: FieldControlProps) {
   const options = (field.options ?? "").split("\n").filter(Boolean);
-  const selected = Array.isArray(value) ? value : [];
+  const selected = useMemo(() => Array.isArray(value) ? value : [], [value]);
+  const selectedSet = new Set<unknown>(selected);
 
   const toggle = useCallback(
     (opt: string) => {
@@ -20,17 +21,17 @@ export default function MulticheckField({ field, value, onChange, disabled }: Fi
   return (
     <div className="flex flex-col gap-1.5">
       {field.label && (
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label}
           {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
-        </label>
+        </span>
       )}
       <div className="flex flex-col gap-1.5">
         {options.map((opt) => (
           <label key={opt} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={selected.includes(opt)}
+              checked={selectedSet.has(opt)}
               onChange={() => toggle(opt)}
               disabled={disabled || !!field.read_only}
               className="rounded border-zinc-300"

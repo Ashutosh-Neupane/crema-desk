@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { X } from "lucide-react";
 import type { FieldControlProps } from "@/lib/trevo-form/controls";
 
 export default function MultiselectField({ field, value, onChange, disabled }: FieldControlProps) {
   const [open, setOpen] = useState(false);
   const options = (field.options ?? "").split("\n").filter(Boolean);
-  const selected = Array.isArray(value) ? value : [];
+  const selected = useMemo(() => Array.isArray(value) ? value : [], [value]);
+  const selectedSet = new Set<unknown>(selected);
 
   const toggle = useCallback(
     (opt: string) => {
@@ -29,10 +30,10 @@ export default function MultiselectField({ field, value, onChange, disabled }: F
   return (
     <div className="flex flex-col gap-1.5 relative">
       {field.label && (
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label}
           {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
-        </label>
+        </span>
       )}
       <div
         className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
@@ -48,7 +49,7 @@ export default function MultiselectField({ field, value, onChange, disabled }: F
               className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
             >
               {String(opt)}
-              <button
+              <button aria-label={`Remove ${String(opt)}`}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -72,7 +73,7 @@ export default function MultiselectField({ field, value, onChange, disabled }: F
             >
               <input
                 type="checkbox"
-                checked={selected.includes(opt)}
+                checked={selectedSet.has(opt)}
                 onChange={() => toggle(opt)}
                 disabled={disabled || !!field.read_only}
                 className="rounded border-zinc-300"

@@ -116,19 +116,19 @@ export function ImageView({ doctype, docname }: ImageViewProps) {
             </div>
           ) : lightboxIndex !== null && images[lightboxIndex] ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={closeLightbox} onKeyDown={(e) => { if (e.key === "Escape") closeLightbox(); }}>
-              <button
+              <button aria-label="Previous image"
                 onClick={(e) => { e.stopPropagation(); navigateLightbox("prev"); }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
-              <button
+              <button aria-label="Next image"
                 onClick={(e) => { e.stopPropagation(); navigateLightbox("next"); }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
-              <button
+              <button aria-label="Close"
                 onClick={closeLightbox}
                 className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
               >

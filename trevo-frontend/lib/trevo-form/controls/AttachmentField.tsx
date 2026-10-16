@@ -114,7 +114,7 @@ export default function AttachmentField({ field, value, onChange: _onChange, dis
                 )}
               </div>
               {!disabled && !field.read_only && (
-                <button
+                <button aria-label="Remove file"
                   type="button"
                   onClick={() => removeFile(i)}
                   className="text-zinc-400 hover:text-red-600"

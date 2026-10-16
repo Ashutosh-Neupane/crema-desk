@@ -95,7 +95,7 @@ export function WebFormView({
             </Label>
             <div className="mt-1">
               {field.fieldtype === "Text" || field.fieldtype === "Small Text" || field.fieldtype === "Long Text" ? (
-                <textarea
+                <textarea aria-label={field.label}
                   value={(values[field.fieldname] as string) ?? ""}
                   onChange={(e) => handleChange(field.fieldname, e.target.value)}
                   required={field.required}
@@ -103,14 +103,14 @@ export function WebFormView({
                   rows={3}
                 />
               ) : field.fieldtype === "Check" ? (
-                <input
+                <input aria-label={field.label}
                   type="checkbox"
                   checked={(values[field.fieldname] as boolean) ?? false}
                   onChange={(e) => handleChange(field.fieldname, e.target.checked)}
                   className="rounded"
                 />
               ) : field.fieldtype === "Select" ? (
-                <select
+                <select aria-label={field.label}
                   value={(values[field.fieldname] as string) ?? ""}
                   onChange={(e) => handleChange(field.fieldname, e.target.value)}
                   required={field.required}
@@ -122,7 +122,7 @@ export function WebFormView({
                   ))}
                 </select>
               ) : field.fieldtype === "Date" ? (
-                <input
+                <input aria-label={field.label}
                   type="date"
                   value={(values[field.fieldname] as string) ?? ""}
                   onChange={(e) => handleChange(field.fieldname, e.target.value)}

@@ -7,6 +7,7 @@ import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { ScrollText, GitCommit } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface ChangelogDoc {
   name: string;
@@ -78,7 +79,7 @@ export function ChangelogFeed() {
                 </span>
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span>{new Date(item.modified).toLocaleString()}</span>
+                <span>{formatDateTime(item.modified)}</span>
                 <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-800">
                   {item.modified_by}
                 </span>

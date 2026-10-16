@@ -64,6 +64,8 @@ export function MapView({
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const useGoogleMaps = !!googleMapsApiKey;
 
+  // listeners are created inside the async map load and removed in this effect's cleanup
+  // react-doctor-disable-next-line effect-needs-cleanup
   useEffect(() => {
     if (!useGoogleMaps || !mapRef.current || locations.length === 0) return;
 
@@ -73,6 +75,7 @@ export function MapView({
     });
 
     const markers: google.maps.Marker[] = [];
+    const listeners: google.maps.MapsEventListener[] = [];
 
     loader.importLibrary("maps").then((maps) => {
       if (!mapRef.current) return;
@@ -98,20 +101,22 @@ export function MapView({
           title: loc.title,
         });
 
+        // titles are document data — escape before building InfoWindow HTML
+        const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
         const infoWindow = new google.maps.InfoWindow({
           content: `
             <div style="padding: 8px; min-width: 150px;">
-              <strong>${loc.title}</strong>
+              <strong>${esc(loc.title)}</strong>
               <p style="margin: 4px 0; color: #666; font-size: 12px;">${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}</p>
               <a href="/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(loc.name ?? '')}" style="color: #2563eb; font-size: 12px;">Open Document</a>
             </div>
           `,
         });
 
-        marker.addListener("click", () => {
+        listeners.push(marker.addListener("click", () => {
           infoWindow.open(map, marker);
           setSelectedLocation(loc);
-        });
+        }));
 
         markers.push(marker);
         markersRef.current.push(marker);
@@ -121,6 +126,8 @@ export function MapView({
     });
 
     return () => {
+      listeners.forEach((l) => l.remove());
+      markers.forEach((m) => m.setMap(null));
       mapInstanceRef.current = null;
       markersRef.current = [];
     };
@@ -209,6 +216,7 @@ export function MapView({
             {/* OpenStreetMap fallback */}
             <div className="flex-1">
               <iframe
+                sandbox="allow-scripts allow-same-origin allow-popups"
                 title="OpenStreetMap"
                 className="w-full h-full min-h-[400px] border-0"
                 src={`https://www.openstreetmap.org/export/embed.html?bbox=${filteredLocations.map(l => `${l.lng},${l.lat}`).join(',')}&layer=mapnik`}

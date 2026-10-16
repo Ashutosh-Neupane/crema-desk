@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, RefreshCw } from "lucide-react";
 import { ChartCard, NumberCard } from "@/components/desk/Widgets";
+import { safeDecode } from "@/lib/utils/safeDecode";
 
 interface DashboardDoc {
   name: string;
@@ -17,7 +18,7 @@ interface DashboardDoc {
 
 export default function DashboardPage() {
   const { name: raw } = useParams<{ name: string }>();
-  const name = decodeURIComponent(raw);
+  const name = safeDecode(raw);
   const qc = useQueryClient();
   const { data: doc, isLoading, error } = useQuery<DashboardDoc>({
     queryKey: ["dashboard-doc", name],

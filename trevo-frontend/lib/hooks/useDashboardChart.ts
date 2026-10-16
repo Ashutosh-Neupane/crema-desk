@@ -30,9 +30,11 @@ export interface NumberCardResult {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((json as { error?: string }).error ?? "Request failed");
-  return json as T;
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? "Request failed");
+  }
+  return (await res.json()) as T;
 }
 
 export function useDashboardChart(

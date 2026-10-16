@@ -47,16 +47,8 @@ function dependsCtx(values: Values, parent?: Values) {
   return parent ? { ...values, parent } : values;
 }
 
-/** depends_on runs with doc; when evaluating "eval:" code Desk also passes parent */
-function evalWith(expr: string, values: Values, parent?: Values) {
-  if (!parent || !expr.includes("parent")) return evalDependsOn(expr, values);
-  try {
-    // eslint-disable-next-line no-new-func
-    return !!new Function("doc", "parent", `"use strict"; return (${expr.replace(/^eval:/, "")});`)(values, parent);
-  } catch {
-    return true;
-  }
-}
+/** depends_on runs with `doc` (and `parent` for child rows), as in Desk */
+const evalWith = (expr: string, values: Values, parent?: Values) => evalDependsOn(expr, values, parent);
 
 export default function FormBody({
   meta,

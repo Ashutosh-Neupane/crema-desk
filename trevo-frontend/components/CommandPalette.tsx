@@ -222,9 +222,9 @@ export default function CommandPalette() {
                     heading={`Documents matching “${search.trim()}”`}
                     className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-400"
                   >
-                    {docs.slice(0, MAX_PER_GROUP).map((r, i) => (
+                    {docs.slice(0, MAX_PER_GROUP).map((r) => (
                       <Command.Item
-                        key={`doc:${r.doctype}:${r.name}:${i}`}
+                        key={`doc:${r.doctype}:${r.name}`}
                         value={`doc:${r.doctype}:${r.name}`}
                         onSelect={() => r.doctype && r.name && go(`/desk/doctype/${enc(r.doctype)}/${enc(r.name)}`)}
                         className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-zinc-100 dark:data-[selected=true]:bg-zinc-800"

@@ -40,6 +40,8 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
           <button type="button" onClick={() => d.hide()} aria-label="Close" className="ml-auto rounded-md p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"><X className="h-4 w-4" /></button>
         </div>
         <div className="px-5" onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void primary()}>
+          {/* frappe.confirm/msgprint HTML comes from the app's own scripts (Desk renders it as HTML too) */}
+          {/* react-doctor-disable-next-line dangerous-html-sink */}
           {d.opts.message && <p className="pb-2 text-sm text-zinc-700 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: d.opts.message }} />}
           {meta.fields.length > 0 && (
             <FormBody meta={meta} values={d.values} errors={d.errors} onChange={(f, v) => void d.set_value(f, v)} compact />

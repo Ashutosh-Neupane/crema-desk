@@ -17,6 +17,8 @@
 export function evalDependsOn(
   expression: string | null | undefined,
   values: Record<string, unknown>,
+  /** parent doc for child-row expressions (`parent.status`) */
+  parent?: Record<string, unknown>,
 ): boolean {
   if (!expression) return true;
 
@@ -34,10 +36,11 @@ export function evalDependsOn(
   }
 
   try {
-    // Only `doc` / `locals` are in scope — no globals leak in from here
-    /* eslint-disable-next-line no-new-func */
-    const fn = new Function("doc", "locals", `"use strict"; return (${expr});`);
-    return !!fn(values, values);
+    // Desk evaluates depends_on JS from the DocType definition the same way (only
+    // `doc` / `parent` / `locals` in scope); the expressions are site config, not user input.
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("doc", "parent", "locals", `"use strict"; return (${expr});`); // react-doctor-disable-line no-eval
+    return !!fn(values, parent ?? {}, values);
   } catch {
     return true;
   }

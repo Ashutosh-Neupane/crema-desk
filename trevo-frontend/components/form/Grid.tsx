@@ -96,7 +96,7 @@ function Cell({
   }
   if (df.fieldtype === "Select") {
     return (
-      <select value={String(value ?? "")} onChange={(e) => set(e.target.value)} className={base}>
+      <select aria-label={df.label ?? df.fieldname} value={String(value ?? "")} onChange={(e) => set(e.target.value)} className={base}>
         {String(df.options ?? "").split("\n").map((o, i) => <option key={`${i}-${o}`} value={o}>{o}</option>)}
       </select>
     );
@@ -132,7 +132,7 @@ function NumberCell({ df, value, display, onCommit, className }: { df: DocField;
 function TextCell({ value, onCommit, className }: { value: string; onCommit: (v: unknown) => void; className: string }) {
   const [text, setText] = useState<string | null>(null);
   return (
-    <input
+    <input aria-label="Value"
       value={text ?? value}
       onFocus={() => setText(value)}
       onChange={(e) => setText(e.target.value)}
@@ -257,6 +257,8 @@ export default function Grid({
                   onClick={async () => {
                     for (const r of rows.filter((x) => selected.has(x.name))) {
                       const copy = Object.fromEntries(Object.entries(r).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner"].includes(k)));
+                      // keep duplicated rows in their original order
+                      // react-doctor-disable-next-line async-await-in-loop
                       await ctl.add_child(table, copy);
                     }
                     setSelected(new Set());

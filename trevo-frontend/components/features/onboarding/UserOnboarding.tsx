@@ -90,7 +90,7 @@ export function UserOnboarding({ steps = DEFAULT_STEPS, onComplete, onDismiss }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <Card className="w-full max-w-lg mx-4 p-6 relative">
-        <button
+        <button aria-label="Dismiss tour"
           onClick={handleDismiss}
           className="absolute top-4 right-4 rounded-lg p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >

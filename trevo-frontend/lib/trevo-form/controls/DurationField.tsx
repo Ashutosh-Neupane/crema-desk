@@ -20,8 +20,8 @@ export default function DurationField({ field, value, onChange, disabled }: Fiel
   return (
     <div className="flex items-center gap-2">
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-zinc-500">HH</label>
-        <input
+        <span className="text-xs text-zinc-500">HH</span>
+        <input aria-label="Hours"
           type="number"
           min="0"
           value={hours}
@@ -32,8 +32,8 @@ export default function DurationField({ field, value, onChange, disabled }: Fiel
       </div>
       <span className="text-zinc-400">:</span>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-zinc-500">MM</label>
-        <input
+        <span className="text-xs text-zinc-500">MM</span>
+        <input aria-label="Minutes"
           type="number"
           min="0"
           max="59"
@@ -45,8 +45,8 @@ export default function DurationField({ field, value, onChange, disabled }: Fiel
       </div>
       <span className="text-zinc-400">:</span>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-zinc-500">SS</label>
-        <input
+        <span className="text-xs text-zinc-500">SS</span>
+        <input aria-label="Seconds"
           type="number"
           min="0"
           max="59"

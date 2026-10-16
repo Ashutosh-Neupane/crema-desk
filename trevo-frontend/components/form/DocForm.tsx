@@ -23,7 +23,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
-import { PREFILL_KEY } from "@/components/DocumentActions";
+import { PREFILL_KEY } from "@/lib/form/prefill";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useShortcuts } from "@/lib/shortcuts";
@@ -101,8 +101,8 @@ function Connections({ meta, doc }: { meta: DocTypeMeta; doc: Doc }) {
   const fieldFor = (dt: string) => dash.non_standard_fieldnames?.[dt] ?? dash.fieldname ?? "";
   return (
     <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
-      {dash.transactions.map((t, i) => (
-        <div key={i}>
+      {dash.transactions.map((t) => (
+        <div key={t.label ?? t.items.join(",")}>
           <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">{t.label}</h4>
           <ul className="space-y-1">
             {t.items.map((dt) => (
@@ -290,7 +290,7 @@ export default function DocForm({ doctype, name }: Props) {
           const c = ctlRef.current;
           if (!c || isNewDoc(c.getDoc())) return;
           const base = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL ?? "";
-          window.open(`${base}/printview?doctype=${enc(doctype)}&name=${enc(c.docname)}&trigger_print=1`, "_blank");
+          window.open(`${base}/printview?doctype=${enc(doctype)}&name=${enc(c.docname)}&trigger_print=1`, "_blank", "noopener,noreferrer");
         },
       },
     ],
@@ -520,7 +520,7 @@ export default function DocForm({ doctype, name }: Props) {
             <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
               <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Comments</h2>
               <div className="flex gap-2">
-                <textarea
+                <textarea aria-label="Add a comment"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void addComment()}
@@ -534,8 +534,8 @@ export default function DocForm({ doctype, name }: Props) {
               </div>
               <h2 className="mb-3 mt-6 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Activity</h2>
               <ol className="relative space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
-                {timeline.map((t, i) => (
-                  <li key={i} className="text-sm">
+                {timeline.map((t) => (
+                  <li key={`${t.kind}-${t.at}-${t.by}`} className="text-sm">
                     <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
                     {t.kind === "comment" ? (
                       <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">

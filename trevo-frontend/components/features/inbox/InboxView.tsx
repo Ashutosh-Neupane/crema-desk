@@ -280,31 +280,34 @@ export function InboxView({ doctype, docname }: InboxViewProps) {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">To</label>
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">To</span>
               <Input
+                aria-label="To"
                 defaultValue={replyTo?.sender ?? ""}
                 placeholder="recipient@example.com"
                 className="mt-1"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Subject</label>
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Subject</span>
               <Input
+                aria-label="Subject"
                 defaultValue={replyTo ? `Re: ${replyTo.subject}` : ""}
                 placeholder="Subject"
                 className="mt-1"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Message</label>
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Message</span>
               <Textarea
+                aria-label="Message"
                 placeholder="Write your message..."
                 className="mt-1 h-48"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Attachments</label>
-              <input
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Attachments</span>
+              <input aria-label="Attachments"
                 type="file"
                 multiple
                 className="mt-1 block w-full text-sm text-zinc-600 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-800 dark:file:bg-zinc-100 dark:file:text-zinc-900 dark:hover:file:bg-zinc-200"

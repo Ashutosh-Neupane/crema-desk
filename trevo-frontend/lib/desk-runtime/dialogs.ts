@@ -111,6 +111,8 @@ export class DeskDialog {
     }
   }
   async set_values(vals: Record<string, unknown>) {
+    // in order: each set_value may run that field's onchange
+    // react-doctor-disable-next-line async-await-in-loop
     for (const [k, v] of Object.entries(vals ?? {})) await this.set_value(k, v);
   }
   set_title(t: string) {

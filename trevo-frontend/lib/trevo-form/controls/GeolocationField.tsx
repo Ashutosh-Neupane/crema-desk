@@ -1,10 +1,12 @@
 "use client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FieldControlProps } from "./index";
 import { loadGoogleMapsScript, isGoogleMapsAvailable } from "@/lib/frappe/maps";
 import { Button } from "@/components/shadcn/button";
+
+const subscribeNoop = () => () => {};
 
 export default function GeolocationField({ field, value, onChange, disabled }: FieldControlProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -13,6 +15,8 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
   const [loaded, setLoaded] = useState(false);
   const [fallback, setFallback] = useState(false);
 
+  // checked after hydration so server and first client render agree
+  const mapsAvailable = useSyncExternalStore(subscribeNoop, isGoogleMapsAvailable, () => false);
   const parsed = useMemo(() => {
     if (!value) return null;
     if (typeof value === "string") {
@@ -22,10 +26,13 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
     return null;
   }, [value]);
 
+  // listeners are created inside the async map load and removed in this effect's cleanup
+  // react-doctor-disable-next-line effect-needs-cleanup
   useEffect(() => {
     if (fallback || loaded || !mapRef.current) return;
     let cancelled = false;
 
+    let dragListener: { remove: () => void } | null = null;
     loadGoogleMapsScript()
       .then((ok) => {
         if (!ok || cancelled) {
@@ -49,7 +56,7 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
           draggable: !disabled && !field.read_only,
         });
 
-        gMarker.addListener("dragend", () => {
+        dragListener = gMarker.addListener("dragend", () => {
           const pos = gMarker.getPosition();
           if (pos) {
             onChange(JSON.stringify({ lat: pos.lat(), lng: pos.lng() }));
@@ -68,6 +75,7 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
 
     return () => {
       cancelled = true;
+      dragListener?.remove();
     };
   }, [fallback, loaded, parsed, onChange, disabled, field.read_only]);
 
@@ -102,24 +110,25 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
     );
   };
 
-  if (fallback || !isGoogleMapsAvailable()) {
+  if (fallback || !mapsAvailable) {
     return (
       <div className="space-y-2">
         <div className="flex gap-2">
-          <input
+          <input aria-label="Latitude"
             type="number"
             step="any"
             placeholder="Latitude"
             value={parsed?.lat ?? ""}
             onChange={(e) => {
-              const lat = parseFloat(e.target.value);
-              const lng = parsed?.lng ?? 0;
-              onChange(JSON.stringify({ lat: Number.isNaN(lat) ? 0 : lat, lng }));
+              // ignore partial input ("-", "") instead of storing 0 / NaN
+              const lat = Number(e.target.value);
+              if (e.target.value.trim() === "" || !Number.isFinite(lat)) return;
+              onChange(JSON.stringify({ lat, lng: parsed?.lng ?? 0 }));
             }}
             disabled={disabled || !!field.read_only}
             className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           />
-          <input
+          <input aria-label="Longitude"
             type="number"
             step="any"
             placeholder="Longitude"

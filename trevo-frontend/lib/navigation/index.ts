@@ -248,13 +248,17 @@ export function sidebarItemHref(item: Pick<SidebarItem, "link_type" | "link_to" 
 export function buildNavigationFromBoot(boot: DeskBoot): NavSection[] {
   const sidebars = boot.module_sidebars ?? {};
   const ordered: string[] = [];
+  const placed = new Set<string>();
   for (const app of boot.app_data ?? []) {
     for (const d of app.dock ?? []) {
-      if (d.link_type === "Sidebar" && sidebars[d.link_to] && !ordered.includes(d.link_to)) ordered.push(d.link_to);
+      if (d.link_type === "Sidebar" && sidebars[d.link_to] && !placed.has(d.link_to)) {
+        placed.add(d.link_to);
+        ordered.push(d.link_to);
+      }
     }
   }
   // Sidebars not placed in any dock (e.g. a custom app's module) still show, after the docked ones
-  for (const name of Object.keys(sidebars)) if (!ordered.includes(name)) ordered.push(name);
+  for (const name of Object.keys(sidebars)) if (!placed.has(name)) ordered.push(name);
 
   return ordered.map((name) => {
     const sb = sidebars[name];

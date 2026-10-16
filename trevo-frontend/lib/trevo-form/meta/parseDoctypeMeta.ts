@@ -5,6 +5,7 @@
 
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
 import type { TrevoField, FormSection, FormLayout, FormTab } from "../types";
+import { numberFormat } from "@/lib/utils/formatNumber";
 
 
 const STRUCTURAL_TYPES = new Set([
@@ -240,20 +241,17 @@ export function formatFieldValue(value: unknown, fieldtype: string): string {
     case "Float": {
       const num = typeof value === "number" ? value : Number(value);
       if (Number.isNaN(num)) return String(value);
-      return new Intl.NumberFormat("en-US").format(num);
+      return numberFormat({}, "en-US").format(num);
     }
     case "Percent": {
       const num = typeof value === "number" ? value : Number(value);
       if (Number.isNaN(num)) return String(value);
-      return `${new Intl.NumberFormat("en-US").format(num)}%`;
+      return `${numberFormat({}, "en-US").format(num)}%`;
     }
     case "Currency": {
       const num = typeof value === "number" ? value : Number(value);
       if (Number.isNaN(num)) return String(value);
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(num);
+      return numberFormat({ style: "currency", currency: "USD" }, "en-US").format(num);
     }
     default:
       return String(value);

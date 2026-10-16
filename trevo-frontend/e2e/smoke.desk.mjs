@@ -38,7 +38,8 @@ await page.waitForURL(/\/desk/, { timeout: 30000 });
 
 for (const p of paths) {
   const [path, action] = p.split("#");
-  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(5000); // not networkidle: the realtime socket keeps the network busy
   if (action?.startsWith("k=")) {
     await page.keyboard.press("Meta+k");
     await page.waitForTimeout(300);

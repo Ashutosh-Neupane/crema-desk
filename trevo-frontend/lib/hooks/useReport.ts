@@ -24,9 +24,9 @@ export function useReportsList() {
   return useQuery({
     queryKey: ["reports-list"],
     queryFn: async () => {
-      const { data } = await fetch("/api/doctype/Report/doc", {
-        headers: { Accept: "application/json" },
-      }).then((r) => r.json());
+      const res = await fetch("/api/doctype/Report/doc", { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("Failed to load reports");
+      const { data } = await res.json();
       return ((data as { message?: Array<{ name: string; report_name?: string }> } | null)?.message ?? []) as Array<{ name: string; report_name?: string }>;
     },
     staleTime: 5 * 60 * 1000,

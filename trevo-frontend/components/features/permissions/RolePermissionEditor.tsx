@@ -255,7 +255,7 @@ export function RolePermissionEditor() {
                             <td className="py-2 px-2 text-zinc-900 dark:text-zinc-100">{doctype}</td>
                             {(["read", "write", "create", "delete", "submit", "report", "export"] as const).map((key) => (
                               <td key={key} className="text-center py-2 px-1">
-                                <input
+                                <input aria-label={`${doctype} ${key}`}
                                   type="checkbox"
                                   checked={!!perm[key]}
                                   onChange={(e) => updatePermMutation.mutate({ doctype, [key]: e.target.checked ? 1 : 0 })}
@@ -287,7 +287,7 @@ export function RolePermissionEditor() {
             </div>
             <div>
               <Label>Description</Label>
-              <textarea
+              <textarea aria-label="Role description"
                 value={roleDesc}
                 onChange={(e) => setRoleDesc(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
@@ -315,7 +315,7 @@ export function RolePermissionEditor() {
             </div>
             <div>
               <Label>Select Role</Label>
-              <select
+              <select aria-label="Select role"
                 value={userRoles[0] || ""}
                 onChange={(e) => setUserRoles([e.target.value])}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
@@ -333,7 +333,7 @@ export function RolePermissionEditor() {
                   {userRoleList.map((ur) => (
                     <Badge key={ur.name} variant="secondary" className="flex items-center gap-1">
                       {ur.role}
-                      <button onClick={() => removeUserMutation.mutate(ur.name)} className="ml-1 hover:text-red-600">×</button>
+                      <button aria-label={`Remove ${ur.role ?? "role"}`} onClick={() => removeUserMutation.mutate(ur.name)} className="ml-1 hover:text-red-600">×</button>
                     </Badge>
                   ))}
                   {userRoleList.length === 0 && <p className="text-xs text-zinc-500">No roles assigned</p>}

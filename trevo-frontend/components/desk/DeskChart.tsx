@@ -52,7 +52,7 @@ function ChartTooltip({
     <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
       {label != null && <div className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">{label}</div>}
       {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+        <div key={p.name ?? String(i)} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
           <span>{p.name}</span>
           <span className="ml-auto pl-4 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">

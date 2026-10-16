@@ -12,7 +12,7 @@ export default function RatingField({ field, value, onChange, disabled }: FieldC
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: maxRating }, (_, i) => i + 1).map((star) => (
-        <button
+        <button aria-label={`${star} star${star > 1 ? "s" : ""}`}
           key={star}
           type="button"
           disabled={disabled || !!field.read_only}

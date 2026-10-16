@@ -7,16 +7,16 @@
  * allow_in_quick_entry fields in a dialog; fall back to the full form
  * when there are mandatory tables or too many fields.
  */
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Maximize2, X } from "lucide-react";
-import FormRenderer, { type FormHandle } from "@/lib/trevo-form/renderers/FormRenderer";
+import FormBody from "@/components/form/FormBody";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
 import { saveDoc, type Doc } from "@/lib/frappe/form";
-import { PREFILL_KEY } from "@/components/DocumentActions";
-import type { DocField, DocTypeMeta, FrappeDocument } from "@/lib/frappe/types";
+import { PREFILL_KEY } from "@/lib/form/prefill";
+import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 const LAYOUT = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading"]);
 
@@ -49,8 +49,9 @@ export default function QuickEntry({
 }) {
   const router = useRouter();
   const { data: ctx } = useDeskContext();
-  const formRef = useRef<FormHandle>(null);
   const [busy, setBusy] = useState(false);
+  const [edits, setEdits] = useState<Record<string, unknown>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const promptName = meta.autoname === "Prompt";
   const quickMeta = useMemo<DocTypeMeta>(() => {
@@ -59,19 +60,25 @@ export default function QuickEntry({
     return { ...meta, fields: [...nameField, ...fields] };
   }, [meta, promptName]);
 
-  const doc = useMemo(() => (ctx ? ({ ...getNewDoc(meta, ctx), ...initial } as Doc) : null), [meta, ctx, initial]);
-
-  const save = async (values: Record<string, unknown>) => {
-    if (!doc) return;
-    const { doc: saved } = await saveDoc({ ...doc, ...values } as Doc, "Save");
-    onCreated(saved.name, saved);
-  };
+  const base = useMemo(() => (ctx ? ({ ...getNewDoc(meta, ctx), ...initial } as Doc) : null), [meta, ctx, initial]);
+  const values = useMemo(() => ({ ...(base ?? {}), ...edits }), [base, edits]);
 
   const onSave = async () => {
+    if (!base) return;
+    const missing: Record<string, string> = {};
+    for (const f of quickMeta.fields ?? []) {
+      const v = values[f.fieldname];
+      if (f.reqd && (v === null || v === undefined || v === "")) missing[f.fieldname] = "Required";
+    }
+    setErrors(missing);
+    if (Object.keys(missing).length) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
     setBusy(true);
     try {
-      const ok = await formRef.current?.save();
-      if (ok === false) toast.error("Please fill all mandatory fields");
+      const { doc: saved } = await saveDoc(values as Doc, "Save");
+      onCreated(saved.name, saved);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save", { duration: 8000 });
     } finally {
@@ -80,8 +87,7 @@ export default function QuickEntry({
   };
 
   const fullForm = () => {
-    const values = formRef.current?.getValues() ?? {};
-    sessionStorage.setItem(PREFILL_KEY(meta.name), JSON.stringify({ ...initial, ...values }));
+    sessionStorage.setItem(PREFILL_KEY(meta.name), JSON.stringify({ ...initial, ...edits }));
     router.push(`/desk/doctype/${encodeURIComponent(meta.name)}/new`);
   };
 
@@ -101,7 +107,22 @@ export default function QuickEntry({
           </button>
         </div>
         <div className="px-3" onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void onSave()}>
-          {doc && <FormRenderer formRef={formRef} hideActions meta={quickMeta} doc={doc as unknown as FrappeDocument} onSave={save} />}
+          {base && (
+            <FormBody
+              meta={quickMeta}
+              values={values}
+              errors={errors}
+              compact
+              onChange={(f, v) => {
+                setEdits((e) => ({ ...e, [f]: v }));
+                setErrors((er) => {
+                  const next = { ...er };
+                  delete next[f];
+                  return next;
+                });
+              }}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2 px-5 py-3">
           <button type="button" onClick={fullForm} className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">

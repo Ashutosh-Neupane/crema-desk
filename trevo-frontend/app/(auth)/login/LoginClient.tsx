@@ -50,8 +50,10 @@ export function LoginClient() {
 
         <form className="mt-5 space-y-3" onSubmit={onSubmit}>
           <div>
-            <label className="text-sm font-medium text-zinc-800">Email or username</label>
+            <label htmlFor="login-usr" className="text-sm font-medium text-zinc-800">Email or username</label>
             <input
+              id="login-usr"
+              autoComplete="username"
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -59,8 +61,10 @@ export function LoginClient() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-zinc-800">Password</label>
+            <label htmlFor="login-pwd" className="text-sm font-medium text-zinc-800">Password</label>
             <input
+              id="login-pwd"
+              autoComplete="current-password"
               type="password"
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
               value={password}

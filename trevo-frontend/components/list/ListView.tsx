@@ -81,7 +81,7 @@ function filtersFromParams(doctype: string, params: URLSearchParams): Filter[] {
   }
   const out: Filter[] = [];
   params.forEach((v, k) => {
-    if (["filters", "view", "sort", "q"].includes(k)) return;
+    if (["filters", "view", "sort", "q", "new"].includes(k)) return;
     out.push([doctype, k, "=", v]);
   });
   return out;
@@ -114,26 +114,26 @@ function FilterEditor({ meta, onAdd }: { meta: DocTypeMeta; onAdd: (f: Filter) =
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[1fr_auto] gap-2">
-        <select value={fieldname} onChange={(e) => { setFieldname(e.target.value); setValue(""); }} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select aria-label="Filter field" value={fieldname} onChange={(e) => { setFieldname(e.target.value); setValue(""); }} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
           {fields.map((f) => <option key={f.fieldname} value={f.fieldname}>{f.label || f.fieldname}</option>)}
         </select>
-        <select value={op} onChange={(e) => setOp(e.target.value)} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select aria-label="Filter operator" value={op} onChange={(e) => setOp(e.target.value)} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
           {OPERATORS.map((o) => <option key={o.op} value={o.op}>{o.label}</option>)}
         </select>
       </div>
       {op === "is" ? (
-        <select value={value || "set"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select aria-label="Filter value" value={value || "set"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
           <option value="set">set</option>
           <option value="not set">not set</option>
         </select>
       ) : df?.fieldtype === "Link" ? (
         <LinkInput doctype={String(df.options)} value={value} onChange={setValue} autoFocus />
       ) : selectOptions ? (
-        <select value={value} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select aria-label="Filter value" value={value} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
           {selectOptions.map((o) => <option key={o} value={o}>{o || "(empty)"}</option>)}
         </select>
       ) : df?.fieldtype === "Check" ? (
-        <select value={value || "1"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select aria-label="Filter value" value={value || "1"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
           <option value="1">Yes</option>
           <option value="0">No</option>
         </select>
@@ -171,7 +171,7 @@ function GroupBy({ meta, filters, onPick }: { meta: DocTypeMeta; filters: Filter
   });
   return (
     <div className="space-y-2">
-      <select value={field} onChange={(e) => setField(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+      <select aria-label="Group by field" value={field} onChange={(e) => setField(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
         {candidates.map((c) => <option key={c.fieldname} value={c.fieldname}>{c.label}</option>)}
       </select>
       <ul className="max-h-72 overflow-auto">
@@ -316,6 +316,17 @@ export default function ListView({ doctype }: { doctype: string }) {
     return v;
   }, [meta, doctype]);
 
+  // ?new=1 (e.g. /desk/doctype/new redirect) opens New / the primary action once the list JS is loaded
+  const wantNew = params.get("new") === "1";
+  const [openedNew, setOpenedNew] = useState(false);
+  useEffect(() => {
+    if (!wantNew || openedNew || !meta || settings === undefined) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot trigger from the URL
+    setOpenedNew(true);
+    if (typeof settings.primary_action === "function") (settings.primary_action as () => unknown).call(settings);
+    else router.push(`/desk/doctype/${enc(doctype)}/new`);
+  }, [wantNew, openedNew, meta, settings, router, doctype]);
+
   // Desk list shortcut: Ctrl/⌘+B = New (list_view.js)
   useShortcuts(
     [{ keys: "mod+b", description: `New ${doctype}`, group: "List", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) }],
@@ -425,12 +436,12 @@ export default function ListView({ doctype }: { doctype: string }) {
           return f.fieldtype === "Link" ? (
             <LinkInput key={f.fieldname} doctype={String(f.options)} value={val} onChange={set} placeholder={f.label ?? f.fieldname} className="w-40" />
           ) : f.fieldtype === "Select" ? (
-            <select key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            <select aria-label={f.label ?? f.fieldname} key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
               <option value="">{f.label}</option>
               {String(f.options ?? "").split("\n").filter(Boolean).map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           ) : f.fieldtype === "Check" ? (
-            <select key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-36 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            <select aria-label={f.label ?? f.fieldname} key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-36 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
               <option value="">{f.label}</option>
               <option value="1">Yes</option>
               <option value="0">No</option>
@@ -483,7 +494,7 @@ export default function ListView({ doctype }: { doctype: string }) {
       {filters.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           {filters.map((f, i) => (
-            <span key={i} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+            <span key={`${f[1]}|${f[2]}|${JSON.stringify(f[3])}`} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
               <ListFilter className="h-3 w-3 text-zinc-400" />
               <span className="font-medium">{fieldLabel(meta, f[1])}</span>
               <span className="text-zinc-400">{OPERATORS.find((o) => o.op === f[2])?.label ?? f[2]}</span>

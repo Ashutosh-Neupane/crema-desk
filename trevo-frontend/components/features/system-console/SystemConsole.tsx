@@ -72,7 +72,7 @@ export function SystemConsole() {
 
       <Card className="p-4">
         <div className="space-y-3">
-          <textarea
+          <textarea aria-label="Script"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Enter SQL query..."

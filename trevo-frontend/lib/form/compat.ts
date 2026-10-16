@@ -10,7 +10,7 @@
  */
 import type { Runtime } from "@/lib/desk-runtime";
 import { deskCall } from "@/lib/frappe/form";
-import { PREFILL_KEY } from "@/components/DocumentActions";
+import { PREFILL_KEY } from "@/lib/form/prefill";
 
 /** Chainable no-op: callable, constructible, any property → itself */
 const NOOP: unknown = new Proxy(function () {}, {

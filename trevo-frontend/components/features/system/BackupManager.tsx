@@ -7,6 +7,7 @@ import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
 import { Skeleton } from "@/components/Skeleton";
 import { Download, Database, RefreshCw, HardDrive } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface Backup {
   name: string;
@@ -115,7 +116,7 @@ function formatDate(v: unknown): string {
   if (!v) return "-";
   const d = new Date(String(v));
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return formatDateTime(d.toISOString(), false);
 }
 
 function formatBytes(bytes: number): string {

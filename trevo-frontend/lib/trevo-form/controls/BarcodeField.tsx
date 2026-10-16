@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import type { FieldControlProps } from "./index";
 
 /**
@@ -10,13 +10,17 @@ import type { FieldControlProps } from "./index";
  * - Falls back gracefully if BarcodeDetector is not available (shows text-only mode).
  */
 
-// Feature-detect the native BarcodeDetector API (Chrome 83+, Edge 83+)
-const hasBarcodeDetector =
-  typeof window !== "undefined" && "BarcodeDetector" in window;
+// Feature-detect the native BarcodeDetector API (Chrome 83+, Edge 83+) after hydration,
+// so server and first client render match
+const subscribeNoop = () => () => {};
+function useHasBarcodeDetector() {
+  return useSyncExternalStore(subscribeNoop, () => "BarcodeDetector" in window, () => false);
+}
 
 export default function BarcodeField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" ? value : "";
   const isDisabled = disabled || !!field.read_only;
+  const hasBarcodeDetector = useHasBarcodeDetector();
 
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -66,7 +70,7 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
       setCameraError(msg);
       stopCamera();
     }
-  }, [onChange, stopCamera]);
+  }, [onChange, stopCamera, hasBarcodeDetector]);
 
   // Cleanup on unmount
   useEffect(() => () => stopCamera(), [stopCamera]);

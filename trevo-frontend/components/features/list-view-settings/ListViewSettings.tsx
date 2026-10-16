@@ -11,6 +11,7 @@ import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frappeGet, frappePost } from "@/lib/frappe/client";
 import { toast } from "sonner";
+import { safeDecode } from "@/lib/utils/safeDecode";
 
 interface ColumnConfig {
   fieldname: string;
@@ -32,7 +33,7 @@ interface ListViewSettingsProps {
 
 export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSettingsProps) {
   const params = useParams<{ doctype: string }>();
-  const doctype = decodeURIComponent(params.doctype);
+  const doctype = safeDecode(params.doctype);
   const { data: meta } = useDoctype(doctype);
   const qc = useQueryClient();
 
@@ -173,7 +174,7 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
 
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium text-zinc-500 mb-2 block">Visible Columns</label>
+          <span className="text-xs font-medium text-zinc-500 mb-2 block">Visible Columns</span>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {columns.map((col) => (
               <div
@@ -204,7 +205,7 @@ export function ListViewSettings({ onColumnsChange, onGroupChange }: ListViewSet
         </div>
 
         <div>
-          <label className="text-xs font-medium text-zinc-500 mb-2 block">Group By</label>
+          <span className="text-xs font-medium text-zinc-500 mb-2 block">Group By</span>
           <div className="flex flex-wrap gap-2">
             {columns.filter((c) => c.visible).map((col) => (
               <button

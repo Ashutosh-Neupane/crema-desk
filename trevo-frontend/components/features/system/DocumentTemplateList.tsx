@@ -7,6 +7,7 @@ import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { FileText } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface TemplateDoc {
   name: string;
@@ -81,7 +82,7 @@ export function DocumentTemplateList() {
                 </Badge>
               </div>
               <p className="mt-2 text-xs text-zinc-400">
-                Modified: {new Date(tmpl.modified).toLocaleDateString()}
+                Modified: {formatDateTime(tmpl.modified, false)}
               </p>
             </Card>
           ))}

@@ -3,23 +3,19 @@
 import { useState } from "react";
 import { useDoctypes } from "@/lib/hooks/useDoctypes";
 import { FileText, Search } from "lucide-react";
-import { QuickEntryDialog } from "@/components/features/quick-entry";
+import { useRouter } from "next/navigation";
 
 export default function FormsPage() {
   const { data: doctypes, isLoading } = useDoctypes();
   const [query, setQuery] = useState("");
-  const [quickEntryOpen, setQuickEntryOpen] = useState(false);
-  const [selectedDoctype, setSelectedDoctype] = useState<string>("");
+  const router = useRouter();
 
   const filtered = (doctypes ?? []).filter((dt: { name: string; module?: string }) =>
     dt.name.toLowerCase().includes(query.toLowerCase()) ||
     (dt.module ?? "").toLowerCase().includes(query.toLowerCase())
   );
 
-  const handleSelectDoctype = (name: string) => {
-    setSelectedDoctype(name);
-    setQuickEntryOpen(true);
-  };
+  const handleSelectDoctype = (name: string) => router.push(`/desk/doctype/${encodeURIComponent(name)}/new`);
 
   return (
     <div className="space-y-6">
@@ -34,7 +30,7 @@ export default function FormsPage() {
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input
+        <input aria-label="Search DocTypes"
           type="text"
           placeholder="Search DocTypes..."
           value={query}
@@ -73,15 +69,6 @@ export default function FormsPage() {
           )}
         </div>
       )}
-
-      <QuickEntryDialog
-        open={quickEntryOpen}
-        onOpenChange={setQuickEntryOpen}
-        doctype={selectedDoctype}
-        onCreated={(name) => {
-          window.location.href = `/desk/doctype/${encodeURIComponent(selectedDoctype)}/${encodeURIComponent(name)}`;
-        }}
-      />
     </div>
   );
 }

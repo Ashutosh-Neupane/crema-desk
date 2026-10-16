@@ -23,8 +23,17 @@ export const metadata: Metadata = {
     template: "%s | Trevo",
   },
   description: "Modern frontend for Trevo, built on Frappe",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: appUrl(),
 };
+
+/** NEXT_PUBLIC_APP_URL may be misconfigured — fall back rather than crash every page */
+function appUrl(): URL {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
+  } catch {
+    return new URL("http://localhost:3000");
+  }
+}
 
 export default function RootLayout({
   children,

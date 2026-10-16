@@ -12,6 +12,7 @@ import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { toast } from "sonner";
 import { Plus, Trash2, Play } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface ServerScriptDoc {
   name: string;
@@ -125,7 +126,7 @@ export function ServerScriptEditor() {
                   </Badge>
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">
-                  {new Date(script.modified).toLocaleString()}
+                  {formatDateTime(script.modified)}
                 </p>
               </button>
             ))}

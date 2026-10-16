@@ -59,7 +59,7 @@ export default function DateRangeField({ field, value, onChange, disabled }: Fie
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <input aria-label="From date"
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
@@ -67,7 +67,7 @@ export default function DateRangeField({ field, value, onChange, disabled }: Fie
           className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         />
         <span className="text-xs text-zinc-500">to</span>
-        <input
+        <input aria-label="To date"
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}

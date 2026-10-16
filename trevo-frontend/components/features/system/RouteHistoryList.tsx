@@ -7,6 +7,7 @@ import { Card } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Skeleton } from "@/components/Skeleton";
 import { History } from "lucide-react";
+import { formatDateTime } from "@/lib/utils/formatNumber";
 
 interface RouteHistoryDoc {
   name: string;
@@ -74,7 +75,7 @@ export function RouteHistoryList() {
                 <span className="text-zinc-700 dark:text-zinc-300">{item.route}</span>
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span>{new Date(item.creation).toLocaleString()}</span>
+                <span>{formatDateTime(item.creation)}</span>
                 <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-800">
                   {item.user}
                 </span>

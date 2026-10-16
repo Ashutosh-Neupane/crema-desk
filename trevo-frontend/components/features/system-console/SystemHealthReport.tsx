@@ -19,6 +19,20 @@ interface SystemHealthData {
   checks: HealthCheck[];
 }
 
+
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "healthy":
+      return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+    case "warning":
+      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+    case "error":
+      return <AlertTriangle className="h-5 w-5 text-red-500" />;
+    default:
+      return <Activity className="h-5 w-5 text-zinc-400" />;
+  }
+}
+
 export function SystemHealthReport() {
   const { data, isLoading, isError } = useQuery<SystemHealthData>({
     queryKey: ["system-health"],
@@ -41,18 +55,6 @@ export function SystemHealthReport() {
     }
   };
 
-  const Icon = ({ status }: { status: string }) => {
-    switch (status) {
-      case "healthy":
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case "warning":
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case "error":
-        return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      default:
-        return <Activity className="h-5 w-5 text-zinc-400" />;
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -84,7 +86,7 @@ export function SystemHealthReport() {
           {data?.checks?.map((check, i) => (
             <Card key={i} className="p-4">
               <div className="flex items-center gap-2">
-                <Icon status={check.status} />
+                <StatusIcon status={check.status} />
                 <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   {check.message}
                 </h3>

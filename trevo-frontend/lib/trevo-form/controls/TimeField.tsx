@@ -18,7 +18,7 @@ export default function TimeField({ field, inputId, value, onChange, disabled, e
   }
 
   return (
-    <input
+    <input aria-label={field.label || field.fieldname}
       id={inputId ?? field.fieldname}
       type="time"
       step={1}

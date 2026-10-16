@@ -157,7 +157,12 @@ export async function frappeServerFetch<T = unknown>(
 ): Promise<ResolvedFetch<T>> {
   const { method = "GET", params, body, rawBody, contentType, headers = {}, throwOnError = true } = opts;
 
-  const url = new URL(`${BACKEND_URL}/${path.replace(/^\//, "")}`);
+  let url: URL;
+  try {
+    url = new URL(`${BACKEND_URL}/${path.replace(/^\//, "")}`);
+  } catch {
+    throw new FrappeError(`Invalid FRAPPE_BACKEND_URL "${BACKEND_URL}"`, { status: 500 });
+  }
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v === undefined || v === null) continue;

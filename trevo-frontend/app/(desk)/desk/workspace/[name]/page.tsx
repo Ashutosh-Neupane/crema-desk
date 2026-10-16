@@ -5,6 +5,7 @@
  */
 import type { Metadata } from "next";
 import WorkspaceView from "@/components/desk/WorkspaceView";
+import { safeDecode } from "@/lib/utils/safeDecode";
 
 interface Props {
   params: Promise<{ name: string }>;
@@ -12,11 +13,11 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await params;
-  return { title: `${decodeURIComponent(name)} | Trevo` };
+  return { title: `${safeDecode(name)} | Trevo` };
 }
 
 export default async function WorkspacePage({ params }: Props) {
   const { name } = await params;
-  const decoded = decodeURIComponent(name);
+  const decoded = safeDecode(name);
   return <WorkspaceView key={decoded} name={decoded} />;
 }

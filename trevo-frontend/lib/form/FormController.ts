@@ -181,6 +181,8 @@ export class FormController {
   // ── values ──────────────────────────────────────────────────────────────
   async set_value(fieldname: string | Record<string, unknown>, value?: unknown): Promise<void> {
     if (typeof fieldname === "object") {
+      // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
+      // react-doctor-disable-next-line async-await-in-loop
       for (const [k, v] of Object.entries(fieldname)) await this.set_value(k, v);
       return;
     }
@@ -200,6 +202,8 @@ export class FormController {
 
   async set_child_value(cdt: string, cdn: string, fieldname: string | Record<string, unknown>, value?: unknown): Promise<void> {
     if (typeof fieldname === "object") {
+      // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
+      // react-doctor-disable-next-line async-await-in-loop
       for (const [k, v] of Object.entries(fieldname)) await this.set_child_value(cdt, cdn, k, v);
       return;
     }
@@ -253,6 +257,8 @@ export class FormController {
     try {
       if (!(await this.validateLink(c))) return;
       await this.fetchFrom(c);
+      // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
+      // react-doctor-disable-next-line async-await-in-loop
       for (const w of this.watchers) await w(c);
       if (c.cdt && c.cdn) await this.trigger(c.fieldname, c.cdt, c.cdn);
       else await this.trigger(c.fieldname);
@@ -278,6 +284,8 @@ export class FormController {
     const current: Record<string, unknown> = c.cdn ? this.findRow(c.cdn)?.row ?? {} : this.doc;
     const targets = dependents.filter((f) => !f.fetch_if_empty || !current[f.fieldname]);
     if (!c.value) {
+      // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
+      // react-doctor-disable-next-line async-await-in-loop
       for (const f of targets) await this.setFor(c, f.fieldname, null);
       return;
     }
@@ -297,6 +305,7 @@ export class FormController {
     }
     for (const f of targets) {
       const src = String(f.fetch_from).split(".")[1];
+      // react-doctor-disable-next-line async-await-in-loop
       if (src in msg) await this.setFor(c, f.fieldname, msg[src]);
     }
   }
@@ -374,9 +383,12 @@ export class FormController {
   }
 
   async remove_rows(table: string, names: string[]) {
-    const rows = ((this.doc[table] as Row[]) ?? []).filter((r) => !names.includes(r.name));
+    const drop = new Set(names);
+    const rows = ((this.doc[table] as Row[]) ?? []).filter((r) => !drop.has(r.name));
     this.setRows(table, rows);
     await this.trigger(`${table}_remove`);
+    // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
+    // react-doctor-disable-next-line async-await-in-loop
     for (const w of this.watchers) await w({ fieldname: table, value: rows, table });
   }
 
@@ -407,6 +419,8 @@ export class FormController {
     for (const h of handlers) {
       try {
         f.validated = true;
+        // handlers run in registration order and may depend on each other (Desk semantics)
+        // react-doctor-disable-next-line async-await-in-loop
         await h(this.frm, cdt ?? this.meta.name, cdn ?? this.doc.name);
         // a handler may set frappe.validated = false to abort (Desk semantics)
         if ((f.validated as boolean | undefined) === false) return false;
