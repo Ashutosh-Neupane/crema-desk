@@ -31,9 +31,12 @@ export async function searchLink(
   return Array.isArray(results) ? results : [];
 }
 
-/** Global search widget (cross-doctype). */
+/**
+ * Full-text search across documents — what Desk's awesomebar runs
+ * ("Search for …"). Returns [{doctype, name, content, title?}].
+ */
 export async function globalSearch(txt: string, opts?: { doctype?: string; page_length?: number }) {
-  const args: Record<string, unknown> = { txt, page_length: opts?.page_length ?? 20 };
+  const args: Record<string, unknown> = { text: txt, start: 0, limit: opts?.page_length ?? 20 };
   if (opts?.doctype) args.doctype = opts.doctype;
-  return frappeMethod("frappe.desk.search.search_widget", args);
+  return frappeMethod("frappe.utils.global_search.search", args);
 }

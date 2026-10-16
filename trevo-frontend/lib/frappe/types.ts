@@ -391,7 +391,9 @@ export interface NotificationLog {
   subject: string | null;
   type: string | null;
   for_user: string | null;
-  seen: boolean | 0 | 1;
+  /** Notification Log tracks this as `read` (0/1) */
+  read: boolean | 0 | 1;
+  seen?: boolean | 0 | 1;
   creation: string;
   document_type?: string;
   document_name?: string;

@@ -11,7 +11,6 @@ import { useListCount } from "@/lib/hooks/useList";
 import { useWorkspaces } from "@/lib/hooks/useWorkspaces";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/shadcn/card";
-import { UserOnboarding } from "@/components/features/onboarding";
 import dynamic from "next/dynamic";
 
 // Lazy-load DashboardView — only rendered when a default dashboard exists
@@ -31,16 +30,6 @@ export default function DeskHomePage() {
   const { data: bootInfo } = useBootInfo();
   const { data: workspaces } = useWorkspaces();
 
-  const { data: onboardingDone } = useQuery<boolean>({
-    queryKey: ["onboarding-done"],
-    queryFn: async () => {
-      if (typeof window === "undefined") return true;
-      return window.localStorage.getItem("trevo-onboarding-done") === "true";
-    },
-    staleTime: Infinity,
-  });
-
-  const showOnboarding = bootInfo && !onboardingDone;
 
   // Check whether a default Dashboard document exists for this user's home module
   const { data: defaultDashboard } = useQuery<{ name: string } | null>({
@@ -104,13 +93,6 @@ export default function DeskHomePage() {
 
   return (
     <div className="space-y-6">
-      {showOnboarding && (
-        <UserOnboarding
-          onComplete={() => {
-            window.localStorage.setItem("trevo-onboarding-done", "true");
-          }}
-        />
-      )}
 
       {/* Welcome header */}
       <div className="flex items-center justify-between">
@@ -124,7 +106,7 @@ export default function DeskHomePage() {
         </div>
         <div className="flex items-center gap-2 text-sm text-zinc-500">
           <Clock className="h-4 w-4" aria-hidden="true" />
-          <time dateTime={new Date().toISOString()}>
+          <time dateTime={new Date().toISOString().slice(0, 10)} suppressHydrationWarning>
             {new Date().toLocaleDateString("en-US", {
               weekday: "long", year: "numeric", month: "long", day: "numeric",
             })}

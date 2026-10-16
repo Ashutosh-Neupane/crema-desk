@@ -10,7 +10,7 @@
  *
  * Cached per session id for a short time; the page is ~400 KB to generate.
  */
-import { FRAPPE_BACKEND_URL, backendFetch } from "./server";
+import { FRAPPE_BACKEND_URL, backendFetch, parseCsrfFromHtml, rememberCsrfToken, sidFromCookie } from "./server";
 
 export interface SidebarItem {
   key: string;
@@ -60,11 +60,6 @@ export interface DeskBoot {
 const TTL_MS = 30_000;
 const cache = new Map<string, { at: number; boot: DeskBoot }>();
 
-function sidFrom(cookieHeader: string): string | null {
-  const m = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/);
-  return m && m[1] !== "Guest" ? m[1] : null;
-}
-
 /** Extract the `frappe.boot = {...}` object literal from the desk HTML. */
 export function parseBootFromHtml(html: string): DeskBoot | null {
   const marker = "frappe.boot = ";
@@ -95,7 +90,7 @@ export function parseBootFromHtml(html: string): DeskBoot | null {
 }
 
 export async function getDeskBoot(cookieHeader: string): Promise<DeskBoot | null> {
-  const sid = sidFrom(cookieHeader);
+  const sid = sidFromCookie(cookieHeader);
   if (!sid) return null;
 
   const hit = cache.get(sid);
@@ -113,7 +108,10 @@ export async function getDeskBoot(cookieHeader: string): Promise<DeskBoot | null
   }
   if (!res.ok) return null;
 
-  const boot = parseBootFromHtml(await res.text());
+  const html = await res.text();
+  const csrf = parseCsrfFromHtml(html);
+  if (csrf) rememberCsrfToken(sid, csrf);
+  const boot = parseBootFromHtml(html);
   if (boot) {
     cache.set(sid, { at: Date.now(), boot });
     if (cache.size > 500) cache.delete(cache.keys().next().value as string);

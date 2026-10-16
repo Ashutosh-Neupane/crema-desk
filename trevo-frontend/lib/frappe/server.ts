@@ -6,9 +6,10 @@
  *  - route handlers (app/api/...) for the BFF proxy
  *
  * It talks DIRECTLY to Frappe at FRAPPE_BACKEND_URL, forwarding the caller's
- * `sid` session cookie. CSRF is NOT enforced for cookie-auth REST/method calls
- * on this backend (verified), so no token plumbing is required. We still send
- * `X-Frappe-CSRF-Token: fetch` defensively.
+ * `sid` session cookie. Frappe enforces CSRF on state-changing requests made
+ * with a session cookie (POST/PUT/DELETE → CSRFTokenError without it), so
+ * backendFetch() attaches the session's csrf_token — the same token Desk reads
+ * from `frappe.csrf_token` in the /desk page.
  */
 
 import type { FrappeAPIResponse } from "./types";
@@ -32,12 +33,75 @@ export function backendHeaders(): Record<string, string> {
   return FRAPPE_SITE_NAME ? { "X-Frappe-Site-Name": FRAPPE_SITE_NAME } : {};
 }
 
-/** `fetch` for Frappe backend URLs — adds the site header. Use instead of bare fetch in BFF routes. */
-export function backendFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+// ---------------------------------------------------------------------------
+// CSRF: one token per Frappe session (sid), read from the /desk page
+// ---------------------------------------------------------------------------
+
+const csrfBySid = new Map<string, string>();
+
+export function sidFromCookie(cookieHeader: string | null | undefined): string | null {
+  const m = (cookieHeader ?? "").match(/(?:^|;\s*)sid=([^;]+)/);
+  return m && m[1] !== "Guest" ? m[1] : null;
+}
+
+/** Remember a session's token (deskBoot parses it from the same /desk page). */
+export function rememberCsrfToken(sid: string, token: string): void {
+  csrfBySid.set(sid, token);
+  if (csrfBySid.size > 2000) csrfBySid.delete(csrfBySid.keys().next().value as string);
+}
+
+export function parseCsrfFromHtml(html: string): string | null {
+  return html.match(/frappe\.csrf_token\s*=\s*"([^"]+)"/)?.[1] ?? null;
+}
+
+async function getCsrfToken(cookieHeader: string, refresh = false): Promise<string | null> {
+  const sid = sidFromCookie(cookieHeader);
+  if (!sid) return null;
+  if (!refresh && csrfBySid.has(sid)) return csrfBySid.get(sid)!;
+  const headers = new Headers({ Cookie: cookieHeader, Accept: "text/html", ...backendHeaders() });
+  try {
+    const res = await fetch(`${BACKEND_URL}/desk`, { headers, cache: "no-store", redirect: "manual" });
+    if (!res.ok) return null;
+    const token = parseCsrfFromHtml(await res.text());
+    if (token) rememberCsrfToken(sid, token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * `fetch` for Frappe backend URLs. Use instead of bare fetch in BFF routes:
+ *  - adds X-Frappe-Site-Name
+ *  - for state-changing requests carrying a session cookie, adds the session's
+ *    X-Frappe-CSRF-Token (and retries once with a fresh token if Frappe
+ *    rejects it, e.g. after the session was renewed)
+ */
+export async function backendFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   for (const [k, v] of Object.entries(backendHeaders())) {
     if (!headers.has(k)) headers.set(k, v);
   }
+  const method = (init.method ?? "GET").toUpperCase();
+  const cookie = headers.get("cookie");
+  const needsCsrf = UNSAFE_METHODS.has(method) && !!sidFromCookie(cookie);
+  const hasRealToken = !!headers.get("x-frappe-csrf-token") && headers.get("x-frappe-csrf-token") !== "fetch";
+
+  if (!needsCsrf || hasRealToken) return fetch(input, { ...init, headers });
+
+  const token = await getCsrfToken(cookie!);
+  if (token) headers.set("X-Frappe-CSRF-Token", token);
+  const res = await fetch(input, { ...init, headers });
+  if (res.status !== 400 || !token) return res;
+
+  // Frappe answers a bad token with 400 + CSRFTokenError — refresh once and retry
+  const body = await res.clone().text();
+  if (!body.includes("CSRFTokenError")) return res;
+  const fresh = await getCsrfToken(cookie!, true);
+  if (!fresh || fresh === token) return res;
+  headers.set("X-Frappe-CSRF-Token", fresh);
   return fetch(input, { ...init, headers });
 }
 

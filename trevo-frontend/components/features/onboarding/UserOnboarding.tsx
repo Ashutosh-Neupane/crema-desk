@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
 import { CheckCircle2, ChevronRight, ChevronLeft, X } from "lucide-react";
@@ -46,12 +46,28 @@ const DEFAULT_STEPS: OnboardingStep[] = [
   },
 ];
 
+function subscribeStorage(cb: () => void) {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+}
+
 export function UserOnboarding({ steps = DEFAULT_STEPS, onComplete, onDismiss }: UserOnboardingProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("trevo-onboarding-seen") === "true";
-  });
+  // localStorage is client-only: the server (and first client render) treat the
+  // tour as seen, so SSR and hydration agree; the real value applies after mount.
+  const seen = useSyncExternalStore(
+    subscribeStorage,
+    () => {
+      try {
+        return window.localStorage.getItem("trevo-onboarding-seen") === "true";
+      } catch {
+        return true;
+      }
+    },
+    () => true,
+  );
+  const [dismissedNow, setDismissed] = useState(false);
+  const dismissed = seen || dismissedNow;
 
   const handleComplete = useCallback(() => {
     if (typeof window !== "undefined") {

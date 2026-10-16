@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, ExternalLink, Clock } from "lucide-react";
 import { useNotifications } from "@/lib/hooks/useNotifications";
-import { useMarkNotificationRead } from "@/lib/hooks/useNotifications";
+import { useMarkNotificationRead, useMarkAllNotificationsRead } from "@/lib/hooks/useNotifications";
 import { subscribeNotification, subscribeMsgprint } from "@/lib/services/realtime";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,9 +30,10 @@ export default function NotificationsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: notifications, isLoading } = useNotifications();
   const markReadMutation = useMarkNotificationRead();
+  const markAllMutation = useMarkAllNotificationsRead();
   const queryClient = useQueryClient();
 
-  const unreadCount = notifications?.filter((n) => !n.seen).length ?? 0;
+  const unreadCount = notifications?.filter((n) => !n.read).length ?? 0;
 
   useEffect(() => {
     const unsubNotif = subscribeNotification(() => {
@@ -57,11 +58,7 @@ export default function NotificationsPanel() {
   };
 
   const handleMarkAllRead = () => {
-    notifications?.forEach((n) => {
-      if (!n.seen && n.name) {
-        markReadMutation.mutate(n.name);
-      }
-    });
+    markAllMutation.mutate();
   };
 
   return (
@@ -129,7 +126,7 @@ export default function NotificationsPanel() {
                       }}
                       className={[
                         "cursor-pointer px-4 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800",
-                        !notification.seen && "bg-blue-50/50 dark:bg-blue-900/10",
+                        !notification.read && "bg-blue-50/50 dark:bg-blue-900/10",
                       ].join(" ")}
                     >
                       <div className="flex items-start gap-3">
@@ -149,7 +146,7 @@ export default function NotificationsPanel() {
                             {formatTimeAgo(notification.creation)}
                           </div>
                         </div>
-                        {!notification.seen && (
+                        {!notification.read && (
                           <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                         )}
                       </div>

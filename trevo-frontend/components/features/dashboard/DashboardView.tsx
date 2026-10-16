@@ -80,12 +80,26 @@ export function DashboardView({ dashboardName }: DashboardViewProps) {
   const { data, isLoading, refetch } = useQuery<DashboardData>({
     queryKey: ["dashboard-doc", dashboardName],
     queryFn: async () => {
-      const res = await fetch(`/api/doctype/Dashboard/${encodeURIComponent(dashboardName)}`);
+      // Dashboard DocType: charts = Dashboard Chart Link {chart, width}, cards = Number Card Link {card}
+      const res = await fetch(`/api/frappe/api/resource/Dashboard/${encodeURIComponent(dashboardName)}`);
       if (!res.ok) throw new Error("Failed to load dashboard");
-      const json = await res.json() as {
+      const doc = ((await res.json()) as { data?: {
+        dashboard_name?: string;
+        module?: string;
+        charts?: Array<{ chart: string; width?: string }>;
+        cards?: Array<{ card: string }>;
+      } }).data ?? {};
+      const json = {
+        title: doc.dashboard_name,
+        module: doc.module,
+        charts: (doc.charts ?? []).map((c) => ({
+          chart_name: c.chart,
+          width: c.width === "Full" ? "full" : "half",
+        })),
+        number_cards: (doc.cards ?? []).map((c) => ({ number_card_name: c.card })),
+      } as {
         title?: string;
         module?: string;
-        widgets?: DashboardWidget[];
         charts?: Array<{ chart_name: string; label?: string; width?: string }>;
         number_cards?: Array<{ number_card_name: string; label?: string }>;
       };
@@ -115,13 +129,15 @@ export function DashboardView({ dashboardName }: DashboardViewProps) {
   // Save widget order back to Frappe
   const saveMutation = useMutation({
     mutationFn: async (ws: DashboardWidget[]) => {
-      const res = await fetch(`/api/doctype/Dashboard/${encodeURIComponent(dashboardName)}`, {
-        method: "POST",
+      const res = await fetch(`/api/frappe/api/resource/Dashboard/${encodeURIComponent(dashboardName)}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "update_widgets",
-          charts: ws.filter((w) => w.type === "chart").map((w) => ({ chart_name: w.name })),
-          number_cards: ws.filter((w) => w.type === "number_card").map((w) => ({ number_card_name: w.name })),
+          charts: ws.filter((w) => w.type === "chart").map((w) => ({
+            chart: w.name,
+            width: w.width === "full" ? "Full" : "Half",
+          })),
+          cards: ws.filter((w) => w.type === "number_card").map((w) => ({ card: w.name })),
         }),
       });
       if (!res.ok) throw new Error("Save failed");

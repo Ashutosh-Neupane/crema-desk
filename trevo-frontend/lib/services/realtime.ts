@@ -32,6 +32,10 @@ let pendingHandlers = 0;
 
 type RealtimeStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 let currentStatus: RealtimeStatus = "disconnected";
+/** Only a connection we actually had can be "reconnecting"; a bench without
+ *  socket.io (no `socketio` process) just stays quietly disconnected, like Desk. */
+let everConnected = false;
+const lost = (): RealtimeStatus => (everConnected ? "reconnecting" : "disconnected");
 const statusListeners = new Set<(status: RealtimeStatus) => void>();
 
 function setStatus(status: RealtimeStatus) {
@@ -88,6 +92,7 @@ export function getRealtimeSocket(): Socket {
 
   socket.on("connect", () => {
     connecting = false;
+    everConnected = true;
     setStatus("connected");
     console.debug("[realtime] connected to Frappe socket.io");
   });
@@ -97,7 +102,7 @@ export function getRealtimeSocket(): Socket {
     if (reason === "io server disconnect") {
       setStatus("disconnected");
     } else {
-      setStatus("reconnecting");
+      setStatus(lost());
     }
   });
 
@@ -120,7 +125,7 @@ export function getRealtimeSocket(): Socket {
       return;
     }
     console.debug("[realtime] connect error:", err.message);
-    setStatus("reconnecting");
+    setStatus(lost());
   });
 
   socket.on("reconnect", () => {
@@ -129,7 +134,7 @@ export function getRealtimeSocket(): Socket {
   });
 
   socket.on("reconnect_attempt", () => {
-    setStatus("reconnecting");
+    setStatus(lost());
   });
 
   return socket;
