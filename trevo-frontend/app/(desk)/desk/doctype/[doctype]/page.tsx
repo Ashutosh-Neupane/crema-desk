@@ -1,11 +1,11 @@
 /**
- * DocType list page — Server Component for metadata.
- * The interactive list is in DoctypeListClient (client component).
- *
- * generateMetadata must live in a Server Component (cannot be in a "use client" file).
+ * DocType list page — Server Component for metadata; the list is the
+ * Desk-style ListView client component.
  */
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { generatePageTitle } from "@/lib/utils/generatePageTitle";
+import ListView from "@/components/list/ListView";
 
 interface Props {
   params: Promise<{ doctype: string }>;
@@ -14,14 +14,15 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { doctype } = await params;
   const d = decodeURIComponent(doctype);
-  return {
-    title: generatePageTitle(d),
-    description: `${d} list view`,
-  };
+  return { title: generatePageTitle(d), description: `${d} list view` };
 }
 
-// The default export is the client component — Next.js uses this as the page.
-export { default } from "./DoctypeListClient";
-
-
-
+export default async function DoctypeListPage({ params }: Props) {
+  const { doctype } = await params;
+  const d = decodeURIComponent(doctype);
+  return (
+    <Suspense>
+      <ListView key={d} doctype={d} />
+    </Suspense>
+  );
+}

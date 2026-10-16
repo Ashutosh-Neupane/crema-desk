@@ -10,12 +10,51 @@ function usePopover() {
   return ctx;
 }
 
-export function Popover({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode }) {
+/** Controlled or uncontrolled; closes on outside click and Escape. */
+export function Popover({
+  open: openProp,
+  onOpenChange,
+  children,
+  className = "",
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [openState, setOpenState] = React.useState(false);
+  const open = openProp ?? openState;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (openProp === undefined) setOpenState(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, setOpen]);
   return (
-    <PopoverContext.Provider value={{ open, setOpen: onOpenChange }}>
-      <div className="relative">{children}</div>
+    <PopoverContext.Provider value={{ open, setOpen }}>
+      <div ref={ref} className={`relative ${className}`}>{children}</div>
     </PopoverContext.Provider>
   );
+}
+
+export function usePopoverClose() {
+  const { setOpen } = usePopover();
+  return () => setOpen(false);
 }
 
 export function PopoverTrigger({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children: React.ReactNode }) {

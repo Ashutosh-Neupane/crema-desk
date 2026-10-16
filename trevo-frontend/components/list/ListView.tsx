@@ -1,0 +1,640 @@
+"use client";
+
+/**
+ * Desk list view (frappe/public/js/frappe/list/list_view.js), rebuilt:
+ *  - columns: title (title_field / name) · status indicator · in_list_view fields · updated
+ *  - indicator from the app's own listview_settings.get_indicator (__list_js)
+ *  - one filter model: ID/title search, inline standard filters, filter editor,
+ *    removable chips; synced to the URL (?status=Draft or ?filters=[…])
+ *  - sort, group-by counts, page size + load more, bulk Delete / Submit / Cancel
+ *  - only the views that make sense for the DocType; quick entry for New when allowed
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  ArrowDownNarrowWide,
+  ArrowUpNarrowWide,
+  ChevronDown,
+  Filter as FilterIcon,
+  Layers,
+  ListFilter,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  X,
+} from "lucide-react";
+import { useDoctype } from "@/lib/hooks/useDoctype";
+import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { useListSettings } from "@/lib/list/useListSettings";
+import { deleteRows, fetchCount, fetchGroupByCount, fetchRows, submitOrCancelRows, type Filter, type Row } from "@/lib/list/api";
+import { getIndicator, INDICATOR_PILL, indicatorFilters } from "@/lib/list/indicator";
+import { formatCell, timeAgo } from "@/lib/list/format";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import LinkInput from "@/components/list/LinkInput";
+import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
+import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+
+const enc = encodeURIComponent;
+const NO_VALUE = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading", "Image", "Table", "Table MultiSelect", "Attach Image", "Signature", "Code", "Text Editor", "HTML Editor", "Markdown Editor", "Password", "JSON", "Geolocation"]);
+const OPERATORS: Array<{ op: string; label: string }> = [
+  { op: "=", label: "equals" },
+  { op: "!=", label: "not equals" },
+  { op: "like", label: "like" },
+  { op: "not like", label: "not like" },
+  { op: ">", label: ">" },
+  { op: "<", label: "<" },
+  { op: ">=", label: ">=" },
+  { op: "<=", label: "<=" },
+  { op: "is", label: "is" },
+];
+const STD_FIELD_LABELS: Record<string, string> = { name: "ID", owner: "Created By", modified: "Last Updated On", creation: "Created On", docstatus: "Document Status", _assign: "Assigned To", modified_by: "Last Updated By" };
+
+type Sort = { field: string; order: "asc" | "desc" };
+
+function filterableFields(meta: DocTypeMeta): DocField[] {
+  return (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !f.hidden);
+}
+
+function fieldLabel(meta: DocTypeMeta, fieldname: string): string {
+  return STD_FIELD_LABELS[fieldname] ?? meta.fields?.find((f) => f.fieldname === fieldname)?.label ?? fieldname;
+}
+
+/** ?status=Draft&customer=X or ?filters=[[…]] → filter tuples */
+function filtersFromParams(doctype: string, params: URLSearchParams): Filter[] {
+  const raw = params.get("filters");
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw) as unknown[][];
+      // accept [field, op, value] as well as [doctype, field, op, value]
+      if (Array.isArray(arr)) return arr.map((f) => (f.length === 3 ? [doctype, f[0], f[1], f[2]] : f) as Filter);
+    } catch {
+      /* ignore */
+    }
+  }
+  const out: Filter[] = [];
+  params.forEach((v, k) => {
+    if (["filters", "view", "sort", "q"].includes(k)) return;
+    out.push([doctype, k, "=", v]);
+  });
+  return out;
+}
+
+function describeValue(v: unknown): string {
+  if (Array.isArray(v)) return v.join(", ");
+  if (v === null || v === undefined || v === "") return "empty";
+  return String(v);
+}
+
+// ── Filter editor ──────────────────────────────────────────────────────────
+function FilterEditor({ meta, onAdd }: { meta: DocTypeMeta; onAdd: (f: Filter) => void }) {
+  const fields = useMemo(() => [{ fieldname: "name", label: "ID", fieldtype: "Data" } as DocField, ...filterableFields(meta), { fieldname: "owner", label: "Created By", fieldtype: "Link", options: "User" } as DocField, { fieldname: "modified", label: "Last Updated On", fieldtype: "Datetime" } as DocField], [meta]);
+  const [fieldname, setFieldname] = useState(fields[1]?.fieldname ?? "name");
+  const [op, setOp] = useState("=");
+  const [value, setValue] = useState("");
+  const df = fields.find((f) => f.fieldname === fieldname);
+  const selectOptions = df?.fieldtype === "Select" ? String(df.options ?? "").split("\n") : null;
+
+  const add = () => {
+    let v: unknown = value;
+    if (op === "like" || op === "not like") v = value.includes("%") ? value : `%${value}%`;
+    if (op === "is") v = value || "set";
+    if (df?.fieldtype === "Check") v = value === "1" ? 1 : 0;
+    onAdd([meta.name, fieldname, op, v]);
+    setValue("");
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <select value={fieldname} onChange={(e) => { setFieldname(e.target.value); setValue(""); }} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+          {fields.map((f) => <option key={f.fieldname} value={f.fieldname}>{f.label || f.fieldname}</option>)}
+        </select>
+        <select value={op} onChange={(e) => setOp(e.target.value)} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+          {OPERATORS.map((o) => <option key={o.op} value={o.op}>{o.label}</option>)}
+        </select>
+      </div>
+      {op === "is" ? (
+        <select value={value || "set"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+          <option value="set">set</option>
+          <option value="not set">not set</option>
+        </select>
+      ) : df?.fieldtype === "Link" ? (
+        <LinkInput doctype={String(df.options)} value={value} onChange={setValue} autoFocus />
+      ) : selectOptions ? (
+        <select value={value} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+          {selectOptions.map((o) => <option key={o} value={o}>{o || "(empty)"}</option>)}
+        </select>
+      ) : df?.fieldtype === "Check" ? (
+        <select value={value || "1"} onChange={(e) => setValue(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+          <option value="1">Yes</option>
+          <option value="0">No</option>
+        </select>
+      ) : (
+        <input
+          type={df?.fieldtype === "Date" ? "date" : ["Int", "Float", "Currency", "Percent"].includes(df?.fieldtype ?? "") ? "number" : "text"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Value"
+          className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        />
+      )}
+      <button type="button" onClick={add} className="w-full rounded-md bg-zinc-900 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
+        Add filter
+      </button>
+    </div>
+  );
+}
+
+// ── Group-by counts ────────────────────────────────────────────────────────
+function GroupBy({ meta, filters, onPick }: { meta: DocTypeMeta; filters: Filter[]; onPick: (f: Filter) => void }) {
+  const candidates = useMemo(
+    () => [
+      { fieldname: "assigned_to", label: "Assigned To" },
+      { fieldname: "owner", label: "Created By" },
+      ...(meta.fields ?? []).filter((f) => ["Select", "Link"].includes(f.fieldtype) && !f.hidden && f.fieldname !== "naming_series").map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname })),
+    ],
+    [meta],
+  );
+  const [field, setField] = useState(candidates.find((c) => c.fieldname === "status")?.fieldname ?? candidates[2]?.fieldname ?? "owner");
+  const { data, isLoading } = useQuery({
+    queryKey: ["group-by", meta.name, field, filters],
+    queryFn: () => fetchGroupByCount(meta.name, filters, field),
+  });
+  return (
+    <div className="space-y-2">
+      <select value={field} onChange={(e) => setField(e.target.value)} className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        {candidates.map((c) => <option key={c.fieldname} value={c.fieldname}>{c.label}</option>)}
+      </select>
+      <ul className="max-h-72 overflow-auto">
+        {isLoading && <li className="px-2 py-1.5 text-sm text-zinc-400">Loading…</li>}
+        {data?.map((g) => (
+          <li key={String(g.name)}>
+            <button
+              type="button"
+              onClick={() => onPick(field === "assigned_to" ? [meta.name, "_assign", "like", `%${g.name}%`] : [meta.name, field, g.name == null ? "is" : "=", g.name ?? "not set"])}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-200">{g.title || g.name || "Not set"}</span>
+              <span className="rounded-full bg-zinc-100 px-1.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{g.count}</span>
+            </button>
+          </li>
+        ))}
+        {data && !data.length && <li className="px-2 py-1.5 text-sm text-zinc-400">No values</li>}
+      </ul>
+    </div>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+export default function ListView({ doctype }: { doctype: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const qc = useQueryClient();
+  const { data: meta, isLoading: metaLoading, error: metaError } = useDoctype(doctype);
+  const { data: ctx } = useDeskContext();
+  const settings = useListSettings(meta);
+
+  const filters = useMemo(() => filtersFromParams(doctype, new URLSearchParams(params.toString())), [doctype, params]);
+  const [search, setSearch] = useState(params.get("q") ?? "");
+  const [debounced, setDebounced] = useState(search);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const defaultSort: Sort = { field: String(meta?.sort_field || "modified"), order: (String(meta?.sort_order || "desc").toLowerCase() as "asc" | "desc") };
+  const [sortState, setSort] = useState<Sort | null>(null);
+  const sort = sortState ?? defaultSort;
+  const [pageLength, setPageLength] = useState(20);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirm, setConfirm] = useState<null | "delete" | "submit" | "cancel">(null);
+  const [quickEntry, setQuickEntry] = useState(false);
+
+  const setFilters = useCallback(
+    (next: Filter[]) => {
+      const sp = new URLSearchParams();
+      // simple equality filters read nicely in the URL (?status=Draft), others go in ?filters=
+      const complex: Filter[] = [];
+      for (const f of next) {
+        if (f[2] === "=" && (typeof f[3] === "string" || typeof f[3] === "number") && !sp.has(f[1]) && !["filters", "view", "sort", "q"].includes(f[1])) sp.set(f[1], String(f[3]));
+        else complex.push(f);
+      }
+      if (complex.length) sp.set("filters", JSON.stringify(complex));
+      if (search.trim()) sp.set("q", search.trim());
+      setSelected(new Set());
+      router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
+    },
+    [pathname, router, search],
+  );
+  const addFilter = (f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]);
+  const removeFilter = (i: number) => setFilters(filters.filter((_, j) => j !== i));
+
+  const titleField = typeof meta?.title_field === "string" && meta.title_field && meta.show_title_field_in_link !== undefined ? meta.title_field : typeof meta?.title_field === "string" ? meta.title_field : "";
+  const listFields = useMemo(() => {
+    if (!meta) return [] as DocField[];
+    return (meta.fields ?? [])
+      .filter((f) => f.in_list_view && !NO_VALUE.has(f.fieldtype) && f.fieldname !== titleField && f.fieldname !== "status")
+      .slice(0, 6);
+  }, [meta, titleField]);
+  const hasStatusField = !!meta?.fields?.some((f) => f.fieldname === "status");
+  const hasIndicator = !!meta && (!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled"));
+  const standardFilters = useMemo(
+    () => (meta?.fields ?? []).filter((f) => f.in_standard_filter && ["Link", "Select", "Data", "Date", "Check"].includes(f.fieldtype)).slice(0, 4),
+    [meta],
+  );
+
+  const fetchFields = useMemo(() => {
+    if (!meta) return [];
+    const fs = new Set<string>(["name", "docstatus", "modified", "owner", "_comment_count", "_assign"]);
+    if (titleField) fs.add(titleField);
+    if (hasStatusField) fs.add("status");
+    if (meta.fields?.some((f) => f.fieldname === "workflow_state")) fs.add("workflow_state");
+    for (const f of listFields) {
+      fs.add(f.fieldname);
+      if (f.fieldtype === "Currency" && typeof f.options === "string" && meta.fields?.some((x) => x.fieldname === f.options)) fs.add(f.options);
+    }
+    for (const f of (settings?.add_fields as string[] | undefined) ?? []) if (f === "name" || meta.fields?.some((x) => x.fieldname === f)) fs.add(f);
+    for (const f of ["enabled", "disabled", "currency"]) if (meta.fields?.some((x) => x.fieldname === f)) fs.add(f);
+    return [...fs].filter((f) => f !== "_comment_count");
+  }, [meta, titleField, hasStatusField, listFields, settings]);
+
+  const searchFilter = useMemo<Filter[]>(() => (debounced ? [[doctype, titleField || "name", "like", `%${debounced}%`]] : []), [debounced, doctype, titleField]);
+  const allFilters = useMemo(() => [...filters, ...searchFilter], [filters, searchFilter]);
+
+  const rowsQuery = useQuery<Row[]>({
+    queryKey: ["list", doctype, fetchFields, allFilters, sort, pageLength],
+    enabled: !!meta && settings !== undefined,
+    queryFn: () => fetchRows({ doctype, fields: fetchFields, filters: allFilters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength }),
+    placeholderData: keepPreviousData,
+  });
+  const countQuery = useQuery({
+    queryKey: ["list-count", doctype, allFilters],
+    enabled: !!meta,
+    queryFn: () => fetchCount(doctype, allFilters),
+  });
+
+  // Search by title can miss an exact ID — retry on name when the title search is empty
+  const rows = rowsQuery.data ?? [];
+  const total = countQuery.data ?? rows.length;
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["list", doctype] });
+    qc.invalidateQueries({ queryKey: ["list-count", doctype] });
+  };
+
+  const runBulk = async () => {
+    const names = [...selected];
+    const kind = confirm;
+    setConfirm(null);
+    try {
+      if (kind === "delete") await deleteRows(doctype, names);
+      else if (kind) await submitOrCancelRows(doctype, names, kind);
+      toast.success(`${kind === "delete" ? "Deleted" : kind === "submit" ? "Submitted" : "Cancelled"} ${names.length} ${doctype}${names.length === 1 ? "" : " records"}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Action failed", { duration: 8000 });
+    }
+    setSelected(new Set());
+    refresh();
+  };
+
+  const views = useMemo(() => {
+    if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
+    const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}` }];
+    if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `/desk/doctype/${enc(doctype)}/view/tree` });
+    if (meta.image_field) v.push({ id: "image", label: "Image", href: `/desk/doctype/${enc(doctype)}/view/image` });
+    return v;
+  }, [meta, doctype]);
+
+  if (metaError) return <p className="p-6 text-sm text-red-600">{(metaError as Error).message}</p>;
+  if (metaLoading || !meta) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
+
+  const sortable = [
+    { fieldname: "modified", label: "Last Updated On" },
+    { fieldname: "creation", label: "Created On" },
+    { fieldname: "name", label: "ID" },
+    ...(meta.fields ?? []).filter((f) => ["Date", "Datetime", "Int", "Float", "Currency", "Percent", "Data", "Link", "Select"].includes(f.fieldtype) && (f.in_list_view || f.in_standard_filter || f.bold)).map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname })),
+  ];
+  const canCreate = !meta.issingle && !meta.istable;
+  const dateFormat = String(ctx?.sysdefaults?.date_format ?? "yyyy-mm-dd");
+  const defaultCurrency = (ctx?.defaults?.currency as string) || undefined;
+  const subjectLabel = titleField ? fieldLabel(meta, titleField) : "ID";
+
+  return (
+    <div className="space-y-3">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{doctype}</h1>
+        {views.length > 1 && (
+          <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
+            {views.map((v) => (
+              <Link key={v.id} href={v.href} className={`rounded-md px-2.5 py-1 text-xs font-medium ${v.id === "list" ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>
+                {v.label}
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={refresh} aria-label="Refresh" className="rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+            <RefreshCw className={`h-4 w-4 ${rowsQuery.isFetching ? "animate-spin" : ""}`} />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger aria-label="List settings" className="rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+              <Settings2 className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/desk/list-view-settings?doctype=${enc(doctype)}`)}>List settings</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {selected.size > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+                Actions ({selected.size}) <ChevronDown className="h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {meta.is_submittable ? (
+                  <>
+                    <DropdownMenuItem onClick={() => setConfirm("submit")}>Submit</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setConfirm("cancel")}>Cancel</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
+                <DropdownMenuItem onClick={() => setConfirm("delete")} className="text-red-600">Delete</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            canCreate && (
+              <button
+                type="button"
+                onClick={() => (canQuickEntry(meta) ? setQuickEntry(true) : router.push(`/desk/doctype/${enc(doctype)}/new`))}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                <Plus className="h-4 w-4" /> Add {doctype}
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-56">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${subjectLabel}`}
+            className="h-8 w-full rounded-md border border-zinc-200 bg-white pl-8 pr-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+        </div>
+        {standardFilters.map((f) => {
+          const current = filters.find((x) => x[1] === f.fieldname && x[2] === "=");
+          const val = current ? String(current[3]) : "";
+          const set = (v: string) => setFilters(v ? [...filters.filter((x) => x[1] !== f.fieldname), [doctype, f.fieldname, "=", v]] : filters.filter((x) => x[1] !== f.fieldname));
+          return f.fieldtype === "Link" ? (
+            <LinkInput key={f.fieldname} doctype={String(f.options)} value={val} onChange={set} placeholder={f.label ?? f.fieldname} className="w-40" />
+          ) : f.fieldtype === "Select" ? (
+            <select key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <option value="">{f.label}</option>
+              {String(f.options ?? "").split("\n").filter(Boolean).map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : f.fieldtype === "Check" ? (
+            <select key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-36 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <option value="">{f.label}</option>
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          ) : (
+            <input key={f.fieldname} type={f.fieldtype === "Date" ? "date" : "text"} defaultValue={val} title={f.label ?? f.fieldname} aria-label={f.label ?? f.fieldname} onBlur={(e) => set(e.target.value)} onKeyDown={(e) => e.key === "Enter" && set((e.target as HTMLInputElement).value)} placeholder={f.label ?? f.fieldname} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+          );
+        })}
+
+        <Popover>
+          <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+            <FilterIcon className="h-3.5 w-3.5" /> Filter
+            {filters.length > 0 && <span className="rounded-full bg-zinc-900 px-1.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">{filters.length}</span>}
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <FilterEditor meta={meta} onAdd={addFilter} />
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+            <Layers className="h-3.5 w-3.5" /> Group by
+          </PopoverTrigger>
+          <PopoverContent className="w-72">
+            <GroupBy meta={meta} filters={allFilters} onPick={addFilter} />
+          </PopoverContent>
+        </Popover>
+
+        <div className="ml-auto flex items-center gap-1">
+          <select
+            value={sort.field}
+            onChange={(e) => setSort({ field: e.target.value, order: sort.order })}
+            aria-label="Sort by"
+            className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          >
+            {sortable.filter((s, i, a) => a.findIndex((x) => x.fieldname === s.fieldname) === i).map((s) => <option key={s.fieldname} value={s.fieldname}>{s.label}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => setSort({ field: sort.field, order: sort.order === "asc" ? "desc" : "asc" })}
+            aria-label={sort.order === "asc" ? "Ascending" : "Descending"}
+            className="rounded-md border border-zinc-200 p-1.5 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            {sort.order === "asc" ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Active filters */}
+      {filters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {filters.map((f, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+              <ListFilter className="h-3 w-3 text-zinc-400" />
+              <span className="font-medium">{fieldLabel(meta, f[1])}</span>
+              <span className="text-zinc-400">{OPERATORS.find((o) => o.op === f[2])?.label ?? f[2]}</span>
+              <span>{describeValue(f[3]).replace(/^%|%$/g, "")}</span>
+              <button type="button" onClick={() => removeFilter(i)} aria-label={`Remove ${fieldLabel(meta, f[1])} filter`} className="rounded-full p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          <button type="button" onClick={() => setFilters([])} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 bg-zinc-50/60 text-left text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <th className="w-10 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={allSelected}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
+                    className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
+                  />
+                </th>
+                <th className="px-3 py-2.5">{subjectLabel}</th>
+                {hasIndicator && <th className="px-3 py-2.5">Status</th>}
+                {listFields.map((f) => (
+                  <th key={f.fieldname} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
+                ))}
+                <th className="w-24 px-3 py-2.5 text-right">
+                  {rows.length} of {total}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
+                const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+                const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
+                return (
+                  <tr
+                    key={r.name}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("a,button,input")) return;
+                      if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
+                      else router.push(href);
+                    }}
+                    className={`group cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
+                  >
+                    <td className="px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${r.name}`}
+                        checked={selected.has(r.name)}
+                        onChange={() => {
+                          const next = new Set(selected);
+                          if (next.has(r.name)) next.delete(r.name);
+                          else next.add(r.name);
+                          setSelected(next);
+                        }}
+                        className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
+                      />
+                    </td>
+                    <td className="max-w-[18rem] px-3 py-2.5">
+                      <Link href={href} className="block truncate font-medium text-zinc-900 hover:underline dark:text-zinc-100">{subject}</Link>
+                      {subject !== r.name && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
+                    </td>
+                    {hasIndicator && (
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        {ind && (
+                          <button
+                            type="button"
+                            title={`Filter by ${ind[0]}`}
+                            onClick={() => ind[2] && setFilters([...filters, ...(indicatorFilters(doctype, ind[2]) as Filter[])])}
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}
+                          >
+                            {ind[0]}
+                          </button>
+                        )}
+                      </td>
+                    )}
+                    {listFields.map((f) => {
+                      const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
+                      const numeric = ["Currency", "Float", "Int", "Percent"].includes(f.fieldtype);
+                      return (
+                        <td key={f.fieldname} className={`max-w-[16rem] truncate whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-300 ${numeric ? "text-right tabular-nums" : ""}`}>
+                          {f.fieldtype === "Link" && text ? (
+                            <button type="button" onClick={() => addFilter([doctype, f.fieldname, "=", r[f.fieldname]])} className="truncate hover:underline" title={`Filter by ${text}`}>
+                              {text}
+                            </button>
+                          ) : (
+                            text
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
+                      <span className="inline-flex items-center gap-2">
+                        {Number(r._comment_count) > 0 && (
+                          <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
+                        )}
+                        {timeAgo(r.modified)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {!rowsQuery.isLoading && rows.length === 0 && (
+          <div className="px-6 py-14 text-center">
+            <p className="text-sm text-zinc-500">{filters.length || debounced ? `No ${doctype} matches these filters` : `You haven't created a ${doctype} yet`}</p>
+            {filters.length || debounced ? (
+              <button type="button" onClick={() => { setSearch(""); setFilters([]); }} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Clear filters</button>
+            ) : (
+              canCreate && <button type="button" onClick={() => (canQuickEntry(meta) ? setQuickEntry(true) : router.push(`/desk/doctype/${enc(doctype)}/new`))} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
+            )}
+          </div>
+        )}
+        {rowsQuery.isLoading && <div className="h-40 animate-pulse bg-zinc-50 dark:bg-zinc-900" />}
+
+        {rows.length > 0 && (
+          <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+            {[20, 100, 500].map((n) => (
+              <button key={n} type="button" onClick={() => setPageLength(n)} className={`rounded-md px-2 py-1 ${pageLength === n ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}>
+                {n}
+              </button>
+            ))}
+            {rows.length < total && (
+              <button type="button" onClick={() => setPageLength(pageLength + 20)} className="ml-auto rounded-md border border-zinc-200 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                Load more
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {confirm === "delete" ? "Delete" : confirm === "submit" ? "Submit" : "Cancel"} {selected.size} {doctype} {selected.size === 1 ? "record" : "records"}?
+            </DialogTitle>
+            <DialogDescription>{confirm === "delete" ? "This cannot be undone." : "This changes the documents permanently."}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200">No</button>
+            <button type="button" onClick={() => void runBulk()} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${confirm === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}>Yes</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {quickEntry && (
+        <QuickEntry
+          meta={meta}
+          onClose={() => setQuickEntry(false)}
+          onCreated={(name) => {
+            setQuickEntry(false);
+            refresh();
+            toast.success(`${doctype} ${name} created`, { action: { label: "Open", onClick: () => router.push(`/desk/doctype/${enc(doctype)}/${enc(name)}`) } });
+          }}
+        />
+      )}
+    </div>
+  );
+}
