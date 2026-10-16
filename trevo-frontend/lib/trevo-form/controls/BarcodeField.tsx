@@ -14,7 +14,7 @@ import type { FieldControlProps } from "./index";
 const hasBarcodeDetector =
   typeof window !== "undefined" && "BarcodeDetector" in window;
 
-export default function BarcodeField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function BarcodeField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" ? value : "";
   const isDisabled = disabled || !!field.read_only;
 
@@ -77,7 +77,7 @@ export default function BarcodeField({ field, value, onChange, disabled, error }
       <div className="flex gap-2">
         <input
           type="text"
-          id={field.fieldname}
+          id={inputId ?? field.fieldname}
           value={str}
           onChange={(e) => onChange(e.target.value)}
           disabled={isDisabled}

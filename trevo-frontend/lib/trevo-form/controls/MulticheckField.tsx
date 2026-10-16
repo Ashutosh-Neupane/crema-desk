@@ -22,7 +22,7 @@ export default function MulticheckField({ field, value, onChange, disabled }: Fi
       {field.label && (
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label}
-          {field.reqd && <span className="ml-1 text-red-500">*</span>}
+          {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
         </label>
       )}
       <div className="flex flex-col gap-1.5">

@@ -14,6 +14,7 @@ export interface DeskContext {
   roles: string[];
   /** permission lists from boot.user (can_create, in_create, …) for app scripts */
   perms: Record<string, string[]>;
+  developer_mode: boolean;
 }
 
 export async function GET() {
@@ -30,6 +31,7 @@ export async function GET() {
         .filter((k) => Array.isArray(user[k]))
         .map((k) => [k, user[k] as string[]]),
     ),
+    developer_mode: !!boot?.developer_mode,
   };
   return NextResponse.json(ctx, { headers: { "Cache-Control": "private, max-age=60" } });
 }

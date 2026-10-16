@@ -39,6 +39,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import LinkInput from "@/components/list/LinkInput";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
+import { useShortcuts } from "@/lib/shortcuts";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 const enc = encodeURIComponent;
@@ -315,6 +316,12 @@ export default function ListView({ doctype }: { doctype: string }) {
     return v;
   }, [meta, doctype]);
 
+  // Desk list shortcut: Ctrl/⌘+B = New (list_view.js)
+  useShortcuts(
+    [{ keys: "mod+b", description: `New ${doctype}`, group: "List", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) }],
+    [doctype, router],
+  );
+
   if (metaError) return <p className="p-6 text-sm text-red-600">{(metaError as Error).message}</p>;
   if (metaLoading || !meta) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
 
@@ -325,6 +332,19 @@ export default function ListView({ doctype }: { doctype: string }) {
     ...(meta.fields ?? []).filter((f) => ["Date", "Datetime", "Int", "Float", "Currency", "Percent", "Data", "Link", "Select"].includes(f.fieldtype) && (f.in_list_view || f.in_standard_filter || f.bold)).map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname })),
   ];
   const canCreate = !meta.issingle && !meta.istable;
+  // Desk: the app's listview_settings.primary_action replaces New (e.g. DocType's "Create New DocType" dialog)
+  const onAdd = () => {
+    if (typeof settings?.primary_action === "function") {
+      try {
+        (settings.primary_action as () => unknown).call(settings);
+        return;
+      } catch (err) {
+        console.warn("[list] primary_action failed", err);
+      }
+    }
+    if (canQuickEntry(meta)) setQuickEntry(true);
+    else router.push(`/desk/doctype/${enc(doctype)}/new`);
+  };
   const dateFormat = String(ctx?.sysdefaults?.date_format ?? "yyyy-mm-dd");
   const defaultCurrency = (ctx?.defaults?.currency as string) || undefined;
   const subjectLabel = titleField ? fieldLabel(meta, titleField) : "ID";
@@ -377,7 +397,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             canCreate && (
               <button
                 type="button"
-                onClick={() => (canQuickEntry(meta) ? setQuickEntry(true) : router.push(`/desk/doctype/${enc(doctype)}/new`))}
+                onClick={onAdd}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 <Plus className="h-4 w-4" /> Add {doctype}
@@ -587,7 +607,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             {filters.length || debounced ? (
               <button type="button" onClick={() => { setSearch(""); setFilters([]); }} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Clear filters</button>
             ) : (
-              canCreate && <button type="button" onClick={() => (canQuickEntry(meta) ? setQuickEntry(true) : router.push(`/desk/doctype/${enc(doctype)}/new`))} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
+              canCreate && <button type="button" onClick={onAdd} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
             )}
           </div>
         )}

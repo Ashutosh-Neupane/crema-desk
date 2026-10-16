@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/frappe/auth";
@@ -8,6 +8,11 @@ import { useUIStore } from "@/lib/stores/ui.store";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import CommandPalette from "@/components/CommandPalette";
 import DeskSidebar from "@/components/DeskSidebar";
+import DialogHost from "@/components/desk/DialogHost";
+import ShortcutsDialog from "@/components/desk/ShortcutsDialog";
+import { useShortcuts } from "@/lib/shortcuts";
+import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
+import { useQueryClient } from "@tanstack/react-query";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useRealtimeStatus } from "@/lib/services/realtime";
@@ -261,16 +266,29 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const realtimeStatus = useRealtimeStatus();
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        document.dispatchEvent(new CustomEvent("trevo:command-palette"));
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const queryClient = useQueryClient();
+  // Desk's global shortcuts (frappe/public/js/frappe/ui/keyboard.js, desk.js, sidebar.js)
+  useShortcuts(
+    [
+      { keys: "mod+k", description: "Open awesomebar", group: "Global", allowInInput: true, action: () => document.dispatchEvent(new CustomEvent("trevo:command-palette")) },
+      { keys: "mod+g", description: "Open global search", group: "Global", allowInInput: true, action: () => document.dispatchEvent(new CustomEvent("trevo:command-palette")) },
+      { keys: "mod+/", description: "Toggle sidebar", group: "Global", allowInInput: true, action: () => toggleSidebar() },
+      { keys: "shift+mod+g", description: "Switch theme", group: "Global", action: () => setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark") },
+      { keys: "shift+?", description: "Show keyboard shortcuts", group: "Global", action: () => setShortcutsOpen(true) },
+      {
+        keys: "shift+mod+r",
+        description: "Clear cache and reload",
+        group: "Global",
+        action: () => {
+          clearDoctypeMetaCache();
+          queryClient.clear();
+          window.location.reload();
+        },
+      },
+    ],
+    [toggleSidebar, setTheme, queryClient],
+  );
 
   const sections = navigation?.sections?.length ? navigation.sections : FALLBACK_NAV.sections;
   const apps = navigation?.apps ?? [];
@@ -450,6 +468,8 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
           </div>
           {children}
         </main>
+        <DialogHost />
+        <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       </div>
     </div>
   );

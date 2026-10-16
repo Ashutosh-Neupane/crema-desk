@@ -11,6 +11,7 @@
 import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
+import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 
 export interface RuntimeContext {
   user: string;
@@ -20,6 +21,7 @@ export interface RuntimeContext {
   sysdefaults?: Record<string, unknown>;
   /** boot.user permission lists (can_create, in_create, …) */
   perms?: Record<string, string[]>;
+  developer_mode?: boolean;
   /** metas known to the page (parent + children) for frappe.meta.* */
   metas?: Record<string, DocTypeMeta>;
   navigate?: (href: string) => void;
@@ -179,9 +181,16 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
 
   const call = async (opts: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void; freeze?: boolean }, args?: Record<string, unknown>) => {
     const o = typeof opts === "string" ? { method: opts, args } : opts;
-    const { env } = await deskCall(o.method, o.args ?? {});
-    o.callback?.(env);
-    return env;
+    try {
+      const { env } = await deskCall(o.method, o.args ?? {});
+      o.callback?.(env);
+      return env;
+    } catch (err) {
+      // Desk's frappe.call shows the server message and the chain simply stops
+      // (a failed jQuery deferred) — never an unhandled rejection that crashes the page
+      toast.error(err instanceof Error ? err.message : String(err), { duration: 8000 });
+      return new Promise<never>(() => {});
+    }
   };
 
   const frappe = {
@@ -204,22 +213,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
         // class bases some app scripts extend; behaviour comes from Trevo's own form
         Controller: class {},
       },
-      Dialog: class {
-        constructor(public opts: Record<string, unknown>) {}
-        show() {}
-        hide() {}
-        set_values() {}
-        get_values() {
-          return {};
-        }
-      },
+      Dialog: DeskDialog,
       toolbar: {},
     },
     provide,
     session: { user: ctx.user, user_fullname: ctx.full_name ?? ctx.user },
     user: { name: ctx.user, has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)) },
     user_roles: ctx.roles ?? [],
-    boot: { sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
+    boot: { developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
     sys_defaults: ctx.sysdefaults ?? {},
     defaults: {
       get_user_default: (k: string) => {
@@ -266,7 +267,13 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
         !!(await call({ method: "frappe.client.get_value", args: { doctype, filters: { name }, fieldname: "name" } })).message,
       count: async (doctype: string, args: { filters?: unknown } = {}) =>
         (await call({ method: "frappe.client.get_count", args: { doctype, filters: args.filters } })).message,
+      insert: async (doc: Record<string, unknown>) => (await call({ method: "frappe.client.insert", args: { doc } })).message,
+      set_value: async (doctype: string, name: string, fieldname: unknown, value?: unknown) =>
+        (await call({ method: "frappe.client.set_value", args: { doctype, name, fieldname, value } })).message,
+      get_doc: async (doctype: string, name: string) => (await call({ method: "frappe.client.get", args: { doctype, name } })).message,
     },
+    prompt: deskPrompt,
+    confirm: deskConfirm,
     msgprint: (m: unknown) => {
       const text = typeof m === "object" && m ? cstr((m as { message?: unknown }).message) : cstr(m);
       toast.info(text.replace(/<[^>]+>/g, ""));

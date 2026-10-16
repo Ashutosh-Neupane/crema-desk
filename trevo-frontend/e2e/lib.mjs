@@ -24,7 +24,7 @@ export async function start() {
   await page.fill("input:not([type=password])", process.env.TREVO_USER ?? "Administrator");
   await page.fill("input[type=password]", process.env.TREVO_PASS ?? "admin");
   await page.click("button[type=submit]");
-  await page.waitForURL(/\/desk/);
+  await page.waitForURL(/\/desk/, { timeout: 120000 });
   let failures = 0;
   return {
     browser,

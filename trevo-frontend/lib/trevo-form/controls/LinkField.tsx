@@ -9,6 +9,8 @@
  *  - arrow to open the linked document
  */
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAnchoredPosition } from "@/lib/hooks/useAnchoredPosition";
 import Link from "next/link";
 import { ArrowUpRight, Plus } from "lucide-react";
 import type { FieldControlProps } from "./index";
@@ -48,7 +50,7 @@ function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; 
   );
 }
 
-export default function LinkField({ field, value, onChange, disabled, error, getQuery }: FieldControlProps) {
+export default function LinkField({ field, inputId, value, onChange, disabled, error, getQuery, compact }: FieldControlProps) {
   const current = typeof value === "string" ? value : value == null ? "" : String(value);
   const [text, setText] = useState(current);
   const [prev, setPrev] = useState(current);
@@ -62,6 +64,9 @@ export default function LinkField({ field, value, onChange, disabled, error, get
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const pos = useAnchoredPosition(anchorRef, listRef, open, { matchWidth: true });
   const doctype = String(field.options ?? "");
   const isDisabled = disabled || !!field.read_only;
 
@@ -105,9 +110,9 @@ export default function LinkField({ field, value, onChange, disabled, error, get
   }
 
   return (
-    <div className="group relative">
+    <div ref={anchorRef} className="group relative">
       <input
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         type="text"
         value={text}
         autoComplete="off"
@@ -147,8 +152,10 @@ export default function LinkField({ field, value, onChange, disabled, error, get
           }
         }}
         className={[
-          "w-full rounded-lg border bg-white px-3 py-2 pr-8 text-sm text-zinc-900 transition-colors focus:outline-none focus:ring-2 dark:bg-zinc-900 dark:text-zinc-100",
-          error ? "border-red-500 focus:ring-red-500/20" : "border-zinc-300 focus:border-zinc-500 focus:ring-zinc-900/10 dark:border-zinc-700",
+          "w-full bg-white pr-8 text-sm text-zinc-900 transition-colors focus:outline-none dark:bg-zinc-900 dark:text-zinc-100",
+          compact
+            ? `h-8 rounded-md border bg-transparent px-2 focus:bg-white dark:bg-transparent dark:focus:bg-zinc-900 ${error ? "border-red-400" : "border-transparent hover:border-zinc-200 focus:border-zinc-400 dark:hover:border-zinc-700"}`
+            : `rounded-lg border px-3 py-2 focus:ring-2 ${error ? "border-red-500 focus:ring-red-500/20" : "border-zinc-300 focus:border-zinc-500 focus:ring-zinc-900/10 dark:border-zinc-700"}`,
         ].join(" ")}
       />
       {current && !open && (
@@ -162,11 +169,13 @@ export default function LinkField({ field, value, onChange, disabled, error, get
       )}
       {loading && open && <div className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700" aria-hidden="true" />}
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <ul
+          ref={listRef}
           role="listbox"
           id={`${field.fieldname}-listbox`}
-          className="absolute left-0 right-0 z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          style={{ position: "fixed", top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width }}
+          className="z-[70] max-h-72 overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           {results.map((r, i) => (
             <li key={r.value} role="option" aria-selected={i === active}>
@@ -192,7 +201,8 @@ export default function LinkField({ field, value, onChange, disabled, error, get
               <Plus className="h-3.5 w-3.5" /> Create a new {doctype}
             </button>
           </li>
-        </ul>
+        </ul>,
+        document.body,
       )}
 
       {creating && (

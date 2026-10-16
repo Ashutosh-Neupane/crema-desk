@@ -7,7 +7,7 @@ import type { FieldControlProps } from "./index";
  * Color field — maps to Frappe fieldtype "Color".
  * Renders a native color picker with a hex text input beside it.
  */
-export default function ColorField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function ColorField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" && value ? value : "#000000";
   const [hex, setHex] = useState(str);
 
@@ -46,7 +46,7 @@ export default function ColorField({ field, value, onChange, disabled, error }: 
       {/* Hex text input */}
       <input
         type="text"
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={hex}
         maxLength={7}
         onChange={(e) => handleTextInput(e.target.value)}

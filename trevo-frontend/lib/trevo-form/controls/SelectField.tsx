@@ -2,7 +2,7 @@
 
 import type { FieldControlProps } from "./index";
 
-export default function SelectField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function SelectField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const options = String(field.options ?? "")
     .split("\n")
     .map((s) => s.trim())
@@ -11,7 +11,7 @@ export default function SelectField({ field, value, onChange, disabled, error }:
 
   return (
     <select
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       value={selected}
       onChange={(e) => onChange(e.target.value || null)}
       disabled={disabled || !!field.read_only}

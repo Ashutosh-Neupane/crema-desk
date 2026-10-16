@@ -75,6 +75,7 @@ export async function fetchDoctypeMetaClient(doctype: string): Promise<DocTypeMe
   const params = new URLSearchParams({ doctype, with_parent: "1" });
   const res = await fetch(`/api/frappe/api/method/${GETDOCTYPE}?${params}`, {
     credentials: "include",
+    cache: "no-store", // meta changes as soon as a DocType / Customize Form is saved
     headers: { Accept: "application/json" },
   });
   const json = (await res.json().catch(() => null)) as (GetDoctypeResponse & { exception?: string }) | null;

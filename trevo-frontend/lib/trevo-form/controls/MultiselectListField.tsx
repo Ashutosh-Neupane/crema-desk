@@ -22,7 +22,7 @@ export default function MultiselectListField({ field, value, onChange, disabled 
       {field.label && (
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label}
-          {field.reqd && <span className="ml-1 text-red-500">*</span>}
+          {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
         </label>
       )}
       <div className="max-h-40 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">

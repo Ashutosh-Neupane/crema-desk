@@ -13,8 +13,9 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { FormController, Row } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
-import LinkInput from "@/components/list/LinkInput";
+import LinkField from "@/lib/trevo-form/controls/LinkField";
 import FormBody from "@/components/form/FormBody";
+import DatePicker from "@/components/form/DatePicker";
 import { formatCell } from "@/lib/list/format";
 import { currencyFor } from "@/lib/trevo-form/controls/NumberField";
 
@@ -81,14 +82,15 @@ function Cell({
     return <div className={`truncate px-2 py-1.5 text-sm text-zinc-700 dark:text-zinc-300 ${NUMERIC.has(df.fieldtype) ? "text-right tabular-nums" : ""}`}>{display}</div>;
   }
   if (df.fieldtype === "Link") {
+    // full Link control: suggestions on focus (set_query filters), "Create a new …", validation
     return (
-      <LinkInput
-        doctype={String(df.options)}
-        value={String(value ?? "")}
-        onChange={(v) => set(v || null)}
-        placeholder=""
+      <LinkField
+        field={df}
+        value={value}
+        onChange={(v) => set(v)}
+        compact
+        error={error}
         getQuery={() => ctl.getQuery(df.fieldname, table)?.(parent, row.doctype, row.name)}
-        className="[&_input]:border-transparent [&_input]:bg-transparent [&_input:hover]:border-zinc-200 [&_input:focus]:border-zinc-400 dark:[&_input:hover]:border-zinc-700"
       />
     );
   }
@@ -100,7 +102,7 @@ function Cell({
     );
   }
   if (NUMERIC.has(df.fieldtype)) return <NumberCell df={df} value={value} display={display} onCommit={set} className={base} />;
-  if (df.fieldtype === "Date") return <input type="date" value={String(value ?? "")} onChange={(e) => set(e.target.value || null)} className={base} />;
+  if (df.fieldtype === "Date") return <DatePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
   return <TextCell value={String(value ?? "")} onCommit={set} className={base} />;
 }
 
@@ -191,7 +193,7 @@ export default function Grid({
             {cols.map((c) => (
               <div key={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
                 {c.label}
-                {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span className="ml-0.5 text-red-500">*</span>}
+                {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
               </div>
             ))}
             <div />

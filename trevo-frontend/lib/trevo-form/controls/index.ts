@@ -8,6 +8,10 @@ export interface FieldControlProps {
   disabled?: boolean;
   /** Current document values — needed by controls that depend on other fields (Dynamic Link, set_query) */
   doc?: Record<string, unknown>;
+  /** dense styling for grid cells */
+  compact?: boolean;
+  /** unique DOM id for the input (label htmlFor) — fieldnames repeat across forms/dialogs */
+  inputId?: string;
   /** set_query result for Link fields: { filters, query } */
   getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
 }

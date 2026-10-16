@@ -20,7 +20,9 @@ import { loginSchema } from "@/lib/schemas/auth-login.schema";
 export async function POST(req: Request) {
   // Check rate limit first
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-  const rateCheck = checkRateLimit(ip, { maxRequests: 5, windowSeconds: 60 });
+  // 5/min per IP in production; local dev (tests log in repeatedly) gets more room
+  const maxRequests = Number(process.env.TREVO_LOGIN_RATE_LIMIT) || (process.env.NODE_ENV === "production" ? 5 : 60);
+  const rateCheck = checkRateLimit(ip, { maxRequests, windowSeconds: 60 });
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { message: "Too many login attempts. Please try again later." },

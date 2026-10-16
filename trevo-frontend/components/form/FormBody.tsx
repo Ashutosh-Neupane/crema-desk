@@ -10,7 +10,7 @@
  *  - depends_on / mandatory_depends_on / read_only_depends_on see `doc` (and
  *    `parent` for child rows); script overrides (set_df_property) win
  */
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import FormControl from "@/lib/trevo-form/controls/FormControl";
 import { parseDoctypeMeta } from "@/lib/trevo-form/meta/parseDoctypeMeta";
@@ -37,6 +37,8 @@ interface Props {
   compact?: boolean;
   /** extra content appended to a tab (e.g. Connections) */
   tabExtras?: Record<string, React.ReactNode>;
+  /** Ctrl+J "jump to field": switch to its tab, open its section, focus it */
+  focusRequest?: { fieldname: string; n: number } | null;
 }
 
 const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
@@ -69,11 +71,30 @@ export default function FormBody({
   renderTable,
   compact = false,
   tabExtras,
+  focusRequest,
 }: Props) {
   const layout = useMemo(() => parseDoctypeMeta(meta), [meta]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const ctx = dependsCtx(values, parent);
+
+  const [handled, setHandled] = useState(0);
+  if (focusRequest && focusRequest.n !== handled) {
+    // adjust state during render (no effect cascade): reveal the field's tab + section
+    setHandled(focusRequest.n);
+    const sec = layout.sections.find((s) => [...s.fields, ...s.childTables].some((f) => f.fieldname === focusRequest.fieldname));
+    if (sec?.tab) setActiveTab(sec.tab);
+    if (sec?.collapsible) setToggled((t) => new Set([...t, sec.fieldname]));
+  }
+  useEffect(() => {
+    if (!focusRequest) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[id$="-${CSS.escape(focusRequest.fieldname)}"]`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focusRequest]);
 
   const effective = (df: DocField): DocField & { _hidden: boolean } => {
     const o = (overrides[`${overridePrefix}${df.fieldname}`] ?? {}) as Partial<DocField>;
@@ -99,7 +120,7 @@ export default function FormBody({
         <div key={df.fieldname} className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             {df.label}
-            {!!df.reqd && <span className="ml-0.5 text-red-500">*</span>}
+            {!!df.reqd && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
           </label>
           {renderTable(df)}
           {errors[df.fieldname] && <span className="text-xs text-red-600">{errors[df.fieldname]}</span>}

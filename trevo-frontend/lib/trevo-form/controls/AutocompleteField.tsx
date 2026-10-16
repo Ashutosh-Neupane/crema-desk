@@ -8,7 +8,7 @@ import type { FieldControlProps } from "./index";
  * Free-text input with a filterable dropdown from field.options (newline-separated).
  * Allows values not in the list (unlike Select which enforces the list).
  */
-export default function AutocompleteField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function AutocompleteField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const options = String(field.options ?? "")
     .split("\n")
     .map((s) => s.trim())
@@ -57,7 +57,7 @@ export default function AutocompleteField({ field, value, onChange, disabled, er
     <div ref={containerRef} className="relative">
       <input
         type="text"
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={inputVal}
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => options.length > 0 && setOpen(true)}

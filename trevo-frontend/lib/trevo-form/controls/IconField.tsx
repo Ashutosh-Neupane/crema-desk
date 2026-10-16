@@ -22,7 +22,7 @@ const ICON_NAMES = [
   "activity","alert-circle","info","help-circle","check-circle","x-circle",
 ];
 
-export default function IconField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function IconField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const current = typeof value === "string" ? value : "";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -47,7 +47,7 @@ export default function IconField({ field, value, onChange, disabled, error }: F
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         disabled={disabled || !!field.read_only}
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"

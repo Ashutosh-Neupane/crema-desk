@@ -9,7 +9,7 @@ const TEXTAREA_TYPES = new Set(["Text", "Small Text", "Long Text"]);
  * Default text input — fallback for all field types without a specialized control.
  * Supports text, data, password, email, url, phone, etc.
  */
-export default function FormField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function FormField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const sharedClassName = [
     "w-full rounded-lg border px-3 py-2 text-sm transition-colors",
     error
@@ -24,13 +24,13 @@ export default function FormField({ field, value, onChange, disabled, error }: F
   if (TEXTAREA_TYPES.has(field.fieldtype)) {
     return (
       <textarea
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={String(value ?? "")}
         onChange={(e) => onChange(e.target.value || null)}
         readOnly={!!field.read_only}
         disabled={disabled || !!field.read_only}
         placeholder={String(field.placeholder ?? "")}
-        maxLength={field.length ?? undefined}
+        maxLength={field.length ? Number(field.length) : undefined}
         rows={field.fieldtype === "Small Text" ? 3 : 5}
         className={`${sharedClassName} resize-y`}
       />
@@ -39,14 +39,14 @@ export default function FormField({ field, value, onChange, disabled, error }: F
 
   return (
     <input
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       type={field.fieldtype === "Password" ? "password" : "text"}
       value={String(value ?? "")}
       onChange={(e) => onChange(e.target.value || null)}
       readOnly={!!field.read_only}
       disabled={disabled || !!field.read_only}
       placeholder={String(field.placeholder ?? "")}
-      maxLength={field.length ?? undefined}
+      maxLength={field.length ? Number(field.length) : undefined}
       className={sharedClassName}
     />
   );

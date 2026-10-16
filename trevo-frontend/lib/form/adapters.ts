@@ -396,17 +396,24 @@ function attachTransaction(ctl: FormController) {
     }
   });
 
-  // new item rows inherit parent defaults, like TransactionController.items_add
+  // new item rows inherit parent defaults, like TransactionController / sales_order.js items_add.
+  // Desk fires `<table>_add` on the CHILD doctype (trigger(fieldname + "_add", cdt, cdn)).
   const handlers = ctl.runtime.frappe.ui.form.handlers;
-  if (!handlers.has(dt)) handlers.set(dt, new Map());
-  const parentHandlers = handlers.get(dt)!;
-  if (!parentHandlers.has("items_add")) parentHandlers.set("items_add", []);
-  parentHandlers.get("items_add")!.unshift((_frm: unknown, _cdt: unknown, cdn: unknown) => {
+  if (!handlers.has(itemsDt)) handlers.set(itemsDt, new Map());
+  const childHandlers = handlers.get(itemsDt)!;
+  if (!childHandlers.has("items_add")) childHandlers.set("items_add", []);
+  childHandlers.get("items_add")!.unshift((_frm: unknown, _cdt: unknown, cdn: unknown) => {
     const d = doc();
+    const first = items()[0];
     const patch: Record<string, unknown> = {};
-    for (const f of ["delivery_date", "schedule_date"]) if (d[f] && has(f, itemsDt)) patch[f] = d[f];
-    if (d.set_warehouse && has("warehouse", itemsDt)) patch.warehouse = d.set_warehouse;
+    for (const f of ["delivery_date", "schedule_date"]) {
+      if (!has(f, itemsDt)) continue;
+      // parent date wins; otherwise copy the first row's (copy_from_first_row)
+      if (d[f]) patch[f] = d[f];
+      else if (first && first.name !== cdn && first[f]) patch[f] = first[f];
+    }
+    if (has("warehouse", itemsDt)) patch.warehouse = d.set_warehouse || (first && first.name !== cdn ? first.warehouse : undefined);
     if (d.cost_center && has("cost_center", itemsDt)) patch.cost_center = d.cost_center;
-    ctl.applyComputed({}, { items: { [String(cdn)]: patch } });
+    ctl.applyComputed({}, { items: { [String(cdn)]: Object.fromEntries(Object.entries(patch).filter(([, v]) => v != null)) } });
   });
 }

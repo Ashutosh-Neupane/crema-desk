@@ -7,7 +7,7 @@ import type { FieldControlProps } from "./index";
  * Text Editor field — clean, modern textarea with auto-resize and markdown hints.
  * Frappe's "Text Editor" maps to this.
  */
-export default function TextEditorField({ field, value, onChange, disabled }: FieldControlProps) {
+export default function TextEditorField({ field, inputId, value, onChange, disabled }: FieldControlProps) {
   const [focus, setFocus] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -28,7 +28,7 @@ export default function TextEditorField({ field, value, onChange, disabled }: Fi
     ].join(" ")}>
       <textarea
         ref={textareaRef}
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={String(value ?? "")}
         onChange={(e) => {
           onChange(e.target.value);

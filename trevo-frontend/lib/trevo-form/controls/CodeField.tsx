@@ -31,7 +31,7 @@ export function languageFor(options: string | null | undefined, fieldtype?: stri
   return [];
 }
 
-export default function CodeField({ field, value, onChange, disabled, error, doc }: FieldControlProps) {
+export default function CodeField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
   const theme = useResolvedTheme();
   // Script doctypes keep the language in a sibling field (Server Script is Python, Client Script JS)
   const lang = useMemo(() => {
@@ -50,7 +50,7 @@ export default function CodeField({ field, value, onChange, disabled, error, doc
       ].join(" ")}
     >
       <CodeMirror
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={String(value ?? "")}
         onChange={(v) => onChange(v || null)}
         extensions={lang}

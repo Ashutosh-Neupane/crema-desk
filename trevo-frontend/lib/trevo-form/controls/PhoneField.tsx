@@ -33,7 +33,7 @@ function splitPhone(val: string): { dialCode: string; number: string } {
   return { dialCode: "", number: val };
 }
 
-export default function PhoneField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function PhoneField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" ? value : "";
   const { dialCode, number } = splitPhone(str);
   const isDisabled = disabled || !!field.read_only;
@@ -70,7 +70,7 @@ export default function PhoneField({ field, value, onChange, disabled, error }: 
       {/* Phone number input */}
       <input
         type="tel"
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         value={number}
         onChange={(e) => handleNumber(e.target.value)}
         disabled={isDisabled}

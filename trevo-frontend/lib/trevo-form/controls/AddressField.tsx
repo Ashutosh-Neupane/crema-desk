@@ -28,7 +28,7 @@ async function fetchPredictions(input: string): Promise<PlacePrediction[]> {
   }
 }
 
-export default function AddressField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function AddressField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" ? value : "";
   const [inputVal, setInputVal] = useState(str);
   const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
@@ -78,7 +78,7 @@ export default function AddressField({ field, value, onChange, disabled, error }
       <div className="relative flex items-center">
         <input
           type="text"
-          id={field.fieldname}
+          id={inputId ?? field.fieldname}
           value={inputVal}
           onChange={(e) => handleInput(e.target.value)}
           onFocus={() => suggestions.length > 0 && setOpen(true)}

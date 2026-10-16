@@ -44,7 +44,7 @@ function renderMarkdown(md: string): string {
     .replace(/^(?!<[h1-6|ul|ol|li|pre|blockquote|hr])(.+)$/gm, "$1");
 }
 
-export default function MarkdownField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function MarkdownField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const str = typeof value === "string" ? value : "";
   const [mode, setMode] = useState<"write" | "preview">("write");
 
@@ -93,7 +93,7 @@ export default function MarkdownField({ field, value, onChange, disabled, error 
 
       {mode === "write" ? (
         <textarea
-          id={field.fieldname}
+          id={inputId ?? field.fieldname}
           value={str}
           onChange={handleChange}
           disabled={isDisabled}

@@ -1,25 +1,18 @@
 "use client";
 
+import DatePicker from "@/components/form/DatePicker";
 import type { FieldControlProps } from "./index";
 
-export default function DateField({ field, value, onChange, disabled, error }: FieldControlProps) {
+/** Date — shadcn calendar popover; ISO value, site date format on screen */
+export default function DateField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   return (
-    <input
-      id={field.fieldname}
-      type="date"
-      value={String(value ?? "")}
-      onChange={(e) => onChange(e.target.value || null)}
-      readOnly={!!field.read_only}
+    <DatePicker
+      id={inputId ?? field.fieldname}
+      value={typeof value === "string" ? value : null}
+      onChange={(v) => onChange(v)}
       disabled={disabled || !!field.read_only}
-      className={[
-        "w-full rounded-lg border px-3 py-2 text-sm transition-colors",
-        error
-          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-          : "border-zinc-300 focus:border-zinc-900 focus:ring-zinc-900/20 dark:border-zinc-700 dark:focus:border-zinc-500",
-        "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100",
-        "focus:outline-none focus:ring-2",
-        (disabled || !!field.read_only) && "bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed",
-      ].join(" ")}
+      error={!!error}
+      ariaLabel={field.label ?? field.fieldname}
     />
   );
 }

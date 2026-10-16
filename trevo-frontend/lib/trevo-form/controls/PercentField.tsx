@@ -6,12 +6,12 @@ import type { FieldControlProps } from "./index";
  * Percent input — numeric field rendered with a trailing % sign,
  * matching Frappe's Percent fieldtype behavior.
  */
-export default function PercentField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function PercentField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const readOnly = disabled || !!field.read_only;
   return (
     <div className="relative">
       <input
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         type="number"
         value={typeof value === "number" ? value : String(value ?? "")}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}

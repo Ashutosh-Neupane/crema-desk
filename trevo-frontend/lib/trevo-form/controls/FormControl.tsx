@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useId } from "react";
 import type { FieldControlProps } from "./index";
 import FormField from "./FormField";
 import SelectField from "./SelectField";
@@ -43,7 +43,9 @@ import NumberField from "./NumberField";
 import DynamicLinkField from "./DynamicLinkField";
 
 function FieldControl({ field, value, onChange, error, disabled = false, doc, getQuery }: FieldControlProps) {
+  const inputId = `${useId()}-${field.fieldname}`;
   const props = {
+    inputId,
     field,
     value,
     onChange,
@@ -150,10 +152,10 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
   return (
     <div className={`flex flex-col gap-1.5 ${field.fullWidth ? "col-span-full" : ""}`}>
       {showLabel && (
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label htmlFor={inputId} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label || field.fieldname}
           {/* reqd is 0/1 from Frappe — `{0 && …}` would render a literal "0" */}
-          {!!field.reqd && <span className="ml-1 text-red-500">*</span>}
+          {!!field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
         </label>
       )}
       {renderInput()}

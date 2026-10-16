@@ -7,11 +7,11 @@ import type { FieldControlProps } from "./index";
  * bound by client scripts. The script bridge can attach behavior via the
  * standard `frm` API; without a bound handler the button stays inert.
  */
-export default function ButtonField({ field, disabled }: FieldControlProps) {
+export default function ButtonField({ field, inputId, disabled }: FieldControlProps) {
   return (
     <button
       type="button"
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       disabled={disabled}
       className={[
         "rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors",

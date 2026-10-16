@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { FieldControlProps } from "./index";
 import { searchLink } from "@/lib/frappe/search";
 
-export default function DynamicLinkField({ field, value, onChange, disabled, ...props }: FieldControlProps & { parentValues?: Record<string, unknown> }) {
+export default function DynamicLinkField({ field, inputId, value, onChange, disabled, ...props }: FieldControlProps & { parentValues?: Record<string, unknown> }) {
   const [query, setQuery] = useState(typeof value === "string" ? value : "");
   const [results, setResults] = useState<Array<{ value: string; description: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,7 @@ export default function DynamicLinkField({ field, value, onChange, disabled, ...
     <div className="relative">
       <input
         ref={inputRef}
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         type="text"
         value={query}
         onChange={(e) => handleChange(e.target.value)}

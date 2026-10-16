@@ -2,10 +2,10 @@
 
 import type { FieldControlProps } from "./index";
 
-export default function FloatField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function FloatField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   return (
     <input
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       type="number"
       value={typeof value === "number" ? value : String(value ?? "")}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}

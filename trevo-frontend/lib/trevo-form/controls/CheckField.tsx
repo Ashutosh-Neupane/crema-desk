@@ -18,7 +18,7 @@ export default function CheckField({ field, value, onChange, disabled }: FieldCo
       />
       <span className="text-sm text-zinc-700 dark:text-zinc-300">
         {field.label || field.fieldname}
-        {!!field.reqd && <span className="ml-1 text-red-500">*</span>}
+        {!!field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
       </span>
     </label>
   );

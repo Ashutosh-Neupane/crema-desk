@@ -2,12 +2,12 @@
 
 import type { FieldControlProps } from "./index";
 
-export default function CurrencyField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function CurrencyField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   return (
     <div className="relative">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">$</span>
       <input
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         type="number"
         value={typeof value === "number" ? value : Number(value ?? 0)}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}

@@ -17,7 +17,7 @@ export function currencyFor(field: FieldControlProps["field"], doc?: Record<stri
   return (doc?.currency as string) || undefined;
 }
 
-export default function NumberField({ field, value, onChange, disabled, error, doc }: FieldControlProps) {
+export default function NumberField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
   const [editing, setEditing] = useState<string | null>(null);
   const isDisabled = disabled || !!field.read_only;
   const num = value === null || value === undefined || value === "" ? null : Number(value);
@@ -41,7 +41,7 @@ export default function NumberField({ field, value, onChange, disabled, error, d
 
   return (
     <input
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       inputMode="decimal"
       value={editing ?? display}
       onFocus={() => setEditing(num == null ? "" : String(num))}

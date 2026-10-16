@@ -227,10 +227,31 @@ export class FormController {
     return (a ?? null) === (b ?? null) || (typeof a === "object" && JSON.stringify(a) === JSON.stringify(b));
   }
 
+  /** Desk Link control: a value that isn't an existing record is rejected (cleared with a message) */
+  private async validateLink(c: { fieldname: string; value: unknown; cdt?: string; cdn?: string }): Promise<boolean> {
+    const df = this.field(c.fieldname, c.cdt ?? this.meta.name);
+    if (!df || df.fieldtype !== "Link" || !c.value || typeof c.value !== "string") return true;
+    try {
+      const { env } = await deskCall("frappe.client.validate_link_and_fetch", { doctype: df.options, docname: c.value, fields_to_fetch: "[]" });
+      const found = (env.message as { name?: string } | undefined)?.name;
+      if (found) {
+        // server may correct case ("rice-25" → "RICE-25")
+        if (found !== c.value) await this.setFor(c, c.fieldname, found);
+        return true;
+      }
+    } catch {
+      return true; // older benches without validate_link_and_fetch: let the server validate on save
+    }
+    toast.error(`${df.label ?? c.fieldname}: ${c.value} does not exist`);
+    await this.setFor(c, c.fieldname, null);
+    return false;
+  }
+
   private async afterChange(c: { fieldname: string; value: unknown; cdt?: string; cdn?: string; table?: string }) {
     if (this.depth > 20) return; // runaway script guard
     this.depth++;
     try {
+      if (!(await this.validateLink(c))) return;
       await this.fetchFrom(c);
       for (const w of this.watchers) await w(c);
       if (c.cdt && c.cdn) await this.trigger(c.fieldname, c.cdt, c.cdn);
@@ -474,6 +495,12 @@ export class FormController {
         refresh: () => {},
         toggle: (show: boolean) => self.setDf(f.fieldname, "hidden", show ? 0 : 1),
         set_query: (fn: QueryFn) => (self.queries[f.fieldname] = fn),
+        // jQuery handles Desk scripts poke at ($wrapper.toggle(), $input.on(), …) — chainable no-ops
+        $wrapper: (self.runtime.globals.$ as () => unknown)(),
+        $input: (self.runtime.globals.$ as () => unknown)(),
+        wrapper: {},
+        set_description: () => {},
+        set_focus: () => {},
         get_query: undefined as unknown,
         // grid API for tables
         grid: TABLE_TYPES.has(f.fieldtype)

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, Tag, Trash2, UserPlus } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
+import FormBuilder from "@/components/form/FormBuilder";
 import { useFormMetas } from "@/lib/hooks/useFormMetas";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { FormController, newFormDoc } from "@/lib/form/FormController";
@@ -24,6 +25,12 @@ import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/components/DocumentActions";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
+import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
+import { useShortcuts } from "@/lib/shortcuts";
+import { Command } from "cmdk";
+
+/** Saving these changes other DocTypes' meta — drop cached metas so forms/lists pick it up */
+const META_EDITORS = new Set(["DocType", "Customize Form", "Custom Field", "Property Setter", "Client Script", "DocType Layout"]);
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { FormSkeleton } from "@/components/Skeleton";
@@ -177,6 +184,7 @@ export default function DocForm({ doctype, name }: Props) {
       defaults: ctx.defaults,
       sysdefaults: ctx.sysdefaults,
       perms: ctx.perms,
+      developer_mode: ctx.developer_mode,
       navigate: (href) => router.push(href),
     });
     attachDoctypeAdapters(c);
@@ -226,6 +234,11 @@ export default function DocForm({ doctype, name }: Props) {
       c.load(saved);
       await c.trigger(action === "Submit" ? "on_submit" : "after_save");
       qc.invalidateQueries({ queryKey: ["list", doctype] });
+      if (META_EDITORS.has(doctype)) {
+        clearDoctypeMetaCache();
+        qc.invalidateQueries({ queryKey: ["form-metas"] });
+        qc.invalidateQueries({ queryKey: ["doctype"] });
+      }
       toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
       if (wasNew) router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
       else {
@@ -258,18 +271,31 @@ export default function DocForm({ doctype, name }: Props) {
     c.onReload = load;
   }, [ctl, run, load]);
 
-  // Ctrl/Cmd+S saves, like Desk
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        const c = ctlRef.current;
-        if (c && Number(c.getDoc().docstatus ?? 0) === 0) void run("save", "Save");
-      }
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [run]);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [focusRequest, setFocusRequest] = useState<{ fieldname: string; n: number } | null>(null);
+  const docstatusNow = () => Number(ctlRef.current?.getDoc().docstatus ?? 0);
+  // Desk form shortcuts (frappe/public/js/frappe/form/toolbar.js, form.js)
+  useShortcuts(
+    [
+      { keys: "mod+s", description: "Save", group: "Form", allowInInput: true, action: () => docstatusNow() === 0 && void run("save", "Save") },
+      { keys: "mod+j", description: "Jump to field", group: "Form", allowInInput: true, action: () => setJumpOpen(true) },
+      { keys: "mod+b", description: `New ${doctype}`, group: "Form", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) },
+      { keys: "shift+mod+d", description: "Delete", group: "Form", action: () => ctlRef.current && !isNewDoc(ctlRef.current.getDoc()) && docstatusNow() !== 1 && setConfirm("delete") },
+      { keys: "shift+r", description: "Reload", group: "Form", action: () => void load() },
+      {
+        keys: "mod+p",
+        description: "Print",
+        group: "Form",
+        action: () => {
+          const c = ctlRef.current;
+          if (!c || isNewDoc(c.getDoc())) return;
+          const base = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL ?? "";
+          window.open(`${base}/printview?doctype=${enc(doctype)}&name=${enc(c.docname)}&trigger_print=1`, "_blank");
+        },
+      },
+    ],
+    [run, load, doctype, router],
+  );
 
   const onCancelConfirmed = async () => {
     const c = ctlRef.current;
@@ -375,6 +401,22 @@ export default function DocForm({ doctype, name }: Props) {
     ...(docinfo.versions ?? []).map((v) => ({ kind: "version" as const, at: String(v.creation ?? ""), by: String(v.owner ?? ""), text: "changed values" })),
   ].sort((a, b) => b.at.localeCompare(a.at));
   const connectionsTab = (meta.fields ?? []).find((f) => f.fieldtype === "Tab Break" && /connection/i.test(f.fieldname))?.fieldname;
+  // DocType / Customize Form: the tab holding the `form_builder` HTML field hosts the visual builder
+  let builderTab: string | undefined;
+  {
+    let tab: string | undefined;
+    for (const f of meta.fields ?? []) {
+      if (f.fieldtype === "Tab Break") tab = f.fieldname;
+      if (f.fieldname === "form_builder" && f.fieldtype === "HTML") builderTab = tab ?? "__details";
+    }
+  }
+  const tabExtras: Record<string, React.ReactNode> = {};
+  if (connectionsTab) tabExtras[connectionsTab] = <Connections meta={meta} doc={doc} />;
+  if (builderTab && ctl.field("fields")) {
+    tabExtras[builderTab] = (
+      <FormBuilder ctl={ctl} childMeta={metas.children.find((m) => m.name === ctl.field("fields")?.options)} readOnly={readOnly} />
+    );
+  }
   const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
@@ -470,7 +512,8 @@ export default function DocForm({ doctype, name }: Props) {
                 errors={snap.errors}
               />
             )}
-            tabExtras={connectionsTab ? { [connectionsTab]: <Connections meta={meta} doc={doc} /> } : undefined}
+            tabExtras={tabExtras}
+            focusRequest={focusRequest}
           />
 
           {!isNewDoc(doc) && (
@@ -551,6 +594,34 @@ export default function DocForm({ doctype, name }: Props) {
           </aside>
         )}
       </div>
+
+      {/* Ctrl+J — Jump to field */}
+      {jumpOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && setJumpOpen(false)}>
+          <Command loop className="w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900" onKeyDown={(e) => e.key === "Escape" && setJumpOpen(false)}>
+            <Command.Input autoFocus placeholder="Jump to field…" className="h-11 w-full border-b border-zinc-200 bg-transparent px-4 text-sm text-zinc-900 outline-none dark:border-zinc-700 dark:text-zinc-100" />
+            <Command.List className="max-h-80 overflow-y-auto p-1.5">
+              <Command.Empty className="px-3 py-6 text-center text-sm text-zinc-500">No field found</Command.Empty>
+              {(meta.fields ?? [])
+                .filter((f) => !["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Heading"].includes(f.fieldtype) && !f.hidden && f.label)
+                .map((f) => (
+                  <Command.Item
+                    key={f.fieldname}
+                    value={`${f.label} ${f.fieldname}`}
+                    onSelect={() => {
+                      setJumpOpen(false);
+                      setFocusRequest((r) => ({ fieldname: f.fieldname, n: (r?.n ?? 0) + 1 }));
+                    }}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-800 data-[selected=true]:bg-zinc-100 dark:text-zinc-200 dark:data-[selected=true]:bg-zinc-800"
+                  >
+                    <span className="flex-1 truncate">{f.label}</span>
+                    <span className="text-xs text-zinc-400">{f.fieldtype}</span>
+                  </Command.Item>
+                ))}
+            </Command.List>
+          </Command>
+        </div>
+      )}
 
       {/* Missing mandatory fields (Desk's "Missing Fields" dialog) */}
       <Dialog open={!!missing} onOpenChange={(o) => !o && setMissing(null)}>

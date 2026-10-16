@@ -33,7 +33,7 @@ export function FormPreview({ doctype, fields: _fields, sections }: FormPreviewP
                         <div key={field.fieldname} className="space-y-1">
                           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                             {field.label || field.fieldname}
-                            {field.required && <span className="ml-1 text-red-500">*</span>}
+                            {field.required && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
                           </label>
                           <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800">
                             {field.fieldtype}

@@ -167,7 +167,7 @@ export default function FormField({ field, value, onChange, errors }: FormFieldP
     <div className="flex flex-col gap-1">
       <label htmlFor={fieldName} className="text-sm font-medium text-zinc-700">
         {field.label || fieldName}
-        {field.reqd && <span className="ml-1 text-red-500">*</span>}
+        {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
       </label>
       {widget}
       {error && <span className="text-xs text-red-600">{error}</span>}

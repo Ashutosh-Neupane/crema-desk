@@ -29,7 +29,7 @@ const TOOLBAR_ITEMS: Array<{ action: ToolbarAction; label: string; icon: string 
   { action: "removeFormat",        icon: "T×",  label: "Clear formatting" },
 ];
 
-export default function HTMLEditorField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function HTMLEditorField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const str = typeof value === "string" ? value : "";
   const isDisabled = disabled || !!field.read_only;
@@ -114,7 +114,7 @@ export default function HTMLEditorField({ field, value, onChange, disabled, erro
       {/* Editable area */}
       <div
         ref={editorRef}
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}

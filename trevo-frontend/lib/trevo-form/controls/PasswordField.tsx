@@ -4,13 +4,13 @@ import { useState } from "react";
 import type { FieldControlProps } from "./index";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function PasswordField({ field, value, onChange, disabled }: FieldControlProps) {
+export default function PasswordField({ field, inputId, value, onChange, disabled }: FieldControlProps) {
   const [show, setShow] = useState(false);
 
   return (
     <div className="relative">
       <input
-        id={field.fieldname}
+        id={inputId ?? field.fieldname}
         type={show ? "text" : "password"}
         value={String(value ?? "")}
         onChange={(e) => onChange(e.target.value || null)}

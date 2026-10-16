@@ -31,9 +31,22 @@ await page.waitForTimeout(2500);
 check((await field("Customer Name").textContent().catch(() => "")) !== null, "customer set");
 
 step("delivery date");
-const dd = page.locator("input[type=date]").nth(1);
+const dd = page.getByRole("textbox", { name: /^Delivery Date/ }).first();
+await dd.click();
 await dd.fill(new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10));
-await dd.blur();
+await dd.press("Enter");
+await page.waitForTimeout(800);
+const rowDate = await page.getByRole("textbox", { name: "Delivery Date", exact: true }).nth(1).inputValue().catch(() => "");
+check(!!rowDate, `parent delivery date copied to item row (${rowDate})`);
+
+step("free text in Item Code is rejected (Link validation)");
+const row1 = page.locator("[aria-label^='Select row']").first().locator("xpath=ancestor::div[contains(@class,'grid')][1]").locator("input").nth(1);
+await row1.click();
+await row1.fill("NOT-AN-ITEM");
+await row1.press("Tab");
+await page.waitForTimeout(2000);
+check(await page.getByText(/NOT-AN-ITEM does not exist/).first().isVisible(), "'does not exist' message shown");
+check((await row1.inputValue()) === "", "invalid Item Code cleared");
 
 step("item → get_item_details fills rate");
 const itemCell = page.locator("[aria-label^='Select row']").first().locator("xpath=ancestor::div[contains(@class,'grid')][1]").locator("input").nth(1);

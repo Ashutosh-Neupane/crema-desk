@@ -7,7 +7,7 @@ import type { FieldControlProps } from "./index";
  * The native time input uses "HH:mm[:ss]", so we trim fractional seconds
  * on the way in and keep the stored value Frappe-compatible.
  */
-export default function TimeField({ field, value, onChange, disabled, error }: FieldControlProps) {
+export default function TimeField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   // "14:30:00.000000" → "14:30:00"; "14:30" → "14:30:00" (native input with step=1 needs seconds)
   const raw = String(value ?? "");
   let normalized = "";
@@ -19,7 +19,7 @@ export default function TimeField({ field, value, onChange, disabled, error }: F
 
   return (
     <input
-      id={field.fieldname}
+      id={inputId ?? field.fieldname}
       type="time"
       step={1}
       value={normalized}
