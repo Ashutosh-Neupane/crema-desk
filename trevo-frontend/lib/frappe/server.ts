@@ -13,6 +13,9 @@
  */
 
 import type { FrappeAPIResponse } from "./types";
+import { frappeErrorMessage, parseServerMessages as parseServerMessagesSafe } from "./errors";
+
+export { frappeErrorMessage };
 
 const BACKEND_URL =
   process.env.FRAPPE_BACKEND_URL ??
@@ -205,16 +208,11 @@ export async function frappeServerFetch<T = unknown>(
   }
 
   if (!res.ok && throwOnError) {
-    const msg =
-      (envelope && typeof envelope.exc === "string"
-        ? envelope.exc.split("\n").filter(Boolean).slice(-1)[0] ?? envelope.exc
-        : null) ||
-      (envelope as { exception?: string })?.exception ||
-      `Frappe request failed (${res.status})`;
-    throw new FrappeError(typeof msg === "string" ? msg : "Frappe error", {
+    const serverMessages = parseServerMessagesSafe(envelope?._server_messages);
+    throw new FrappeError(frappeErrorMessage(envelope, serverMessages, res.status), {
       status: res.status,
       excType: (envelope as { exc_type?: string })?.exc_type,
-      serverMessages: parseServerMessagesSafe(envelope?._server_messages),
+      serverMessages,
     });
   }
 
@@ -222,24 +220,6 @@ export async function frappeServerFetch<T = unknown>(
   const data = (envelope?.message ?? envelope?.data ?? (envelope as unknown as T)) ?? null;
 
   return { data, status: res.status, ok: res.ok, setCookies, envelope };
-}
-
-function parseServerMessagesSafe(raw?: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr.map((m) => {
-      try {
-        const obj = typeof m === "string" ? JSON.parse(m) : m;
-        return obj?.message ?? null;
-      } catch {
-        return String(m);
-      }
-    }).filter(Boolean) as string[];
-  } catch {
-    return [];
-  }
 }
 
 /** Convenience: read the cookie header from next/headers cookies() (async in Next 15+). */

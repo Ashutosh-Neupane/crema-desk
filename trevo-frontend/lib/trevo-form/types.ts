@@ -207,6 +207,22 @@ export interface FormSection {
   fields: TrevoField[];
   /** Child tables in this section */
   childTables: TrevoField[];
+  /** Desk layout: fields (incl. tables) per Column Break, in order */
+  columnFields?: TrevoField[][];
+  /** Tab Break this section belongs to (fieldname) */
+  tab?: string;
+  /** Section Breaks without a label render no header, like Desk */
+  showLabel?: boolean;
+  /** Section Break `collapsible` flag — only these get a toggle */
+  collapsible?: boolean;
+  collapsible_depends_on?: string | null;
+  depends_on?: string | null;
+}
+
+export interface FormTab {
+  fieldname: string;
+  label: string;
+  depends_on?: string | null;
 }
 
 // ---------------------------------------------------------------------------

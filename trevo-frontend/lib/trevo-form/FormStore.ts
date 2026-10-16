@@ -280,6 +280,17 @@ export const useTrevoFormStore = create<TrevoFormStore>()(
         recentDocs: state.recentDocs,
         collapsedSections: Array.from(state.collapsedSections),
       }),
+      // Sets don't survive JSON: revive the persisted array, or every
+      // collapsedSections.has() call crashes the form after a reload
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<TrevoFormStore> & { collapsedSections?: unknown };
+        const saved = p.collapsedSections;
+        return {
+          ...current,
+          ...p,
+          collapsedSections: new Set<string>(Array.isArray(saved) ? (saved as string[]) : []),
+        };
+      },
     },
   ),
 );

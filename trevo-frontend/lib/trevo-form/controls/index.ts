@@ -6,6 +6,8 @@ export interface FieldControlProps {
   onChange: (value: unknown) => void;
   error?: string;
   disabled?: boolean;
+  /** Current document values — needed by controls that depend on other fields (Dynamic Link, set_query) */
+  doc?: Record<string, unknown>;
 }
 
 export { default as FormField } from "./FormField";

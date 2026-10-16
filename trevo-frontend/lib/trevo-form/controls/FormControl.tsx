@@ -43,14 +43,16 @@ import MultiselectListField from "./MultiselectListField";
 import SwitchField from "./SwitchField";
 import CommentField from "./CommentField";
 import HeadingField from "./HeadingField";
+import DynamicLinkField from "./DynamicLinkField";
 
-function FieldControl({ field, value, onChange, error, disabled = false }: FieldControlProps) {
+function FieldControl({ field, value, onChange, error, disabled = false, doc }: FieldControlProps) {
   const props = {
     field,
     value,
     onChange,
     disabled: disabled || !!field.read_only,
     error,
+    doc,
   };
 
   const renderInput = () => {
@@ -78,7 +80,8 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
       case "Link":
         return <LinkField {...props} />;
       case "Dynamic Link":
-        return <LinkField {...props} />;
+        // options names the field holding the target DocType
+        return <DynamicLinkField {...props} parentValues={doc} />;
       case "Attach":
       case "Attach Image":
         return <AttachmentField {...props} />;
@@ -144,14 +147,15 @@ function FieldControl({ field, value, onChange, error, disabled = false }: Field
   };
 
   // Layout-only fieldtypes don't render a field label
-  const showLabel = field.fieldtype !== "HTML" && field.fieldtype !== "Button";
+  const showLabel = !["HTML", "Button", "Heading", "Check"].includes(field.fieldtype);
 
   return (
     <div className={`flex flex-col gap-1.5 ${field.fullWidth ? "col-span-full" : ""}`}>
       {showLabel && (
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label || field.fieldname}
-          {field.reqd && <span className="ml-1 text-red-500">*</span>}
+          {/* reqd is 0/1 from Frappe — `{0 && …}` would render a literal "0" */}
+          {!!field.reqd && <span className="ml-1 text-red-500">*</span>}
         </label>
       )}
       {renderInput()}

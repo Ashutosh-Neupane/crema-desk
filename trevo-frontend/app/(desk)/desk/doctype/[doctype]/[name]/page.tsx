@@ -1,10 +1,10 @@
 /**
- * Document detail page — Server Component wrapper for metadata.
- * The actual UI is in DocumentDetailClient (client component).
+ * Document page — Server Component wrapper for metadata.
+ * The form (view + edit in one, like Desk) is DocForm.
  */
 import type { Metadata } from "next";
 import { generatePageTitle } from "@/lib/utils/generatePageTitle";
-import { DocumentDetailClient } from "./DocumentDetailClient";
+import DocForm from "@/components/form/DocForm";
 
 interface Props {
   params: Promise<{ doctype: string; name: string }>;
@@ -23,7 +23,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function DoctypeDetailPage({ params }: Props) {
   const { doctype, name } = await params;
   return (
-    <DocumentDetailClient
+    <DocForm
+      key={`${doctype}/${name}`}
       doctype={decodeURIComponent(doctype)}
       name={decodeURIComponent(name)}
     />

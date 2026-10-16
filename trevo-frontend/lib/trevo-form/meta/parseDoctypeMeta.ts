@@ -4,16 +4,18 @@
  */
 
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
-import type { TrevoField, FormSection, FormLayout } from "../types";
+import type { TrevoField, FormSection, FormLayout, FormTab } from "../types";
 
 
 const STRUCTURAL_TYPES = new Set([
-  "Section Break", "Column Break", "Tab Break", "Fold", "Heading",
+  "Section Break", "Column Break", "Tab Break", "Fold",
 ]);
 
 interface ParsedMeta {
   fields: TrevoField[];
   sections: FormSection[];
+  /** Tab Breaks in order; empty when the DocType has no tabs */
+  tabs: FormTab[];
   layout: FormLayout;
 }
 
@@ -31,8 +33,8 @@ export function parseDoctypeMeta(meta: DocTypeMeta): ParsedMeta {
   // Enhance data fields with Trevo-specific properties
   const enhancedFields: TrevoField[] = dataFields.map((f) => enhanceField(f));
 
-  // Build sections from structural markers
-  const sections = buildSections(rawFields, enhancedFields);
+  // Build Desk layout: tabs → sections → columns
+  const { sections, tabs } = buildLayout(rawFields, enhancedFields);
 
   // Determine layout based on column breaks
   const layout = determineLayout(structuralFields);
@@ -40,6 +42,7 @@ export function parseDoctypeMeta(meta: DocTypeMeta): ParsedMeta {
   return {
     fields: enhancedFields,
     sections,
+    tabs,
     layout,
   };
 }
@@ -82,120 +85,87 @@ function enhanceField(f: DocField): TrevoField {
   };
 }
 
-function buildSections(allFields: DocField[], dataFields: TrevoField[]): FormSection[] {
+/**
+ * Desk's form layout (frappe/public/js/frappe/form/layout.js):
+ *  - Tab Break starts a tab (fields before the first one go in a "Details" tab)
+ *  - Section Break starts a section inside the current tab; an unlabeled one
+ *    has no header, only `collapsible` ones toggle
+ *  - Column Break starts a new column inside the current section; fields flow
+ *    top→bottom within their column
+ *  - Tables stay in their column position, Fold collapses everything after it
+ */
+function buildLayout(allFields: DocField[], dataFields: TrevoField[]): { sections: FormSection[]; tabs: FormTab[] } {
+  const byName = new Map(dataFields.map((f) => [f.fieldname, f]));
   const sections: FormSection[] = [];
-  const pendingFields: TrevoField[] = [];
-  const pendingChildTables: TrevoField[] = [];
-  let currentSection: FormSection | null = null;
-  let currentColumns = 1;
+  const tabs: FormTab[] = [];
+  let currentTab: string | undefined;
+  let section: FormSection | null = null;
+  let folded = false;
 
-  const flushCurrentSection = () => {
-    if (!currentSection) return;
-    sections.push(currentSection);
-    currentSection = null;
-  };
-
-  const flushPendingAsDefaultSection = () => {
-    if (pendingFields.length === 0 && pendingChildTables.length === 0) return;
-    sections.push({
-      label: "Details",
-      fieldname: "_default",
-      collapsed: false,
+  const openSection = (f: Partial<DocField> & { fieldname: string }, opts: { collapsed?: boolean } = {}) => {
+    section = {
+      label: (f.label as string) ?? "",
+      fieldname: f.fieldname,
+      collapsed: opts.collapsed ?? (!!f.collapsible && !!(f as { collapsed?: unknown }).collapsed),
       columns: 1,
-      fields: pendingFields.splice(0),
-      childTables: pendingChildTables.splice(0),
-    });
+      fields: [],
+      childTables: [],
+      columnFields: [[]],
+      tab: currentTab,
+      showLabel: !!f.label,
+      collapsible: !!f.collapsible || !!opts.collapsed,
+      collapsible_depends_on: typeof f.collapsible_depends_on === "string" ? f.collapsible_depends_on : null,
+      depends_on: typeof f.depends_on === "string" ? f.depends_on : null,
+    };
+    sections.push(section);
+    return section;
   };
+  const ensureSection = (): FormSection => section ?? openSection({ fieldname: `_section_${sections.length}` });
 
   for (const f of allFields) {
-    if (f.fieldtype === "Section Break") {
-      // Start new section
-      flushPendingAsDefaultSection();
-      flushCurrentSection();
-      currentSection = {
-        label: f.label ?? f.fieldname,
-        fieldname: f.fieldname,
-        collapsed: !!f.collapsed,
-
-        columns: 1,
-        fields: [],
-        childTables: [],
-      };
-      currentColumns = 1;
-    } else if (f.fieldtype === "Column Break") {
-      // Increase columns in current section
-      if (currentSection) {
-      currentSection.columns = Math.max(currentSection.columns, (currentColumns + 1) as 1 | 2 | 3)
-      }
-      currentColumns++;
-
-    } else if (f.fieldtype === "Tab Break") {
-      // Each tab becomes its own section
-      flushPendingAsDefaultSection();
-      flushCurrentSection();
-      currentSection = {
-        label: f.label ?? f.fieldname,
-        fieldname: f.fieldname,
-        collapsed: false,
-        columns: 1 as 1 | 2 | 3,
-        fields: [],
-        childTables: [],
-      };
-      currentColumns = 1;
-    } else if (f.fieldtype === "Fold") {
-      // Fold — a collapsible section; everything after it folds up
-      flushPendingAsDefaultSection();
-      flushCurrentSection();
-      currentSection = {
-        label: f.label ?? "Details",
-        fieldname: f.fieldname,
-        collapsed: true,
-        columns: 1,
-        fields: [],
-        childTables: [],
-      };
-      currentColumns = 1;
-    } else if (f.fieldtype === "Table") {
-      // Child table
-      const tableField = (dataFields.find((df) => df.fieldname === f.fieldname) ?? {
-        ...(f as unknown as TrevoField),
-        label: f.label ?? f.fieldname,
-      }) as TrevoField;
-      if (currentSection) {
-        currentSection.childTables.push(tableField);
-      } else {
-        pendingChildTables.push(tableField);
-      }
-    } else if (!STRUCTURAL_TYPES.has(f.fieldtype)) {
-      // Data field — add to current section
-      const enhanced = dataFields.find((df) => df.fieldname === f.fieldname);
-      if (enhanced) {
-        if (currentSection) {
-          currentSection.fields.push(enhanced);
-        } else {
-          pendingFields.push(enhanced);
+    switch (f.fieldtype) {
+      case "Tab Break":
+        if (!tabs.length && (sections.length || section)) {
+          // fields before the first Tab Break form an implicit first tab
+          tabs.push({ fieldname: "__details", label: "Details" });
+          for (const s of sections) s.tab = "__details";
         }
+        currentTab = f.fieldname;
+        tabs.push({ fieldname: f.fieldname, label: f.label ?? f.fieldname, depends_on: typeof f.depends_on === "string" ? f.depends_on : null });
+        section = null;
+        break;
+      case "Section Break":
+        openSection(f);
+        break;
+      case "Fold":
+        folded = true;
+        openSection({ ...f, label: f.label || "More" }, { collapsed: true });
+        break;
+      case "Column Break": {
+        const s = ensureSection();
+        s.columnFields!.push([]);
+        s.columns = s.columnFields!.length;
+        break;
+      }
+      default: {
+        const field = byName.get(f.fieldname);
+        if (!field) break;
+        const s = ensureSection();
+        s.columnFields![s.columnFields!.length - 1].push(field);
+        if (f.fieldtype === "Table") s.childTables.push(field);
+        else s.fields.push(field);
       }
     }
   }
+  void folded;
 
-  // Don't forget the last section
-  flushCurrentSection();
-  flushPendingAsDefaultSection();
-
-  // If no sections were created, create a default one
-  if (sections.length === 0) {
-    sections.push({
-      label: "Details",
-      fieldname: "_default",
-      collapsed: false,
-      columns: 1,
-      fields: pendingFields.length > 0 ? pendingFields : dataFields.filter((field) => field.fieldtype !== "Table"),
-      childTables: pendingChildTables.length > 0 ? pendingChildTables : dataFields.filter((field) => field.fieldtype === "Table"),
-    });
+  // Drop columns left empty by trailing breaks; keep sections that render something
+  for (const s of sections) {
+    s.columnFields = s.columnFields!.filter((c) => c.length > 0);
+    if (!s.columnFields.length) s.columnFields = [[]];
+    s.columns = s.columnFields.length;
   }
-
-  return sections;
+  return { sections: sections.filter((s) => s.fields.length || s.childTables.length), tabs };
 }
 
 function determineLayout(structuralFields: DocField[]): FormLayout {
