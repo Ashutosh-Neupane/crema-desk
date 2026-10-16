@@ -40,8 +40,9 @@ await shot("1_new");
 
 step("save without mandatory Description");
 await page.getByRole("button", { name: /^Save/ }).click();
-await page.waitForTimeout(800);
-check(await page.getByText(/mandatory|required|Value missing/i).first().isVisible(), "mandatory error shown");
+await page.getByText("Missing fields").waitFor({ timeout: 10000 });
+check(await page.getByRole("dialog").getByText("Description").isVisible(), "Missing fields dialog lists Description");
+await page.getByRole("button", { name: "OK" }).click();
 check(page.url().endsWith("/new"), "still on /new");
 
 step("fill Description and save");

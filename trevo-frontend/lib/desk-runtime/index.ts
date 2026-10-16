@@ -18,6 +18,8 @@ export interface RuntimeContext {
   roles?: string[];
   defaults?: Record<string, unknown>;
   sysdefaults?: Record<string, unknown>;
+  /** boot.user permission lists (can_create, in_create, …) */
+  perms?: Record<string, string[]>;
   /** metas known to the page (parent + children) for frappe.meta.* */
   metas?: Record<string, DocTypeMeta>;
   navigate?: (href: string) => void;
@@ -217,7 +219,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     session: { user: ctx.user, user_fullname: ctx.full_name ?? ctx.user },
     user: { name: ctx.user, has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)) },
     user_roles: ctx.roles ?? [],
-    boot: { sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {} } },
+    boot: { sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
     sys_defaults: ctx.sysdefaults ?? {},
     defaults: {
       get_user_default: (k: string) => {
@@ -301,6 +303,11 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     in_list,
     locals: {} as Record<string, unknown>,
     cur_frm: undefined,
+    // Desk globals some scripts still call
+    refresh_field: () => {},
+    refresh_many: () => {},
+    msgprint: (m: unknown) => (frappe.msgprint as (m: unknown) => void)(m),
+    show_alert: (m: unknown) => (frappe.show_alert as (m: unknown) => void)(m),
     $: makeJQueryStub(),
     jQuery: undefined,
     format_currency: (v: unknown, currency?: string) => `${currency ?? ""} ${flt(v, 2).toLocaleString()}`.trim(),

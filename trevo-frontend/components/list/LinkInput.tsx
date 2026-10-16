@@ -11,6 +11,7 @@ export default function LinkInput({
   placeholder,
   className = "",
   autoFocus,
+  getQuery,
 }: {
   doctype: string;
   value: string;
@@ -18,6 +19,7 @@ export default function LinkInput({
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
 }) {
   const [text, setText] = useState(value);
   const [open, setOpen] = useState(false);
@@ -38,7 +40,13 @@ export default function LinkInput({
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        setResults((await searchLink(doctype, q, undefined)).slice(0, 10));
+        let opts;
+        try {
+          opts = getQuery?.();
+        } catch {
+          opts = undefined;
+        }
+        setResults((await searchLink(doctype, q, opts)).slice(0, 10));
         setActive(0);
       } catch {
         setResults([]);

@@ -8,6 +8,8 @@ export interface FieldControlProps {
   disabled?: boolean;
   /** Current document values — needed by controls that depend on other fields (Dynamic Link, set_query) */
   doc?: Record<string, unknown>;
+  /** set_query result for Link fields: { filters, query } */
+  getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
 }
 
 export { default as FormField } from "./FormField";

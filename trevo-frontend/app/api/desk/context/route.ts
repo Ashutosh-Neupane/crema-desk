@@ -12,6 +12,8 @@ export interface DeskContext {
   defaults: Record<string, unknown>;
   sysdefaults: Record<string, unknown>;
   roles: string[];
+  /** permission lists from boot.user (can_create, in_create, …) for app scripts */
+  perms: Record<string, string[]>;
 }
 
 export async function GET() {
@@ -23,6 +25,11 @@ export async function GET() {
     defaults: (user.defaults as Record<string, unknown>) ?? {},
     sysdefaults: (boot?.sysdefaults as Record<string, unknown>) ?? {},
     roles: Array.isArray(user.roles) ? (user.roles as string[]) : [],
+    perms: Object.fromEntries(
+      ["can_create", "can_read", "can_write", "can_submit", "can_cancel", "can_delete", "can_print", "can_email", "can_export", "can_import", "in_create", "can_get_report", "can_search"]
+        .filter((k) => Array.isArray(user[k]))
+        .map((k) => [k, user[k] as string[]]),
+    ),
   };
   return NextResponse.json(ctx, { headers: { "Cache-Control": "private, max-age=60" } });
 }

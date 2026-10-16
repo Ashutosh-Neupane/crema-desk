@@ -7,9 +7,6 @@ import SelectField from "./SelectField";
 import DateField from "./DateField";
 import DateTimeField from "./DateTimeField";
 import CheckField from "./CheckField";
-import IntField from "./IntField";
-import FloatField from "./FloatField";
-import CurrencyField from "./CurrencyField";
 import TextEditorField from "./TextEditorField";
 import LinkField from "./LinkField";
 import AttachmentField from "./AttachmentField";
@@ -34,7 +31,6 @@ import AutocompleteField from "./AutocompleteField";
 import MultiselectField from "./MultiselectField";
 import AddressField from "./AddressField";
 import TimeField from "./TimeField";
-import PercentField from "./PercentField";
 import ImageField from "./ImageField";
 import ButtonField from "./ButtonField";
 import DateRangeField from "./DateRangeField";
@@ -43,9 +39,10 @@ import MultiselectListField from "./MultiselectListField";
 import SwitchField from "./SwitchField";
 import CommentField from "./CommentField";
 import HeadingField from "./HeadingField";
+import NumberField from "./NumberField";
 import DynamicLinkField from "./DynamicLinkField";
 
-function FieldControl({ field, value, onChange, error, disabled = false, doc }: FieldControlProps) {
+function FieldControl({ field, value, onChange, error, disabled = false, doc, getQuery }: FieldControlProps) {
   const props = {
     field,
     value,
@@ -53,6 +50,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc }: 
     disabled: disabled || !!field.read_only,
     error,
     doc,
+    getQuery,
   };
 
   const renderInput = () => {
@@ -70,11 +68,11 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc }: 
       case "Check":
         return <CheckField {...props} />;
       case "Int":
-        return <IntField {...props} />;
+        return <NumberField {...props} />;
       case "Float":
-        return <FloatField {...props} />;
+        return <NumberField {...props} />;
       case "Currency":
-        return <CurrencyField {...props} />;
+        return <NumberField {...props} />;
       case "Text Editor":
         return <TextEditorField {...props} />;
       case "Link":
@@ -124,7 +122,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc }: 
       case "Time":
         return <TimeField {...props} />;
       case "Percent":
-        return <PercentField {...props} />;
+        return <NumberField {...props} />;
       case "Image":
         return <ImageField {...props} />;
       case "Button":

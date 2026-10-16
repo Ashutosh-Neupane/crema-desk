@@ -1,33 +1,34 @@
 "use client";
 
 /**
- * Desk-style document form — one page for viewing *and* editing, like
- * /app/<doctype>/<name> in Frappe:
- *  - header: title, status indicator (Not Saved / Draft / Submitted / Cancelled /
- *    status field), primary action following Desk's rules
- *    (Save → Submit → Cancel → Amend), "…" menu (New, Duplicate, Reload, Copy, Delete)
- *  - body: the metadata-driven form (tabs, sections, columns, client scripts)
- *  - footer: comments + activity from docinfo
- * New documents live at /new with a local doc ("new-<doctype>-1"); after the
- * first save the URL is replaced with the real name.
+ * Desk-style document form — one page for viewing and editing, like
+ * /desk/<doctype>/<name>. Built on FormController (the live doc, scripts,
+ * fetch_from, child events) and FormBody/Grid (layout).
+ *
+ * Save pipeline = Desk's frappe.ui.form.save:
+ *   validate → before_save → mandatory check → savedocs → reload → after_save → refresh
+ * Submit adds before_submit / on_submit; Cancel before_cancel / after_cancel.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, CopyPlus, Loader2, MoreHorizontal, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
-import FormRenderer, { type FormHandle } from "@/lib/trevo-form/renderers/FormRenderer";
-import { useDoctype } from "@/lib/hooks/useDoctype";
+import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, Tag, Trash2, UserPlus } from "lucide-react";
+import FormBody from "@/components/form/FormBody";
+import Grid from "@/components/form/Grid";
+import { useFormMetas } from "@/lib/hooks/useFormMetas";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
-import { getNewDoc } from "@/lib/trevo-form/newDoc";
+import { FormController, newFormDoc } from "@/lib/form/FormController";
+import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/components/DocumentActions";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { FormSkeleton } from "@/components/Skeleton";
-import type { DocTypeMeta, FrappeDocument } from "@/lib/frappe/types";
+import { INDICATOR_PILL } from "@/lib/list/indicator";
+import type { DocTypeMeta } from "@/lib/frappe/types";
 
 const enc = encodeURIComponent;
 
@@ -42,7 +43,6 @@ function copyForNew(meta: DocTypeMeta, doc: Doc): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(doc)) {
     if (NO_COPY_ALWAYS.has(k) || noCopy.has(k)) continue;
-    // child rows lose their identity too
     out[k] = Array.isArray(v)
       ? v.map((row) => {
           const r = { ...(row as Record<string, unknown>) };
@@ -54,41 +54,66 @@ function copyForNew(meta: DocTypeMeta, doc: Doc): Record<string, unknown> {
   return out;
 }
 
-type Indicator = { label: string; color: "orange" | "red" | "blue" | "green" | "gray" };
-
-const INDICATOR_CLASSES: Record<Indicator["color"], string> = {
-  orange: "bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:ring-orange-900",
-  red: "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/40 dark:text-red-300 dark:ring-red-900",
-  blue: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-900",
-  green: "bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/40 dark:text-green-300 dark:ring-green-900",
-  gray: "bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
-};
-
-/** Desk's form indicator (frappe.get_indicator): unsaved → docstatus → status field */
-function getIndicator(meta: DocTypeMeta, doc: Doc, dirty: boolean): Indicator | null {
-  if (isNewDoc(doc) || dirty) return { label: "Not Saved", color: "orange" };
-  if (doc.docstatus === 2) return { label: "Cancelled", color: "red" };
-  if (typeof doc.workflow_state === "string" && doc.workflow_state) return { label: doc.workflow_state, color: "blue" };
-  if (meta.is_submittable) {
-    if (doc.docstatus === 1) return { label: typeof doc.status === "string" && doc.status ? doc.status : "Submitted", color: "blue" };
-    return { label: "Draft", color: "red" };
-  }
+/** Desk's form indicator: unsaved → cancelled → workflow → draft → status → submitted */
+function getIndicator(meta: DocTypeMeta, doc: Doc, dirty: boolean): [string, string] | null {
+  if (isNewDoc(doc) || dirty) return ["Not Saved", "orange"];
+  if (doc.docstatus === 2) return ["Cancelled", "red"];
+  if (typeof doc.workflow_state === "string" && doc.workflow_state) return [doc.workflow_state, "blue"];
+  if (meta.is_submittable && doc.docstatus === 0) return ["Draft", "red"];
   if (typeof doc.status === "string" && doc.status) {
     const s = doc.status.toLowerCase();
-    const color: Indicator["color"] = ["open", "pending", "draft"].includes(s) ? "orange" : ["closed", "completed", "active", "enabled"].includes(s) ? "green" : ["cancelled", "disabled", "expired"].includes(s) ? "red" : "gray";
-    return { label: doc.status, color };
+    return [doc.status, /to |pending|open|overdue|draft|hold/.test(s) ? "orange" : /complete|closed|paid|active|enabled|delivered/.test(s) ? "green" : /cancel|disabled|expired|lost/.test(s) ? "red" : "blue"];
   }
+  if (meta.is_submittable && doc.docstatus === 1) return ["Submitted", "blue"];
   return null;
 }
 
 function timeAgo(iso?: unknown): string {
   if (typeof iso !== "string") return "";
-  const then = new Date(iso.replace(" ", "T")).getTime();
-  const s = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso.replace(" ", "T")).getTime()) / 1000));
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return `${Math.floor(s / 86400)} d ago`;
+}
+
+/** __dashboard → Connections: related doctypes with counts (frappe.desk.notifications.get_open_count) */
+function Connections({ meta, doc }: { meta: DocTypeMeta; doc: Doc }) {
+  const dash = (meta as { __dashboard?: { fieldname?: string; non_standard_fieldnames?: Record<string, string>; transactions?: Array<{ label?: string; items: string[] }> } }).__dashboard;
+  const items = useMemo(() => (dash?.transactions ?? []).flatMap((t) => t.items), [dash]);
+  const { data: counts } = useQuery({
+    queryKey: ["open-count", meta.name, doc.name],
+    enabled: !!items.length && !isNewDoc(doc),
+    queryFn: async () => {
+      const { env } = await deskCall("frappe.desk.notifications.get_open_count", { doctype: meta.name, name: doc.name, items: JSON.stringify(items) });
+      const count = (env.message as { count?: Array<{ name: string; count: number }> } | undefined)?.count ?? [];
+      return Object.fromEntries(count.map((c) => [c.name, c.count]));
+    },
+  });
+  if (!dash?.transactions?.length || isNewDoc(doc)) return null;
+  const fieldFor = (dt: string) => dash.non_standard_fieldnames?.[dt] ?? dash.fieldname ?? "";
+  return (
+    <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
+      {dash.transactions.map((t, i) => (
+        <div key={i}>
+          <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">{t.label}</h4>
+          <ul className="space-y-1">
+            {t.items.map((dt) => (
+              <li key={dt} className="flex items-center gap-2">
+                <Link href={`/desk/doctype/${enc(dt)}?${new URLSearchParams({ [fieldFor(dt)]: doc.name })}`} className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                  <span className="flex-1 truncate">{dt}</span>
+                  {!!counts?.[dt] && <span className="rounded-full bg-zinc-100 px-1.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{counts[dt]}</span>}
+                </Link>
+                <Link href={`/desk/doctype/${enc(dt)}/new`} aria-label={`New ${dt}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
+                  <Plus className="h-3.5 w-3.5" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface Props {
@@ -99,21 +124,17 @@ interface Props {
 
 export default function DocForm({ doctype, name }: Props) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { data: meta, isLoading: metaLoading, error: metaError } = useDoctype(doctype);
+  const qc = useQueryClient();
+  const { data: metas, error: metaError } = useFormMetas(doctype);
   const { data: ctx } = useDeskContext();
-  const formRef = useRef<FormHandle>(null);
+  const isNew = !name;
 
-  const [doc, setDoc] = useState<Doc | null>(null);
-  const [docinfo, setDocinfo] = useState<DocInfo>({});
+  const [loaded, setLoaded] = useState<{ doc: Doc; docinfo: DocInfo } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<null | "save" | "submit" | "cancel" | "delete">(null);
   const [confirm, setConfirm] = useState<null | "submit" | "cancel" | "delete">(null);
+  const [missing, setMissing] = useState<string[] | null>(null);
   const [comment, setComment] = useState("");
-
-  const isNew = !name;
-  // Duplicate/Amend hand over a copy via sessionStorage — read once on mount
   const [prefill] = useState<Record<string, unknown>>(() => {
     if (typeof window === "undefined" || name) return {};
     try {
@@ -125,15 +146,12 @@ export default function DocForm({ doctype, name }: Props) {
     }
   });
 
-  // ── Load ────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!name) return;
     try {
-      const { doc: d, docinfo: info } = await getDoc(doctype, name);
-      addRecentDoc({ doctype, name: d.name, title: typeof d.title === "string" ? d.title : undefined });
-      setDoc(d);
-      setDocinfo(info);
-      setDirty(false);
+      const r = await getDoc(doctype, name);
+      addRecentDoc({ doctype, name: r.doc.name, title: typeof r.doc.title === "string" ? r.doc.title : undefined });
+      setLoaded(r);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load document");
@@ -145,108 +163,163 @@ export default function DocForm({ doctype, name }: Props) {
     void load();
   }, [load]);
 
-  // New doc: Desk defaults (+ Duplicate/Amend copy); replaced by the saved doc after the first save
-  const newDoc = useMemo(
-    () => (isNew && meta && ctx ? ({ ...getNewDoc(meta, ctx), ...prefill } as Doc) : null),
-    [isNew, meta, ctx, prefill],
-  );
-  const current = doc ?? newDoc;
+  // One controller per form instance, created once meta, context and the doc are known
+  const ctlRef = useRef<FormController | null>(null);
+  const [ctl, setCtl] = useState<FormController | null>(null);
+  useEffect(() => {
+    if (!metas || !ctx || ctlRef.current) return;
+    if (!isNew && !loaded) return;
+    const doc = isNew ? newFormDoc(metas.meta, ctx, prefill) : loaded!.doc;
+    const c = new FormController(metas.meta, metas.children, doc, {
+      user: ctx.user,
+      full_name: ctx.full_name,
+      roles: ctx.roles,
+      defaults: ctx.defaults,
+      sysdefaults: ctx.sysdefaults,
+      perms: ctx.perms,
+      navigate: (href) => router.push(href),
+    });
+    attachDoctypeAdapters(c);
+    c.loadScripts();
+    ctlRef.current = c;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time controller creation once inputs are ready
+    setCtl(c);
+    void c.runLoadEvents(true);
+  }, [metas, ctx, loaded, isNew, prefill, router]);
+
+  // Later reloads (Reload / after cancel) feed the same controller
+  useEffect(() => {
+    const c = ctlRef.current;
+    if (loaded && c && c.docname === loaded.doc.name && c.getDoc().modified !== loaded.doc.modified) {
+      c.load(loaded.doc);
+      void c.runLoadEvents(false);
+    }
+  }, [loaded]);
+
+  const noopSubscribe = useCallback(() => () => {}, []);
+  const snap = useSyncExternalStore(ctl?.subscribe ?? noopSubscribe, () => ctl?.snapshot() ?? null, () => null);
 
   // Warn before leaving with unsaved changes (Desk does the same)
   useEffect(() => {
-    if (!dirty) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
+    if (!snap?.dirty) return;
+    const h = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [snap?.dirty]);
 
-  // ── Actions ─────────────────────────────────────────────────────────────
+  // ── actions ─────────────────────────────────────────────────────────────
   const persist = useCallback(
-    async (values: Record<string, unknown>, action: SaveAction) => {
-      if (!current) return;
-      try {
-        const { doc: saved, messages } = await saveDoc({ ...current, ...values } as Doc, action);
-        messages.forEach((m) => toast.info(m));
-        setDoc(saved);
-        setDirty(false);
-        queryClient.invalidateQueries({ queryKey: ["list", doctype] });
-        queryClient.invalidateQueries({ queryKey: ["doctype-list", doctype] });
-        toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
-        if (isNew || saved.name !== current.name) {
-          router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
-        } else {
-          void load();
-        }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Save failed", { duration: 8000 });
-        throw e;
+    async (action: SaveAction) => {
+      const c = ctlRef.current;
+      if (!c) return;
+      if (!(await c.trigger("validate"))) return;
+      if (action !== "Submit" && !(await c.trigger("before_save"))) return;
+      if (action === "Submit" && !(await c.trigger("before_submit"))) return;
+      const miss = c.validateMandatory();
+      if (miss.length) {
+        setMissing(miss);
+        return;
+      }
+      const wasNew = isNewDoc(c.getDoc());
+      const { doc: saved, messages } = await saveDoc(c.getDoc(), action);
+      messages.forEach((m) => toast.info(m));
+      c.load(saved);
+      await c.trigger(action === "Submit" ? "on_submit" : "after_save");
+      qc.invalidateQueries({ queryKey: ["list", doctype] });
+      toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
+      if (wasNew) router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
+      else {
+        setLoaded((l) => (l ? { ...l, doc: saved } : l));
+        await c.runLoadEvents(false);
       }
     },
-    [current, doctype, isNew, load, queryClient, router],
+    [doctype, qc, router],
   );
 
-  const run = async (kind: "save" | "submit", fn: () => Promise<boolean>) => {
-    setBusy(kind);
-    try {
-      const ok = await fn();
-      if (!ok) toast.error("Please fill all mandatory fields", { description: "Fields marked * are required." });
-    } catch {
-      /* already toasted */
-    } finally {
-      setBusy(null);
-    }
-  };
+  const run = useCallback(
+    async (kind: "save" | "submit", action: SaveAction) => {
+      setBusy(kind);
+      try {
+        await persist(action);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Save failed", { duration: 10000 });
+      } finally {
+        setBusy(null);
+      }
+    },
+    [persist],
+  );
 
-  const onSave = () => run("save", () => formRef.current?.save() ?? Promise.resolve(false));
-  const onSubmitConfirmed = () => {
-    setConfirm(null);
-    void run("submit", () => formRef.current?.submit() ?? Promise.resolve(false));
-  };
+  useEffect(() => {
+    const c = ctlRef.current;
+    if (!c) return;
+    // scripts' frm.save() / frm.reload_doc() route through the page's pipeline
+    c.onSave = (a) => run(a === "Submit" ? "submit" : "save", (a as SaveAction) || "Save");
+    c.onReload = load;
+  }, [ctl, run, load]);
+
+  // Ctrl/Cmd+S saves, like Desk
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        const c = ctlRef.current;
+        if (c && Number(c.getDoc().docstatus ?? 0) === 0) void run("save", "Save");
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [run]);
 
   const onCancelConfirmed = async () => {
-    if (!doc) return;
+    const c = ctlRef.current;
     setConfirm(null);
+    if (!c) return;
     setBusy("cancel");
     try {
-      await cancelDoc(doctype, doc.name);
+      if (!(await c.trigger("before_cancel"))) return;
+      await cancelDoc(doctype, c.docname);
       toast.success("Cancelled");
       await load();
+      await c.trigger("after_cancel");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Cancel failed", { duration: 8000 });
+      toast.error(e instanceof Error ? e.message : "Cancel failed", { duration: 10000 });
     } finally {
       setBusy(null);
     }
   };
 
   const onDeleteConfirmed = async () => {
-    if (!doc) return;
+    const c = ctlRef.current;
     setConfirm(null);
+    if (!c) return;
     setBusy("delete");
     try {
-      await deleteDoc(doctype, doc.name);
-      toast.success(`${doctype} ${doc.name} deleted`);
-      queryClient.invalidateQueries({ queryKey: ["list", doctype] });
+      await deleteDoc(doctype, c.docname);
+      toast.success(`${doctype} ${c.docname} deleted`);
+      qc.invalidateQueries({ queryKey: ["list", doctype] });
       router.push(`/desk/doctype/${enc(doctype)}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete failed", { duration: 8000 });
+      toast.error(e instanceof Error ? e.message : "Delete failed", { duration: 10000 });
       setBusy(null);
     }
   };
 
   const openCopy = (amend: boolean) => {
-    if (!meta || !doc) return;
-    const copy = copyForNew(meta, doc);
-    if (amend) copy.amended_from = doc.name;
+    const c = ctlRef.current;
+    if (!c || !metas) return;
+    const copy = copyForNew(metas.meta, c.getDoc());
+    if (amend) copy.amended_from = c.docname;
     sessionStorage.setItem(PREFILL_KEY(doctype), JSON.stringify(copy));
     router.push(`/desk/doctype/${enc(doctype)}/new`);
   };
 
   const addComment = async () => {
-    if (!doc || !comment.trim()) return;
+    if (!snap || !comment.trim()) return;
     try {
       await deskCall("frappe.desk.form.utils.add_comment", {
         reference_doctype: doctype,
-        reference_name: doc.name,
+        reference_name: snap.doc.name,
         content: comment.trim(),
         comment_email: ctx?.user,
         comment_by: ctx?.full_name,
@@ -258,29 +331,7 @@ export default function DocForm({ doctype, name }: Props) {
     }
   };
 
-  // ── Derived ─────────────────────────────────────────────────────────────
-  const perms = docinfo.permissions ?? {};
-  const can = (p: string) => isNew || perms[p] === undefined || !!perms[p];
-  const submittable = !!meta?.is_submittable;
-  const docstatus = Number(current?.docstatus ?? 0);
-
-  // Desk's primary action: Save while new/dirty (or not submittable) → Submit → Cancel
-  let primary: null | { label: string; kind: "save" | "submit" | "cancel" } = null;
-  if (current && docstatus === 0) {
-    if (isNew || dirty || !submittable) primary = isNew || can("write") ? { label: "Save", kind: "save" } : null;
-    else primary = can("submit") ? { label: "Submit", kind: "submit" } : null;
-  } else if (current && docstatus === 1 && can("cancel")) {
-    primary = { label: "Cancel", kind: "cancel" };
-  }
-  const onPrimary = (kind: "save" | "submit" | "cancel") => {
-    if (kind === "save") void onSave();
-    else setConfirm(kind);
-  };
-
-  const titleField = typeof meta?.title_field === "string" ? meta.title_field : "";
-  const titleValue = titleField && current ? current[titleField] : "";
-  const title = !current ? "" : isNew ? `New ${doctype}` : typeof titleValue === "string" && titleValue ? titleValue : current.name;
-
+  // ── render ──────────────────────────────────────────────────────────────
   if (metaError) return <div className="p-6 text-sm text-red-600" role="alert">{(metaError as Error).message}</div>;
   if (loadError) {
     return (
@@ -290,72 +341,96 @@ export default function DocForm({ doctype, name }: Props) {
       </div>
     );
   }
-  if (metaLoading || !meta || !current) return <FormSkeleton />;
-  const doc_ = current;
+  if (!metas || !ctl || !snap) return <FormSkeleton />;
 
-  const indicator = getIndicator(meta, doc_, dirty);
+  const { meta } = metas;
+  const doc = snap.doc;
+  const docstatus = Number(doc.docstatus ?? 0);
+  const perms = loaded?.docinfo.permissions ?? {};
+  const can = (p: string) => isNew || perms[p] === undefined || !!perms[p];
+  const submittable = !!meta.is_submittable;
+  const readOnly = docstatus !== 0 || !can("write") || !!snap.overrides.__form?.read_only;
+  const indicator = getIndicator(meta, doc, snap.dirty);
+  const titleField = typeof meta.title_field === "string" ? meta.title_field : "";
+  const titleValue = titleField ? doc[titleField] : "";
+  const title = isNewDoc(doc) ? `New ${doctype}` : typeof titleValue === "string" && titleValue ? titleValue : doc.name;
+
+  let primary: null | { label: string; kind: "save" | "submit" | "cancel" } = null;
+  if (docstatus === 0 && !snap.overrides.__form?.disable_save) {
+    if (isNewDoc(doc) || snap.dirty || !submittable) primary = isNew || can("write") ? { label: "Save", kind: "save" } : null;
+    else primary = can("submit") ? { label: "Submit", kind: "submit" } : null;
+  } else if (docstatus === 1 && can("cancel")) primary = { label: "Cancel", kind: "cancel" };
+
+  // custom buttons: ungrouped as buttons, grouped as dropdowns (Desk "Create ▾")
+  const groups = new Map<string, typeof snap.buttons>();
+  for (const b of snap.buttons) {
+    const g = b.group ?? "";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push(b);
+  }
+
+  const docinfo = loaded?.docinfo ?? {};
   const timeline = [
-    ...(docinfo.comments ?? []).map((c) => ({ kind: "comment" as const, at: String(c.creation ?? ""), by: String(c.owner ?? c.comment_email ?? ""), text: String(c.content ?? "") })),
+    ...(docinfo.comments ?? []).map((c) => ({ kind: "comment" as const, at: String(c.creation ?? ""), by: String(c.owner ?? ""), text: String(c.content ?? "") })),
     ...(docinfo.versions ?? []).map((v) => ({ kind: "version" as const, at: String(v.creation ?? ""), by: String(v.owner ?? ""), text: "changed values" })),
   ].sort((a, b) => b.at.localeCompare(a.at));
+  const connectionsTab = (meta.fields ?? []).find((f) => f.fieldtype === "Tab Break" && /connection/i.test(f.fieldname))?.fieldname;
+  const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 pb-16">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-4 pb-16">
+      {/* Header (sticks under the navbar so actions stay reachable on long forms) */}
+      <div className="sticky top-12 z-20 -mx-4 flex flex-wrap items-center gap-3 bg-[var(--bg-color)]/95 px-4 py-2 backdrop-blur">
         <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
-        {indicator && (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${INDICATOR_CLASSES[indicator.color]}`}>
-            {indicator.label}
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {!isNew && (
+        {indicator && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${INDICATOR_PILL[indicator[1]] ?? INDICATOR_PILL.gray}`}>{indicator[0]}</span>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {[...groups.entries()].map(([g, btns]) =>
+            g ? (
+              <DropdownMenu key={g}>
+                <DropdownMenuTrigger className={`inline-flex items-center gap-1 ${btnCls}`}>
+                  {g} <ChevronDown className="h-3.5 w-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {btns.map((b) => (
+                    <DropdownMenuItem key={b.label} onClick={() => void b.action()}>{b.label}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              btns.map((b) => (
+                <button key={b.label} type="button" onClick={() => void b.action()} className={btnCls}>
+                  {b.label}
+                </button>
+              ))
+            ),
+          )}
+          {!isNewDoc(doc) && (
             <DropdownMenu>
-              <DropdownMenuTrigger aria-label="More actions" className="rounded-lg border border-zinc-200 p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">
+              <DropdownMenuTrigger aria-label="More actions" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
                 <MoreHorizontal className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
-                {can("create") && (
-                  <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}>
-                    <Plus className="h-4 w-4" /> New {doctype}
-                  </DropdownMenuItem>
-                )}
-                {can("create") && meta.allow_copy !== 0 && (
-                  <DropdownMenuItem onClick={() => openCopy(false)}>
-                    <CopyPlus className="h-4 w-4" /> Duplicate
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => void load()}>
-                  <RefreshCw className="h-4 w-4" /> Reload
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(doc_.name); toast.success("Copied"); }}>
-                  <Copy className="h-4 w-4" /> Copy name
-                </DropdownMenuItem>
+                {can("create") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}><Plus className="h-4 w-4" /> New {doctype}</DropdownMenuItem>}
+                {can("create") && meta.allow_copy !== 0 && <DropdownMenuItem onClick={() => openCopy(false)}><CopyPlus className="h-4 w-4" /> Duplicate</DropdownMenuItem>}
+                <DropdownMenuItem onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Reload</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(doc.name); toast.success("Copied"); }}><Copy className="h-4 w-4" /> Copy name</DropdownMenuItem>
                 {can("delete") && docstatus !== 1 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setConfirm("delete")} className="text-red-600">
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setConfirm("delete")} className="text-red-600"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
           {docstatus === 2 && can("amend") && (
-            <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
-              Amend
-            </button>
-          )}
-          {submittable && docstatus === 0 && !isNew && dirty && can("write") && (
-            <span className="hidden text-xs text-zinc-500 sm:inline">Save to enable Submit</span>
+            <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">Amend</button>
           )}
           {primary && (
             <button
               type="button"
-              onClick={() => onPrimary(primary.kind)}
               disabled={!!busy}
+              onClick={() => (primary!.kind === "save" ? void run("save", "Save") : setConfirm(primary!.kind))}
               className={[
                 "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60",
                 primary.kind === "cancel"
@@ -365,95 +440,149 @@ export default function DocForm({ doctype, name }: Props) {
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {primary.label}
-              {primary.kind === "save" && <kbd className="hidden rounded bg-white/15 px-1 text-[10px] sm:inline">⌘S</kbd>}
             </button>
           )}
         </div>
       </div>
 
-      {docstatus === 1 && <p className="text-xs text-zinc-500">This document is submitted and can no longer be edited. Cancel it to make changes (then Amend).</p>}
-      {docstatus === 2 && <p className="text-xs text-zinc-500">This document is cancelled. Use Amend to create a corrected copy.</p>}
-
-      {/* Form */}
-      <FormRenderer
-        formRef={formRef}
-        hideActions
-        meta={meta}
-        doc={doc_ as unknown as FrappeDocument}
-        editable={docstatus === 0 && can("write")}
-        readOnly={docstatus !== 0}
-        onChange={() => setDirty(true)}
-        onSave={(values) => persist(values, "Save")}
-        onSubmit={(values) => persist(values, "Submit")}
-      />
-
-      {/* Comments + activity */}
-      {!isNew && (
-        <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Comments</h2>
-          <div className="flex gap-2">
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void addComment();
-              }}
-              rows={2}
-              placeholder="Add a comment (⌘↵ to post)"
-              className="flex-1 resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            />
-            <button
-              type="button"
-              onClick={() => void addComment()}
-              disabled={!comment.trim()}
-              aria-label="Post comment"
-              className="self-end rounded-lg bg-zinc-900 p-2.5 text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-
-          <h2 className="mb-3 mt-6 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Activity</h2>
-          <ol className="relative space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
-            {timeline.map((t, i) => (
-              <li key={i} className="text-sm">
-                <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
-                {t.kind === "comment" ? (
-                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
-                    <div className="text-xs text-zinc-500">{t.by} · {timeAgo(t.at)}</div>
-                    <div className="mt-1 text-zinc-800 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: t.text }} />
-                  </div>
-                ) : (
-                  <span className="text-zinc-600 dark:text-zinc-400"><b className="font-medium text-zinc-800 dark:text-zinc-200">{t.by}</b> {t.text} · {timeAgo(t.at)}</span>
-                )}
-              </li>
-            ))}
-            <li className="text-sm text-zinc-600 dark:text-zinc-400">
-              <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
-              <b className="font-medium text-zinc-800 dark:text-zinc-200">{String(doc_.owner ?? "")}</b> created this · {timeAgo(doc_.creation)}
-            </li>
-          </ol>
-        </div>
+      {snap.intro?.message && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200" dangerouslySetInnerHTML={{ __html: snap.intro.message }} />
       )}
+      {docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
 
-      {/* Confirmations */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
+        <div className="min-w-0 space-y-4">
+          <FormBody
+            meta={meta}
+            values={doc}
+            readOnly={readOnly}
+            overrides={snap.overrides}
+            errors={snap.errors}
+            onChange={(f, v) => void ctl.set_value(f, v)}
+            getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
+            renderTable={(df) => (
+              <Grid
+                ctl={ctl}
+                df={df}
+                meta={metas.children.find((m) => m.name === df.options) ?? ({ name: String(df.options), fields: [] } as unknown as DocTypeMeta)}
+                readOnly={readOnly && !df.allow_on_submit}
+                overrides={snap.overrides}
+                errors={snap.errors}
+              />
+            )}
+            tabExtras={connectionsTab ? { [connectionsTab]: <Connections meta={meta} doc={doc} /> } : undefined}
+          />
+
+          {!isNewDoc(doc) && (
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Comments</h2>
+              <div className="flex gap-2">
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void addComment()}
+                  rows={2}
+                  placeholder="Add a comment (⌘↵ to post)"
+                  className="flex-1 resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+                <button type="button" onClick={() => void addComment()} disabled={!comment.trim()} aria-label="Post comment" className="self-end rounded-lg bg-zinc-900 p-2.5 text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900">
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+              <h2 className="mb-3 mt-6 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Activity</h2>
+              <ol className="relative space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+                {timeline.map((t, i) => (
+                  <li key={i} className="text-sm">
+                    <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
+                    {t.kind === "comment" ? (
+                      <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
+                        <div className="text-xs text-zinc-500">{t.by} · {timeAgo(t.at)}</div>
+                        <div className="mt-1 text-zinc-800 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: t.text }} />
+                      </div>
+                    ) : (
+                      <span className="text-zinc-600 dark:text-zinc-400"><b className="font-medium text-zinc-800 dark:text-zinc-200">{t.by}</b> {t.text} · {timeAgo(t.at)}</span>
+                    )}
+                  </li>
+                ))}
+                <li className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
+                  <b className="font-medium text-zinc-800 dark:text-zinc-200">{String(doc.owner ?? "")}</b> created this · {timeAgo(doc.creation)}
+                </li>
+              </ol>
+            </div>
+          )}
+        </div>
+
+        {/* Form sidebar (Desk shows assigned / attachments / tags / meta) */}
+        {!isNewDoc(doc) && (
+          <aside className="space-y-4 text-sm xl:sticky xl:top-28 xl:self-start">
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><UserPlus className="h-3.5 w-3.5" /> Assigned to</h3>
+              {(docinfo.assignments ?? []).length ? (
+                <ul className="space-y-1">{(docinfo.assignments ?? []).map((a) => <li key={String(a.name)} className="truncate text-zinc-700 dark:text-zinc-200">{String(a.owner ?? a.allocated_to ?? a.name)}</li>)}</ul>
+              ) : (
+                <p className="text-zinc-400">Nobody</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><Paperclip className="h-3.5 w-3.5" /> Attachments</h3>
+              {(docinfo.attachments ?? []).length ? (
+                <ul className="space-y-1">
+                  {(docinfo.attachments ?? []).map((a) => (
+                    <li key={String(a.name)}><a href={String(a.file_url)} target="_blank" rel="noreferrer" className="block truncate text-zinc-700 hover:underline dark:text-zinc-200">{String(a.file_name ?? a.name)}</a></li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-zinc-400">None</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><Tag className="h-3.5 w-3.5" /> Tags</h3>
+              {docinfo.tags ? (
+                <div className="flex flex-wrap gap-1">{String(docinfo.tags).split(",").filter(Boolean).map((t) => <span key={t} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">{t}</span>)}</div>
+              ) : (
+                <p className="text-zinc-400">No tags</p>
+              )}
+            </div>
+            <div className="space-y-1 px-1 text-xs text-zinc-500">
+              <p>Created by <b className="font-medium text-zinc-700 dark:text-zinc-300">{String(doc.owner ?? "")}</b> · {timeAgo(doc.creation)}</p>
+              <p>Updated by <b className="font-medium text-zinc-700 dark:text-zinc-300">{String(doc.modified_by ?? "")}</b> · {timeAgo(doc.modified)}</p>
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* Missing mandatory fields (Desk's "Missing Fields" dialog) */}
+      <Dialog open={!!missing} onOpenChange={(o) => !o && setMissing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Missing fields</DialogTitle>
+            <DialogDescription>Mandatory fields required in {doctype}:</DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-200">{(missing ?? []).map((m) => <li key={m}>{m}</li>)}</ul>
+          <DialogFooter>
+            <button type="button" onClick={() => setMissing(null)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">OK</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {confirm === "submit" ? `Permanently submit ${doc_.name}?` : confirm === "cancel" ? `Permanently cancel ${doc_.name}?` : `Delete ${doc_.name}?`}
-            </DialogTitle>
-            <DialogDescription>
-              {confirm === "delete" ? "This cannot be undone." : confirm === "submit" ? "Submitted documents cannot be edited." : "Cancelled documents cannot be edited; you can amend them."}
-            </DialogDescription>
+            <DialogTitle>{confirm === "submit" ? `Permanently submit ${doc.name}?` : confirm === "cancel" ? `Permanently cancel ${doc.name}?` : `Delete ${doc.name}?`}</DialogTitle>
+            <DialogDescription>{confirm === "delete" ? "This cannot be undone." : confirm === "submit" ? "Submitted documents cannot be edited." : "Cancelled documents cannot be edited; you can amend them."}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600">
-              No
-            </button>
+            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200">No</button>
             <button
               type="button"
-              onClick={() => (confirm === "submit" ? onSubmitConfirmed() : confirm === "cancel" ? void onCancelConfirmed() : void onDeleteConfirmed())}
+              onClick={() => {
+                if (confirm === "submit") {
+                  setConfirm(null);
+                  void run("submit", "Submit");
+                } else if (confirm === "cancel") void onCancelConfirmed();
+                else void onDeleteConfirmed();
+              }}
               className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${confirm === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"}`}
             >
               Yes

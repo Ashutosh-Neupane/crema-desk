@@ -22,6 +22,7 @@ export function useListSettings(meta: DocTypeMeta | undefined): Record<string, u
       roles: ctx.roles,
       defaults: ctx.defaults,
       sysdefaults: ctx.sysdefaults,
+      perms: ctx.perms,
       metas: { [meta.name]: meta },
       navigate: (href) => router.push(href),
     });

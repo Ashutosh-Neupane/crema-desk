@@ -36,7 +36,8 @@ check((await page.getByRole("button", { name: /^Filter/ }).count()) === 1, "exac
 step("search by customer name");
 await page.getByPlaceholder(/Search/).fill("Everest");
 await settle();
-check((await rowCount()) === 1, "search narrows to 1 row");
+const found = await page.locator("tbody tr").allInnerTexts();
+check(found.length >= 1 && found.length < n0 && found.every((r) => r.includes("Everest")), `search narrows to Everest rows (${found.length})`);
 await page.getByPlaceholder(/Search/).fill("");
 await settle();
 

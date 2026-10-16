@@ -14,6 +14,9 @@ export async function searchLink(
     filters?: unknown;
     reference_doctype?: string;
     page_length?: number;
+    /** custom search method from set_query({ query }) */
+    query?: string;
+    params?: Record<string, unknown>;
   },
 ): Promise<SearchLinkResult[]> {
   const args: Record<string, unknown> = {
@@ -23,6 +26,8 @@ export async function searchLink(
   };
   if (opts?.filters) args.filters = typeof opts.filters === "string" ? opts.filters : JSON.stringify(opts.filters);
   if (opts?.reference_doctype) args.reference_doctype = opts.reference_doctype;
+  if (opts?.query) args.query = opts.query;
+  if (opts?.params) Object.assign(args, opts.params);
 
   const results = await frappeMethod<SearchLinkResult[]>(
     "frappe.desk.search.search_link",
