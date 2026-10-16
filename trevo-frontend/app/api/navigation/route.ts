@@ -15,7 +15,9 @@ import { NextResponse } from "next/server";
 import { frappeServerFetch, getCookieHeader } from "@/lib/frappe/server";
 import { assembleBootInfo } from "@/lib/frappe/boot";
 import type { WorkspaceSidebarItem, WorkspaceData } from "@/lib/frappe/types";
+import { getDeskBoot } from "@/lib/frappe/deskBoot";
 import {
+  buildNavigationFromBoot,
   buildNavigationFromWorkspaces,
   SYSTEM_NAV,
   SYSTEM_DOCTYPES,
@@ -36,9 +38,13 @@ export async function GET() {
   try {
     const cookie = await getCookieHeader();
 
-    // 1. Workspace sidebar items
+    // v16+: Desk's own sidebar tree comes inlined in the desk boot payload
+    const deskBoot = await getDeskBoot(cookie);
+    const bootSections = deskBoot?.module_sidebars ? buildNavigationFromBoot(deskBoot) : null;
+
+    // 1. Workspace sidebar items (v15 API — removed in v16)
     let pages: WorkspaceSidebarItem[] = [];
-    try {
+    if (!bootSections) try {
       const { data } = await frappeServerFetch<{ pages: WorkspaceSidebarItem[] }>(
         cookie,
         "api/method/frappe.desk.desktop.get_workspace_sidebar_items",
@@ -52,7 +58,7 @@ export async function GET() {
     const workspaceDetails: WorkspaceData[] = [];
     const rootPages = pages.filter((p) => !p.parent_page);
     const namesToFetch = rootPages.slice(0, 12).map((p) => p.name);
-    if (namesToFetch.length > 0) {
+    if (!bootSections && namesToFetch.length > 0) {
       try {
         const listRes = await frappeServerFetch<WorkspaceData[]>(
           cookie,
@@ -72,7 +78,8 @@ export async function GET() {
     try {
       const { data } = await frappeServerFetch<ModuleDef[]>(
         cookie,
-        "api/resource/Module Def?fields=[\"name\",\"app_name\",\"color\",\"icon\"]&limit=200",
+        // v16 Module Def has no color/icon columns; requesting them fails the whole query
+        "api/resource/Module Def?fields=[\"name\",\"app_name\"]&limit=500",
       );
       if (Array.isArray(data)) {
         modules = data.map((m) => ({
@@ -96,12 +103,12 @@ export async function GET() {
     }
 
     // 5. Build sections from workspaces
-    const workspaceSections = buildNavigationFromWorkspaces(pages, workspaceDetails);
+    const workspaceSections = bootSections ?? buildNavigationFromWorkspaces(pages, workspaceDetails);
 
     // 6. System section — include only doctypes that exist on the backend
     const systemItems: NavLinkItem[] = [];
     const systemSection: NavSection = { type: "section", id: "system", label: "System", items: [] };
-    for (const item of [
+    const candidates = [
       { label: "Settings", doctype: "System Settings", href: "/desk/settings" },
       ...SYSTEM_DOCTYPES.map((d) => ({
         ...d,
@@ -111,21 +118,22 @@ export async function GET() {
             ? "/desk/settings"
             : `/desk/doctype/${encodeURIComponent(d.doctype)}`,
       })),
-    ]) {
-      try {
-        const { data } = await frappeServerFetch<unknown>(
+    ];
+    // Probe in parallel (skipped when the boot tree is used) (was one request at a time on every page load)
+    const exists = bootSections ? [] : await Promise.all(
+      candidates.map((item) =>
+        frappeServerFetch<unknown>(
           cookie,
           `api/resource/${encodeURIComponent(item.doctype)}?limit=1&fields=["name"]`,
-        );
-        if (data !== null) {
-          systemItems.push({ type: "link", label: item.label, href: item.href });
-        }
-      } catch {
-        // Skip doctypes that don't exist
-      }
-    }
+        ).then(({ data }) => data !== null, () => false),
+      ),
+    );
+    candidates.forEach((item, i) => {
+      if (exists[i]) systemItems.push({ type: "link", label: item.label, href: item.href });
+    });
     systemSection.items = systemItems;
-    if (systemItems.length > 0) {
+    // v16 boot already carries the framework modules (Build, Users, System, …)
+    if (!bootSections && systemItems.length > 0) {
       workspaceSections.push(systemSection);
     }
 

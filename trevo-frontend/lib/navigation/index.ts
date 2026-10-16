@@ -212,3 +212,79 @@ export const SYSTEM_DOCTYPES: Array<{ label: string; doctype: string }> = [
   { label: "Backups", doctype: "Backup" },
 ];
 
+
+// ---------------------------------------------------------------------------
+// Frappe v16: module sidebars from the desk boot payload
+// ---------------------------------------------------------------------------
+
+import type { DeskBoot, SidebarItem } from "@/lib/frappe/deskBoot";
+
+/** Trevo route for a v16 sidebar/dock link. */
+export function sidebarItemHref(item: Pick<SidebarItem, "link_type" | "link_to" | "url">): string | null {
+  const to = item.link_to ?? "";
+  switch (item.link_type) {
+    case "DocType":
+      return `/desk/doctype/${encodeURIComponent(to)}`;
+    case "Report":
+      return `/desk/query-report/${encodeURIComponent(to)}`;
+    case "Workspace":
+      return `/desk/workspace/${encodeURIComponent(to)}`;
+    case "Dashboard":
+      return `/desk/dashboard/${encodeURIComponent(to)}`;
+    case "Page":
+      return `/desk/page/${encodeURIComponent(to)}`;
+    case "URL":
+      return item.url ?? null;
+    default:
+      return item.url ?? null;
+  }
+}
+
+/**
+ * One NavSection per module sidebar (Accounts, Selling, Stock, …) in the app's
+ * dock order, with Section Breaks becoming nested groups — the same tree
+ * Desk's sidebar renders.
+ */
+export function buildNavigationFromBoot(boot: DeskBoot): NavSection[] {
+  const sidebars = boot.module_sidebars ?? {};
+  const ordered: string[] = [];
+  for (const app of boot.app_data ?? []) {
+    for (const d of app.dock ?? []) {
+      if (d.link_type === "Sidebar" && sidebars[d.link_to] && !ordered.includes(d.link_to)) ordered.push(d.link_to);
+    }
+  }
+  // Sidebars not placed in any dock (e.g. a custom app's module) still show, after the docked ones
+  for (const name of Object.keys(sidebars)) if (!ordered.includes(name)) ordered.push(name);
+
+  return ordered.map((name) => {
+    const sb = sidebars[name];
+    const home = sb.items.find((i) => i.link_type === "Workspace" && i.type === "Link");
+    const section: NavSection = {
+      type: "section",
+      id: `module:${sb.name}`,
+      label: sb.label || sb.name,
+      href: home ? sidebarItemHref(home) ?? undefined : undefined,
+      icon: sb.header_icon ?? null,
+      app: sb.app,
+      items: [],
+    };
+    let group: NavSection | null = null;
+    sb.items.forEach((it, idx) => {
+      if (it.type === "Section Break") {
+        group = { type: "section", id: `${section.id}:${idx}`, label: it.label, icon: it.icon ?? null, items: [] };
+        section.items.push(group);
+        return;
+      }
+      const href = sidebarItemHref(it);
+      if (!href) return;
+      const link: NavLinkItem = { type: "link", label: it.label, href, icon: it.icon ?? null };
+      // `child` marks items that belong under the preceding Section Break
+      if (group && it.child) group.items.push(link);
+      else {
+        group = null;
+        section.items.push(link);
+      }
+    });
+    return section;
+  });
+}
