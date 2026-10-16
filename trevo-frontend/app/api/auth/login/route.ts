@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { FRAPPE_BACKEND_URL } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
 import { checkRateLimit } from "@/lib/services/rateLimiter";
 import { generateCsrfToken } from "@/lib/services/csrf";
 import { loginSchema } from "@/lib/schemas/auth-login.schema";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const cookieHeader = cookieJar.toString();
 
   const url = `${FRAPPE_BACKEND_URL}/api/method/login`;
-  const res = await fetch(url, {
+  const res = await backendFetch(url, {
     method: "POST",
     headers: {
       Accept: "application/json",

@@ -50,7 +50,7 @@ export function LoginClient() {
 
         <form className="mt-5 space-y-3" onSubmit={onSubmit}>
           <div>
-            <label className="text-sm font-medium text-zinc-800">Email</label>
+            <label className="text-sm font-medium text-zinc-800">Email or username</label>
             <input
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
               value={email}
