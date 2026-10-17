@@ -53,6 +53,8 @@ Newest entries on top. Each session: append what was done, what's verified, what
   Verified by `e2e/gantt.mjs`.
 - Tier 2 #12 (part): Image view `/desk/doctype/X/view/image` (`components/views/ImageView.tsx`) — the list already linked
   there; cards via reportview + /files proxy, search, filters, load more. Verified by `e2e/image.mjs`.
+- Tier 2 #12 (part): File manager `/desk/files` rebuilt on frappe.core.api.file (folders, breadcrumbs, new folder,
+  upload into folder, search, move, delete); "Home" view on the File list. Verified by `e2e/files.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

@@ -163,6 +163,8 @@ export default function ListView({ doctype }: { doctype: string }) {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
     const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}` }];
     v.push({ id: "report", label: "Report", href: `/desk/doctype/${enc(doctype)}/view/report` });
+    // Desk: File has a folder view (/app/file/view/home)
+    if (doctype === "File") v.push({ id: "home", label: "Home", href: "/desk/files" });
     // Desk offers Calendar when the DocType ships calendar settings (frappe.views.calendar)
     const calJs = String((meta as { __calendar_js?: string }).__calendar_js ?? "");
     if (calJs) v.push({ id: "calendar", label: "Calendar", href: `/desk/doctype/${enc(doctype)}/view/calendar` });
