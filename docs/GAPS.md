@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-17 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (26 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (28 today, all passing).
 
 ---
 
@@ -26,7 +26,7 @@ Frappe's frontend is four kinds of code; each gets a different strategy.
 | Layer | What it is | Strategy | Status |
 |---|---|---|---|
 | **L1 Metadata UI** | DocType forms, lists, views, reports | Native React driven by meta; the site's JS (`__js`, `__list_js`, `__tree_js`, `__calendar_js`, report JS, Client Scripts) runs in the Desk runtime (`lib/desk-runtime`) against a `frappe` / `frm` / `cur_frm` compatibility API | ✅ core done |
-| **L2 Script DOM** | Form scripts that write into the page: `frm.fields_dict.x.$wrapper.html()`, `$(frm.wrapper).find()`, `frm.dashboard.add_section()` | Load **real jQuery** into the runtime and give scripts real DOM nodes: each HTML field renders a container whose node is `fields_dict[f].wrapper` / `$wrapper`; `frm.dashboard`, `frm.page.body`, `frm.layout.wrapper` get containers too. Unknown members stay chainable no-ops (NOOP) | 🟡 NOOP stubs today; real-DOM containers ❌ |
+| **L2 Script DOM** | Form scripts that write into the page: `frm.fields_dict.x.$wrapper.html()`, `$(frm.wrapper).find()`, `frm.dashboard.add_section()` | Load **real jQuery** into the runtime and give scripts real DOM nodes: each HTML field renders a container whose node is `fields_dict[f].wrapper` / `$wrapper`; `frm.dashboard`, `frm.page.body`, `frm.layout.wrapper` get containers too. Unknown members stay chainable no-ops (NOOP) | ✅ real jQuery + HTML-field containers (`e2e/scriptdom.mjs`); 🟡 `frm.dashboard` / `frm.page.body` still NOOP |
 | **L3 Desk widgets** | jQuery widgets Desk mounts inside forms: RoleEditor, ModuleEditor, Permission Manager, form tour, dashboard heatmap/graph | Rebuild natively, keyed by DocType + HTML field (`components/form/widgets`), writing to the **same child tables** as Desk so saving is identical | ✅ RoleEditor + ModuleEditor |
 | **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page (served at Trevo's `/app/<path>`) in a same-origin frame; `/assets`, `/files`, `/api/method`, `/api/resource` proxied; Desk chrome hidden; title and Form/List/Report navigation bridged back to Trevo. Replace page by page with native rebuilds where UX matters (POS first) | ✅ (`e2e/legacy.mjs` — ERPNext POS) |
 
@@ -56,7 +56,7 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 - ✅ Save/submit/cancel/amend/delete, scripts, ERPNext transaction logic, grid (drag, pages, CSV), quick entry,
   shortcuts, sidebar, timeline + mentions + email, print, rename/links/remind/customize, workflow, realtime,
   Get Items From, attach fields, route_options.
-- ❌ L2 real-DOM containers + real jQuery (app scripts that draw HTML).
+- ✅ L2: real jQuery; HTML fields are real DOM nodes for `$wrapper.html()` / `.find().on()` / `set_df_property` options.
 - ❌ Form dashboard beyond Connections: heatmap, stats, `frm.dashboard.add_indicator/add_progress/add_comment`.
 - ❌ Undo/redo (form/undo_manager.js), form tour, success action.
 - ❌ Grid: multi-row edit, "Insert Above", per-user grid column settings.

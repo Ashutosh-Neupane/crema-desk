@@ -7,7 +7,7 @@ const t = await start();
 const { page, check, step, shot } = t;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
 const EMAIL = `trevo.user.${Date.now() % 100000}@example.com`;
-const PROFILE = "Trevo E2E Profile";
+const PROFILE = `Trevo E2E Profile ${Date.now() % 100000}`;
 await post("frappe.client.delete", { doctype: "Role Profile", name: PROFILE });
 
 step("create the user in the form");

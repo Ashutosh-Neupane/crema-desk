@@ -72,6 +72,12 @@ Newest entries on top. Each session: append what was done, what's verified, what
   type). ERPNext POS runs unmodified. Sidebar/workspace Page links go there. Verified by `e2e/legacy.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
+- L2 script DOM done: the runtime's `$` is real jQuery 3.7.1 (`lib/desk-runtime/jquery.ts`), wrapped so missing
+  plugins (`.select2()`, `.datepicker()`…) are chainable no-ops; server render keeps the stub. HTML fields render
+  `HtmlHost`, which mounts the controller's own node — `frm.fields_dict.x.wrapper` / `$wrapper` are that node, so
+  `$wrapper.html()`, `.find().on("click")`, `.css()` work; `set_df_property(f, "options", html)` refills it.
+  Verified by `e2e/scriptdom.mjs`; full suite (28) green with real jQuery. users.mjs uses a unique Role Profile
+  name (a queued Role Profile job locks the doc between runs).
 
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
@@ -116,8 +122,8 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. L2 real jQuery + DOM containers for HTML fields
-2. Permission Manager (native), Map view, list sidebar + saved filters
+1. Permission Manager (native L3), User Permission flows, Reset Password / Login Link buttons
+2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):

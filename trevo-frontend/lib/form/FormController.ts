@@ -504,6 +504,21 @@ export class FormController {
     this.emit();
   }
 
+  // ── HTML field DOM (docs/GAPS.md L2) ─────────────────────────────────────
+  private htmlEls = new Map<string, HTMLDivElement>();
+  /** The DOM node behind an HTML field — created on first use, mounted into the form by HtmlHost */
+  htmlWrapper(fieldname: string): HTMLDivElement | null {
+    if (typeof document === "undefined") return null;
+    let el = this.htmlEls.get(fieldname);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "frappe-control";
+      el.dataset.fieldname = fieldname;
+      this.htmlEls.set(fieldname, el);
+    }
+    return el;
+  }
+
   // ── frm (what scripts see) ──────────────────────────────────────────────
   private buildFrm(): Record<string, unknown> {
     // getters on frm must read the controller's current doc, not a snapshot
@@ -520,10 +535,16 @@ export class FormController {
         refresh: () => {},
         toggle: (show: boolean) => self.setDf(f.fieldname, "hidden", show ? 0 : 1),
         set_query: (fn: QueryFn) => (self.queries[f.fieldname] = fn),
-        // jQuery handles Desk scripts poke at ($wrapper.toggle(), $input.on(), …) — chainable no-ops
-        $wrapper: (self.runtime.globals.$ as () => unknown)(),
+        // HTML fields get a real DOM node (rendered by HtmlHost) so scripts' markup shows up; other fields
+        // get an empty jQuery set — calls on it are harmless no-ops
+        get wrapper() {
+          return f.fieldtype === "HTML" ? (self.htmlWrapper(f.fieldname) ?? {}) : {};
+        },
+        get $wrapper() {
+          const $ = self.runtime.globals.$ as (el?: unknown) => unknown;
+          return f.fieldtype === "HTML" && self.htmlWrapper(f.fieldname) ? $(self.htmlWrapper(f.fieldname)) : $();
+        },
         $input: (self.runtime.globals.$ as () => unknown)(),
-        wrapper: {},
         set_description: () => {},
         set_focus: () => {},
         get_query: undefined as unknown,

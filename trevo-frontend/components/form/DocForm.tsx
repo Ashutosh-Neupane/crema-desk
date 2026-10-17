@@ -28,6 +28,7 @@ import FormSidebar from "@/components/form/FormSidebar";
 import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
 import { getHtmlWidget } from "@/components/form/widgets";
+import HtmlHost from "@/components/form/HtmlHost";
 import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
@@ -627,7 +628,7 @@ export default function DocForm({ doctype, name }: Props) {
             )}
             renderHtml={(df) => {
               const widget = getHtmlWidget(doctype, df.fieldname);
-              return widget ? widget({ ctl, readOnly }) : undefined;
+              return widget ? widget({ ctl, readOnly }) : <HtmlHost el={ctl.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />;
             }}
             tabExtras={tabExtras}
             focusRequest={focusRequest}

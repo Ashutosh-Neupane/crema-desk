@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
 import { MultiSelectDialog } from "./multiSelect";
+import { makeLenientJQuery } from "./jquery";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 
 export interface RuntimeContext {
@@ -363,7 +364,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     refresh_many: () => {},
     msgprint: (m: unknown) => (frappe.msgprint as (m: unknown) => void)(m),
     show_alert: (m: unknown) => (frappe.show_alert as (m: unknown) => void)(m),
-    $: makeJQueryStub(),
+    $: makeLenientJQuery(makeJQueryStub, NOOP),
     jQuery: undefined,
     format_currency: (v: unknown, currency?: string) => `${currency ?? ""} ${flt(v, 2).toLocaleString()}`.trim(),
   });
