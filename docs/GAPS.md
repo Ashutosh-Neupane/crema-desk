@@ -15,7 +15,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
    Image preview, private/public, `image_field` header avatar.
 2. ✅ **Form sidebar is read-only** — Desk lets you add/remove assignments (assign_to.add/remove), attach files,
    add/remove tags, share (docshare), follow, like. Trevo only lists them.
-3. **Timeline / activity** — comment edit/delete and @mentions, version diffs ("changed X from A to B"),
+3. ✅ **Timeline / activity** — comment edit/delete and @mentions, version diffs ("changed X from A to B"),
    communications (emails), assignment/attachment/like/share events, "New Email" composer
    (`frappe.core.doctype.communication.email.make`).
 4. **Print** — print view with format selection, letterhead, PDF download (`frappe.utils.print_format.download_pdf`),

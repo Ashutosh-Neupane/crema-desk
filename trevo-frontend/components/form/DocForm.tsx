@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
@@ -25,6 +25,7 @@ import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import FormSidebar from "@/components/form/FormSidebar";
+import Timeline from "@/components/form/Timeline";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
@@ -76,15 +77,6 @@ function getIndicator(meta: DocTypeMeta, doc: Doc, dirty: boolean): [string, str
   }
   if (meta.is_submittable && doc.docstatus === 1) return ["Submitted", "blue"];
   return null;
-}
-
-function timeAgo(iso?: unknown): string {
-  if (typeof iso !== "string") return "";
-  const s = Math.max(0, Math.floor((Date.now() - new Date(iso.replace(" ", "T")).getTime()) / 1000));
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return `${Math.floor(s / 86400)} d ago`;
 }
 
 /** __dashboard → Connections: related doctypes with counts (frappe.desk.notifications.get_open_count) */
@@ -144,7 +136,6 @@ export default function DocForm({ doctype, name }: Props) {
   const [busy, setBusy] = useState<null | "save" | "submit" | "cancel" | "delete">(null);
   const [confirm, setConfirm] = useState<null | "submit" | "cancel" | "delete">(null);
   const [missing, setMissing] = useState<string[] | null>(null);
-  const [comment, setComment] = useState("");
   const [prefill] = useState<Record<string, unknown>>(() => {
     if (typeof window === "undefined" || name) return {};
     try {
@@ -238,7 +229,7 @@ export default function DocForm({ doctype, name }: Props) {
           if (!(await c.trigger("before_workflow_action"))) return;
           const doc = await applyWorkflow(c.getDoc(), t.action);
           c.load(doc);
-          setLoaded((l) => (l ? { ...l, doc } : l));
+          await load();
           c.frm.selected_workflow_action = null;
           await c.trigger("after_workflow_action");
           await c.runLoadEvents(false);
@@ -253,7 +244,7 @@ export default function DocForm({ doctype, name }: Props) {
       if (workflow?.enable_action_confirmation) deskConfirm(`Are you sure you want to ${t.action}?`, () => void go());
       else await go();
     },
-    [workflow, qc, doctype],
+    [workflow, qc, doctype, load],
   );
 
   // Warn before leaving with unsaved changes (Desk does the same)
@@ -291,11 +282,12 @@ export default function DocForm({ doctype, name }: Props) {
       toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
       if (wasNew) router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
       else {
-        setLoaded((l) => (l ? { ...l, doc: saved } : l));
+        // refresh docinfo too (versions, comments) — Desk reloads it after every save
+        await load();
         await c.runLoadEvents(false);
       }
     },
-    [doctype, qc, router],
+    [doctype, qc, router, load],
   );
 
   const run = useCallback(
@@ -389,23 +381,6 @@ export default function DocForm({ doctype, name }: Props) {
     router.push(`/desk/doctype/${enc(doctype)}/new`);
   };
 
-  const addComment = async () => {
-    if (!snap || !comment.trim()) return;
-    try {
-      await deskCall("frappe.desk.form.utils.add_comment", {
-        reference_doctype: doctype,
-        reference_name: snap.doc.name,
-        content: comment.trim(),
-        comment_email: ctx?.user,
-        comment_by: ctx?.full_name,
-      });
-      setComment("");
-      await load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not add comment");
-    }
-  };
-
   // ── render ──────────────────────────────────────────────────────────────
   if (metaError) return <div className="p-6 text-sm text-red-600" role="alert">{(metaError as Error).message}</div>;
   if (loadError) {
@@ -451,10 +426,6 @@ export default function DocForm({ doctype, name }: Props) {
   }
 
   const docinfo = loaded?.docinfo ?? {};
-  const timeline = [
-    ...(docinfo.comments ?? []).map((c) => ({ kind: "comment" as const, at: String(c.creation ?? ""), by: String(c.owner ?? ""), text: String(c.content ?? "") })),
-    ...(docinfo.versions ?? []).map((v) => ({ kind: "version" as const, at: String(v.creation ?? ""), by: String(v.owner ?? ""), text: "changed values" })),
-  ].sort((a, b) => b.at.localeCompare(a.at));
   const connectionsTab = (meta.fields ?? []).find((f) => f.fieldtype === "Tab Break" && /connection/i.test(f.fieldname))?.fieldname;
   // DocType / Customize Form: the tab holding the `form_builder` HTML field hosts the visual builder
   let builderTab: string | undefined;
@@ -587,42 +558,7 @@ export default function DocForm({ doctype, name }: Props) {
           />
 
           {!isNewDoc(doc) && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-              <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Comments</h2>
-              <div className="flex gap-2">
-                <textarea aria-label="Add a comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void addComment()}
-                  rows={2}
-                  placeholder="Add a comment (⌘↵ to post)"
-                  className="flex-1 resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                />
-                <button type="button" onClick={() => void addComment()} disabled={!comment.trim()} aria-label="Post comment" className="self-end rounded-lg bg-zinc-900 p-2.5 text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900">
-                  <Send className="h-4 w-4" />
-                </button>
-              </div>
-              <h2 className="mb-3 mt-6 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Activity</h2>
-              <ol className="relative space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
-                {timeline.map((t) => (
-                  <li key={`${t.kind}-${t.at}-${t.by}`} className="text-sm">
-                    <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
-                    {t.kind === "comment" ? (
-                      <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
-                        <div className="text-xs text-zinc-500">{t.by} · {timeAgo(t.at)}</div>
-                        <div className="mt-1 text-zinc-800 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: t.text }} />
-                      </div>
-                    ) : (
-                      <span className="text-zinc-600 dark:text-zinc-400"><b className="font-medium text-zinc-800 dark:text-zinc-200">{t.by}</b> {t.text} · {timeAgo(t.at)}</span>
-                    )}
-                  </li>
-                ))}
-                <li className="text-sm text-zinc-600 dark:text-zinc-400">
-                  <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-600" />
-                  <b className="font-medium text-zinc-800 dark:text-zinc-200">{String(doc.owner ?? "")}</b> created this · {timeAgo(doc.creation)}
-                </li>
-              </ol>
-            </div>
+            <Timeline doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} meta={meta} childMetas={metas.children} user={ctx?.user} fullName={ctx?.full_name} onChanged={load} />
           )}
         </div>
 

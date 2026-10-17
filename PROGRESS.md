@@ -11,6 +11,11 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 1 #2 done: form sidebar is editable (`components/form/FormSidebar.tsx`): assign/unassign, attach/remove
   files, add/remove tags, share/unshare, like; Follow shown only where Frappe allows it (track_changes, not
   Administrator, not ToDo/Communication/…). Verified by `e2e/sidebar.mjs`.
+- Tier 1 #3 done: timeline (`components/form/Timeline.tsx`): comments with @mentions (Frappe mention spans),
+  edit/delete own comments, version diffs with field labels (incl. child rows), emails, assignment/attachment/
+  like/info/workflow logs; New Email composer (`EmailComposer.tsx` → communication.email.make, contacts, CC/BCC,
+  print attachment). Docinfo reloads after save/workflow. Verified by `e2e/timeline.mjs` (this site has no outgoing
+  email account, so the test checks Desk's error path; with an account it checks the Communication).
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

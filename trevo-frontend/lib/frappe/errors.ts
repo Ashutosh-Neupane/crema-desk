@@ -4,8 +4,15 @@
  * first, then the exception line without its Python module prefix.
  */
 
+const ENTITIES: Record<string, string> = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'" };
+
+/** Server messages are HTML — keep the text, decode entities (toasts render plain text) */
 const stripHtml = (html: string) =>
-  html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+  html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39|#x27);/g, (e) => ENTITIES[e] ?? e)
+    .trim();
 
 /**
  * The human message for a failed Frappe call, as Desk would show it:
