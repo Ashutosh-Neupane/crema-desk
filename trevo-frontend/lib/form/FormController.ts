@@ -402,6 +402,17 @@ export class FormController {
     void this.trigger(`${table}_move`);
   }
 
+  /** Drag-and-drop reorder (Desk: grid sortable → idx renumbered, `<table>_move` fired) */
+  reorder_row(table: string, name: string, toIndex: number) {
+    const rows = [...((this.doc[table] as Row[]) ?? [])];
+    const i = rows.findIndex((r) => r.name === name);
+    if (i < 0 || toIndex < 0 || toIndex >= rows.length || i === toIndex) return;
+    const [row] = rows.splice(i, 1);
+    rows.splice(toIndex, 0, row);
+    this.setRows(table, rows);
+    void this.trigger(`${table}_move`);
+  }
+
   // ── events ──────────────────────────────────────────────────────────────
   watch(w: Watcher) {
     this.watchers.push(w);

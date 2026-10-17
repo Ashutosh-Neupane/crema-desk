@@ -40,6 +40,9 @@ Newest entries on top. Each session: append what was done, what's verified, what
   name, merge), Links (linked_with.get), Remind Me (Reminder), Copy to Clipboard (JSON), Customize, Edit DocType (dev
   mode). URL query values apply to fields after load like Desk route_options (Customize Form ?doc_type=X).
   Verified by `e2e/formmenu.mjs`. Undo/redo still missing.
+- Tier 1 #9 done: grid drag-to-reorder (dnd-kit handle on the No. column, `ctl.reorder_row`), 50-row pagination,
+  CSV Download/Upload when the Table field has allow_bulk_edit (like Desk). Layout parser now keeps every raw docfield
+  property (it dropped allow_bulk_edit, cannot_add_rows, …). Verified by `e2e/grid.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

@@ -31,7 +31,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
    DocType lists/forms. → Redirect to the generic list/form; rebuild only real Desk pages (below).
 8. ✅ **Form menu** (undo/redo still ❌) — Rename (title/name, `frappe.model.rename_doc.update_document_title`), Links (linked_with),
    Customize, Copy to Clipboard, Remind Me, Undo/Redo, Email, "Set User Permissions".
-9. **Grid** — drag to reorder rows, pagination over 50 rows, download/upload rows as CSV, multi-row edit.
+9. ✅ **Grid** (multi-row edit ❌) — drag to reorder rows, pagination over 50 rows, download/upload rows as CSV, multi-row edit.
 
 ### Tier 2: Desk views and pages not yet rebuilt
 10. Calendar view per DocType (`/view/calendar`, `__calendar_js` field map, drag to reschedule).

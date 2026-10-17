@@ -46,6 +46,7 @@ check(true, "image uploaded and shown");
 await page.getByLabel("Document", { exact: true }).setInputFiles(txt);
 await page.getByRole("link", { name: "notes.txt" }).waitFor({ timeout: 30000 });
 const img = page.locator("img[alt='Photo']");
+await page.waitForFunction(() => { const el = document.querySelector("img[alt='Photo']"); return !!el && el.complete && el.naturalWidth > 0; }, null, { timeout: 15000 }).catch(() => {});
 check(await img.evaluate((el) => el.complete && el.naturalWidth > 0), "preview loads through /files proxy");
 await page.getByRole("button", { name: /^Save$/ }).click();
 await page.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });

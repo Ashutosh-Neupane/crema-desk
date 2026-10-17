@@ -50,6 +50,8 @@ export function parseDoctypeMeta(meta: DocTypeMeta): ParsedMeta {
 
 function enhanceField(f: DocField): TrevoField {
   return {
+    // keep every Desk docfield property (allow_bulk_edit, cannot_add_rows, fetch_from, …); normalized keys below win
+    ...(f as unknown as Partial<TrevoField>),
     fieldname: f.fieldname,
     label: f.label ?? f.fieldname,
     fieldtype: f.fieldtype,
