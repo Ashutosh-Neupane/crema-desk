@@ -26,11 +26,15 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   drag between/within columns (dnd-kit, pointer-first collision, keyboard) → update_order_for_single_card,
   "Move to" card menu, per-column load more, + card prefilled with the column value, add/archive/restore column,
   card fields/assignees/footer date from the board. Verified by `e2e/kanban.mjs` (ToDo board)
+- List bulk actions (`components/list/BulkActions.tsx`): Edit (submit_cancel_or_update_docs "update"),
+  Assign To (assign_to.add_multiple), Add Tags, Export CSV, workflow actions common to the selection
+  (get_common_transition_actions → bulk_workflow_approval), Submit/Cancel, Delete. Verified by `e2e/bulk.mjs`.
+  LinkInput now has combobox/listbox ARIA; list view links don't prefetch (dev compile stalls router.replace)
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
 Next
-1. Bulk edit + workflow bulk actions in list; data import/export (rebuild properly)
+1. Data import/export (rebuild properly)
 2. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
 3. Remaining React Doctor warnings
 

@@ -6,7 +6,7 @@
  *  - indicator from the app's own listview_settings.get_indicator (__list_js)
  *  - one filter model: ID/title search, inline standard filters, filter editor,
  *    removable chips; synced to the URL (?status=Draft or ?filters=[…])
- *  - sort, group-by counts, page size + load more, bulk Delete / Submit / Cancel
+ *  - sort, group-by counts, page size + load more, bulk actions (components/list/BulkActions)
  *  - only the views that make sense for the DocType; quick entry for New when allowed
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import {
   ArrowDownNarrowWide,
   ArrowUpNarrowWide,
-  ChevronDown,
   Filter as FilterIcon,
   Layers,
   ListFilter,
@@ -31,15 +30,15 @@ import {
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useListSettings } from "@/lib/list/useListSettings";
-import { deleteRows, fetchCount, fetchRows, submitOrCancelRows, type Filter, type Row } from "@/lib/list/api";
+import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
 import { getIndicator, INDICATOR_PILL, indicatorFilters } from "@/lib/list/indicator";
 import { formatCell, timeAgo } from "@/lib/list/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import LinkInput from "@/components/list/LinkInput";
 import { FilterEditor, GroupBy, NO_VALUE, OPERATORS, describeValue, fieldLabel, filtersFromParams } from "@/components/list/filters";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
+import BulkActions from "@/components/list/BulkActions";
 import { useShortcuts } from "@/lib/shortcuts";
 import type { DocField } from "@/lib/frappe/types";
 
@@ -69,7 +68,6 @@ export default function ListView({ doctype }: { doctype: string }) {
   const sort = sortState ?? defaultSort;
   const [pageLength, setPageLength] = useState(20);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirm, setConfirm] = useState<null | "delete" | "submit" | "cancel">(null);
   const [quickEntry, setQuickEntry] = useState(false);
 
   const setFilters = useCallback(
@@ -145,21 +143,6 @@ export default function ListView({ doctype }: { doctype: string }) {
     qc.invalidateQueries({ queryKey: ["list-count", doctype] });
   };
 
-  const runBulk = async () => {
-    const names = [...selected];
-    const kind = confirm;
-    setConfirm(null);
-    try {
-      if (kind === "delete") await deleteRows(doctype, names);
-      else if (kind) await submitOrCancelRows(doctype, names, kind);
-      toast.success(`${kind === "delete" ? "Deleted" : kind === "submit" ? "Submitted" : "Cancelled"} ${names.length} ${doctype}${names.length === 1 ? "" : " records"}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Action failed", { duration: 8000 });
-    }
-    setSelected(new Set());
-    refresh();
-  };
-
   const views = useMemo(() => {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
     const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}` }];
@@ -228,7 +211,7 @@ export default function ListView({ doctype }: { doctype: string }) {
         {views.length > 1 && (
           <nav aria-label="Views" className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
             {views.map((v) => (
-              <Link key={v.id} href={v.href} aria-current={v.id === "list" ? "page" : undefined} className={`rounded-md px-2.5 py-1 text-xs font-medium ${v.id === "list" ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>
+              <Link key={v.id} href={v.href} prefetch={false} aria-current={v.id === "list" ? "page" : undefined} className={`rounded-md px-2.5 py-1 text-xs font-medium ${v.id === "list" ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>
                 {v.label}
               </Link>
             ))}
@@ -249,21 +232,15 @@ export default function ListView({ doctype }: { doctype: string }) {
             </DropdownMenuContent>
           </DropdownMenu>
           {selected.size > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-                Actions ({selected.size}) <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {meta.is_submittable ? (
-                  <>
-                    <DropdownMenuItem onClick={() => setConfirm("submit")}>Submit</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setConfirm("cancel")}>Cancel</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                ) : null}
-                <DropdownMenuItem onClick={() => setConfirm("delete")} className="text-red-600">Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <BulkActions
+              meta={meta}
+              rows={rows.filter((r) => selected.has(r.name))}
+              columns={listFields.map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname, fieldtype: f.fieldtype }))}
+              onDone={() => {
+                setSelected(new Set());
+                refresh();
+              }}
+            />
           ) : (
             canCreate && (
               <button
@@ -499,21 +476,6 @@ export default function ListView({ doctype }: { doctype: string }) {
           </div>
         )}
       </div>
-
-      <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {confirm === "delete" ? "Delete" : confirm === "submit" ? "Submit" : "Cancel"} {selected.size} {doctype} {selected.size === 1 ? "record" : "records"}?
-            </DialogTitle>
-            <DialogDescription>{confirm === "delete" ? "This cannot be undone." : "This changes the documents permanently."}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200">No</button>
-            <button type="button" onClick={() => void runBulk()} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${confirm === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}>Yes</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {quickEntry && (
         <QuickEntry

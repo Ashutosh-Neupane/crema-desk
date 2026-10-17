@@ -35,14 +35,17 @@ check((await page.getByRole("button", { name: /^Filter/ }).count()) === 1, "exac
 
 step("search by customer name");
 await page.getByPlaceholder(/Search/).fill("Everest");
+await page.waitForFunction((n) => document.querySelectorAll("tbody tr").length < n, n0, { timeout: 30000 }).catch(() => {});
 await settle();
 const found = await page.locator("tbody tr").allInnerTexts();
 check(found.length >= 1 && found.length < n0 && found.every((r) => r.includes("Everest")), `search narrows to Everest rows (${found.length})`);
 await page.getByPlaceholder(/Search/).fill("");
+await page.waitForFunction((n) => document.querySelectorAll("tbody tr").length === n, n0, { timeout: 30000 });
 await settle();
 
 step("indicator click adds filter; chip removes it");
 await page.getByRole("button", { name: "Draft" }).first().click();
+await page.waitForURL(/docstatus=0/, { timeout: 30000 }).catch(() => {});
 await settle();
 check(page.url().includes("docstatus=0"), "URL has docstatus=0");
 check((await rowCount()) === 2, "2 draft orders");
