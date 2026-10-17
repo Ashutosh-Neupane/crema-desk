@@ -24,6 +24,8 @@ import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
+import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
+import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useShortcuts } from "@/lib/shortcuts";
@@ -176,7 +178,10 @@ export default function DocForm({ doctype, name }: Props) {
   useEffect(() => {
     if (!metas || !ctx || ctlRef.current) return;
     if (!isNew && !loaded) return;
-    const doc = isNew ? newFormDoc(metas.meta, ctx, prefill) : loaded!.doc;
+    const base = isNew ? newFormDoc(metas.meta, ctx, prefill) : loaded!.doc;
+    // Desk set_default_state: a new doc starts in the workflow state for docstatus 0
+    const wfNew = isNew ? getWorkflow(metas.meta) : null;
+    const doc = wfNew && !base[wfNew.workflow_state_field] ? { ...base, [wfNew.workflow_state_field]: defaultState(wfNew, 0) ?? undefined } : base;
     const c = new FormController(metas.meta, metas.children, doc, {
       user: ctx.user,
       full_name: ctx.full_name,
@@ -207,6 +212,48 @@ export default function DocForm({ doctype, name }: Props) {
 
   const noopSubscribe = useCallback(() => () => {}, []);
   const snap = useSyncExternalStore(ctl?.subscribe ?? noopSubscribe, () => ctl?.snapshot() ?? null, () => null);
+
+  // workflow: active Workflow from the meta, transitions for the saved + clean doc
+  const workflow = useMemo(() => getWorkflow(metas?.meta), [metas]);
+  const { data: transitions = [] } = useTransitions(workflow, snap?.doc ?? null, !!snap?.dirty, ctx?.user, ctx?.roles ?? []);
+  const { data: stateStyles } = useQuery({
+    queryKey: ["workflow-state-styles"],
+    enabled: !!workflow,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { env } = await deskCall("frappe.client.get_list", { doctype: "Workflow State", fields: ["name", "style"], limit_page_length: 0 });
+      return Object.fromEntries(((env.message as Array<{ name: string; style?: string }>) ?? []).map((w) => [w.name, w.style ?? ""]));
+    },
+  });
+  const [wfBusy, setWfBusy] = useState(false);
+  const runTransition = useCallback(
+    async (t: Transition) => {
+      const c = ctlRef.current;
+      if (!c) return;
+      const go = async () => {
+        setWfBusy(true);
+        try {
+          c.frm.selected_workflow_action = t.action;
+          if (!(await c.trigger("before_workflow_action"))) return;
+          const doc = await applyWorkflow(c.getDoc(), t.action);
+          c.load(doc);
+          setLoaded((l) => (l ? { ...l, doc } : l));
+          c.frm.selected_workflow_action = null;
+          await c.trigger("after_workflow_action");
+          await c.runLoadEvents(false);
+          qc.invalidateQueries({ queryKey: ["list", doctype] });
+          toast.success(`${t.action}: ${t.next_state}`);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Workflow action failed", { duration: 10000 });
+        } finally {
+          setWfBusy(false);
+        }
+      };
+      if (workflow?.enable_action_confirmation) deskConfirm(`Are you sure you want to ${t.action}?`, () => void go());
+      else await go();
+    },
+    [workflow, qc, doctype],
+  );
 
   // Warn before leaving with unsaved changes (Desk does the same)
   useEffect(() => {
@@ -376,8 +423,11 @@ export default function DocForm({ doctype, name }: Props) {
   const perms = loaded?.docinfo.permissions ?? {};
   const can = (p: string) => isNew || perms[p] === undefined || !!perms[p];
   const submittable = !!meta.is_submittable;
-  const readOnly = docstatus !== 0 || !can("write") || !!snap.overrides.__form?.read_only;
-  const indicator = getIndicator(meta, doc, snap.dirty);
+  const wfReadOnly = !!workflow && isWorkflowReadOnly(workflow, doc, ctx?.roles ?? []);
+  const readOnly = docstatus !== 0 || !can("write") || !!snap.overrides.__form?.read_only || wfReadOnly;
+  const wfState = workflow ? (doc[workflow.workflow_state_field] as string | undefined) : undefined;
+  const indicator: [string, string] | null =
+    workflow && wfState && !isNewDoc(doc) && !snap.dirty ? [wfState, stateColour(workflow, wfState, stateStyles)] : getIndicator(meta, doc, snap.dirty);
   const titleField = typeof meta.title_field === "string" ? meta.title_field : "";
   const titleValue = titleField ? doc[titleField] : "";
   const title = isNewDoc(doc) ? `New ${doctype}` : typeof titleValue === "string" && titleValue ? titleValue : doc.name;
@@ -387,6 +437,9 @@ export default function DocForm({ doctype, name }: Props) {
     if (isNewDoc(doc) || snap.dirty || !submittable) primary = isNew || can("write") ? { label: "Save", kind: "save" } : null;
     else primary = can("submit") ? { label: "Submit", kind: "submit" } : null;
   } else if (docstatus === 1 && can("cancel")) primary = { label: "Cancel", kind: "cancel" };
+  // Desk workflow setup_btn: transitions replace the primary/secondary buttons
+  const showActions = transitions.length > 0 && !snap.dirty && !isNewDoc(doc);
+  if (showActions) primary = null;
 
   // custom buttons: ungrouped as buttons, grouped as dropdowns (Desk "Create ▾")
   const groups = new Map<string, typeof snap.buttons>();
@@ -468,6 +521,21 @@ export default function DocForm({ doctype, name }: Props) {
           )}
           {docstatus === 2 && can("amend") && (
             <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">Amend</button>
+          )}
+          {showActions && (
+            <DropdownMenu>
+              <DropdownMenuTrigger disabled={wfBusy} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+                {wfBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Actions <ChevronDown className="h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {transitions.map((t) => (
+                  <DropdownMenuItem key={`${t.action}|${t.next_state}`} onClick={() => void runTransition(t)}>
+                    {t.action}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {primary && (
             <button

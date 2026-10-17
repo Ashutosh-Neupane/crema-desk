@@ -17,11 +17,15 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   group by with count/sum/avg, totals, page size, CSV; settings remembered in user_settings "Report";
   Save / Save As → `frappe.desk.reportview.save_report`. Verified by `e2e/reportview.mjs`.
   Filter editor / group-by / URL filters moved to `components/list/filters.tsx` (shared by list + report)
+- Workflow on forms (`lib/form/workflow.ts`, DocForm): default state on new docs, Actions menu from
+  `get_transitions` (role + self-approval) replacing Save/Submit/Cancel, `before/after_workflow_action` hooks,
+  `apply_workflow`, action confirmation, state indicator coloured by Workflow State style, read-only when the
+  user's roles can't edit the state. Verified by `e2e/workflow.mjs` (custom submittable DocType + workflow)
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
 Next
-1. Kanban, workflow actions on forms, bulk edit, data import/export (rebuild properly)
+1. Kanban, bulk edit, data import/export (rebuild properly); workflow bulk actions in list
 2. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
 3. Remaining React Doctor warnings
 
