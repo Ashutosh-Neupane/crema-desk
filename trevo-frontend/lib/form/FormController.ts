@@ -15,7 +15,7 @@
  *  - `frm` object handed to scripts (Desk's API surface)
  */
 import { toast } from "sonner";
-import { createRuntime, flt, type Runtime, type RuntimeContext } from "@/lib/desk-runtime";
+import { createRuntime, flt, type Runtime, type RuntimeContext, NOOP } from "@/lib/desk-runtime";
 import { deskCall, isNewDoc, type Doc } from "@/lib/frappe/form";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
 import { evalDependsOn } from "@/lib/trevo-form/dependsOn";
@@ -592,6 +592,12 @@ export class FormController {
         self.dirty = true;
         self.emit();
       },
+      /** frappe.model.sync of a server-mapped copy of this doc (map_docs) — keeps it unsaved */
+      __sync: (doc: Doc) => {
+        self.doc = self.normalize({ ...doc, __islocal: self.doc.__islocal, __unsaved: 1 });
+        self.dirty = true;
+        self.emit();
+      },
       set_df_property: (f: string, prop: string, v: unknown, _docname?: string, table?: string) =>
         self.setDf(table ? `${table}.${f}` : f, prop, v),
       toggle_display: (f: string | string[], show: boolean) => (Array.isArray(f) ? f : [f]).forEach((x) => self.setDf(x, "hidden", show ? 0 : 1)),
@@ -681,7 +687,9 @@ export class FormController {
     return new Proxy(frm, {
       get(target, prop, receiver) {
         if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
-        return () => undefined;
+        // Desk UI members we don't model (frm.msgbox.$wrapper.is(...), frm.timeline.refresh()) resolve to
+        // a chainable no-op instead of throwing
+        return NOOP;
       },
     });
   }

@@ -23,6 +23,11 @@ Newest entries on top. Each session: append what was done, what's verified, what
   wkhtmltopdf fetches /assets from the same single gunicorn worker and deadlocked; `host_name` set to
   http://localhost:8000 for the site. ERPNext "Classic/Modern" formats need Chromium (not in the image) → PDF error,
   same as Desk. Verified by `e2e/print.mjs`. Print Format Builder still to do.
+- Tier 1 #5 done: `frappe.ui.form.MultiSelectDialog` for scripts (`lib/desk-runtime/multiSelect.ts` +
+  `components/desk/MultiSelectHost.tsx`, search_widget like Desk) and `erpnext.utils.map_current_doc` shim
+  (`lib/form/compat.ts` → mapper.map_docs → `frm.__sync`, doc stays unsaved). Unknown `frm.*` members now return the
+  chainable NOOP, which unblocked Sales Invoice's refresh (`frm.msgbox.$wrapper.is`) and its "Get Items From" menu.
+  Verified by `e2e/getitems.mjs` (SI ← SO, saved rows keep sales_order).
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

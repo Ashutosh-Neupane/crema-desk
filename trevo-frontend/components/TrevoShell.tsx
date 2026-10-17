@@ -9,6 +9,7 @@ import { useNavigation } from "@/lib/hooks/useNavigation";
 import CommandPalette from "@/components/CommandPalette";
 import DeskSidebar from "@/components/DeskSidebar";
 import DialogHost from "@/components/desk/DialogHost";
+import MultiSelectHost from "@/components/desk/MultiSelectHost";
 import ShortcutsDialog from "@/components/desk/ShortcutsDialog";
 import { useShortcuts } from "@/lib/shortcuts";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
@@ -469,6 +470,7 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <DialogHost />
+        <MultiSelectHost />
         <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       </div>
     </div>

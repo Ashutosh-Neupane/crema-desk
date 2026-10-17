@@ -20,7 +20,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
    (`frappe.core.doctype.communication.email.make`).
 4. 🟡 **Print** (view/PDF ✅, Print Format Builder ❌) — print view with format selection, letterhead, PDF download (`frappe.utils.print_format.download_pdf`),
    "Print" in form menu; Print Format Builder.
-5. **ERPNext "Get Items From"** — `frappe.ui.form.MultiSelectDialog` / `erpnext.utils.map_current_doc` (e.g. Sales
+5. ✅ **ERPNext "Get Items From"** — `frappe.ui.form.MultiSelectDialog` / `erpnext.utils.map_current_doc` (e.g. Sales
    Invoice ← Sales Order, Delivery Note ← Sales Order) and grid "Add Multiple" (link_selector) aren't available to scripts.
 6. **Realtime** — list auto-refresh on `list_update`, form "This document has been modified" notice on `doc_update`,
    form viewers.

@@ -11,6 +11,7 @@
 import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
+import { MultiSelectDialog } from "./multiSelect";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 
 export interface RuntimeContext {
@@ -156,7 +157,7 @@ function makeJQueryStub(): unknown {
 }
 
 /** Chainable no-op: callable, constructible, any property → itself */
-const NOOP: unknown = new Proxy(function () {}, {
+export const NOOP: unknown = new Proxy(function () {}, {
   get: (_t, p) => (p === "prototype" ? {} : p === Symbol.toPrimitive ? () => "" : p === "then" || p === Symbol.iterator ? undefined : NOOP),
   apply: () => undefined,
   construct: () => ({}),
@@ -242,6 +243,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
         },
         // class bases some app scripts extend; behaviour comes from Trevo's own form
         Controller: class {},
+        MultiSelectDialog,
       },
       Dialog: DeskDialog,
       toolbar: {},
