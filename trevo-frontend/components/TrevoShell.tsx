@@ -89,8 +89,6 @@ const FALLBACK_NAV: DeskNavigation = {
         { type: "link", label: "Files", href: "/desk/files", icon: "FolderOpen" },
         { type: "link", label: "Tags", href: "/desk/tags", icon: "Tag" },
         { type: "link", label: "Inbox", href: "/desk/inbox", icon: "Mail" },
-        { type: "link", label: "Map", href: "/desk/map", icon: "MapPin" },
-        { type: "link", label: "Image View", href: "/desk/image", icon: "Image" },
         { type: "link", label: "Translations", href: "/desk/translations", icon: "Languages" },
         { type: "link", label: "Route History", href: "/desk/route-history", icon: "ScrollText" },
         { type: "link", label: "System Health", href: "/desk/system-health", icon: "Activity" },

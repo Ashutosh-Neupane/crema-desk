@@ -24,7 +24,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
    Invoice ← Sales Order, Delivery Note ← Sales Order) and grid "Add Multiple" (link_selector) aren't available to scripts.
 6. ✅ **Realtime** — list auto-refresh on `list_update`, form "This document has been modified" notice on `doc_update`,
    form viewers.
-7. **Broken prototype routes** (smoke): /desk/notes, /desk/assignments, /desk/roles, /desk/users crash (functions passed
+7. ✅ **Broken prototype routes** (smoke): /desk/notes, /desk/assignments, /desk/roles, /desk/users crash (functions passed
    to client components); /desk/permissions, /desk/web-forms, /desk/website-builder, /desk/server-scripts,
    /desk/notification-settings call `/api/resource/api/resource/...`; /desk/follow, /desk/backups, /desk/system-health,
    /desk/tags, /desk/map use removed or invented endpoints. Desk has no custom pages for most of these — they are
@@ -40,7 +40,8 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
 13. List sidebar: "Assigned To / Created By / Tags" counts, saved filters (List Filter), "Assigned to me".
 14. List settings: choose columns, count/likes/comments in list, per-user list settings.
 15. Awesomebar extras: calculator, "New X", search in reports, help results.
-16. Permission Manager page, Role Permissions for Page and Report, backups page.
+16. Permission Manager page, Role Permissions for Page and Report, backups page (routes redirect for now).
+16b. Virtual/single DocTypes (System Health Report) render read-only like Desk — no "Not Saved"/Save.
 17. Workspace editing (blocks, shortcuts, cards, charts) and Dashboard editing.
 18. User language / translations (`__` with lang_dict), user settings dialog, setup wizard on fresh sites.
 19. Form tour, success action, form dashboard heatmap, reminders.

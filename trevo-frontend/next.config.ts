@@ -32,6 +32,41 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
 
+  // Prototype routes that are plain DocType lists/forms in Desk (or not part of Frappe at all)
+  async redirects() {
+    return [
+      { source: "/desk/assignments", destination: "/desk/doctype/ToDo", permanent: false },
+      { source: "/desk/backups", destination: "/desk/doctype/System%20Settings/System%20Settings", permanent: false },
+      { source: "/desk/changelog-feed", destination: "/desk", permanent: false },
+      { source: "/desk/console-log", destination: "/desk/doctype/Console%20Log", permanent: false },
+      { source: "/desk/custom-html-block", destination: "/desk/doctype/Custom%20HTML%20Block", permanent: false },
+      { source: "/desk/dashboard-chart-source", destination: "/desk/doctype/Dashboard%20Chart%20Source", permanent: false },
+      { source: "/desk/desktop-icon", destination: "/desk/doctype/Desktop%20Icon", permanent: false },
+      { source: "/desk/desktop-layout", destination: "/desk/doctype/Desktop%20Layout", permanent: false },
+      { source: "/desk/document-template", destination: "/desk", permanent: false },
+      { source: "/desk/follow", destination: "/desk/doctype/Document%20Follow", permanent: false },
+      { source: "/desk/global-search-settings", destination: "/desk/doctype/Global%20Search%20Settings/Global%20Search%20Settings", permanent: false },
+      { source: "/desk/image", destination: "/desk", permanent: false },
+      { source: "/desk/list-view-settings", destination: "/desk/doctype/List%20View%20Settings", permanent: false },
+      { source: "/desk/map", destination: "/desk", permanent: false },
+      { source: "/desk/notes", destination: "/desk/doctype/Note", permanent: false },
+      { source: "/desk/notification-settings", destination: "/desk/doctype/Notification%20Settings", permanent: false },
+      { source: "/desk/onboarding-permission", destination: "/desk/doctype/Onboarding%20Permission", permanent: false },
+      { source: "/desk/onboarding-step", destination: "/desk/doctype/Onboarding%20Step", permanent: false },
+      { source: "/desk/permissions", destination: "/desk/doctype/Role", permanent: false },
+      { source: "/desk/print-format", destination: "/desk/doctype/Print%20Format", permanent: false },
+      { source: "/desk/roles", destination: "/desk/doctype/Role", permanent: false },
+      { source: "/desk/route-history", destination: "/desk/doctype/Route%20History", permanent: false },
+      { source: "/desk/server-scripts", destination: "/desk/doctype/Server%20Script", permanent: false },
+      { source: "/desk/system-health", destination: "/desk/doctype/System%20Health%20Report/System%20Health%20Report", permanent: false },
+      { source: "/desk/tags", destination: "/desk/doctype/Tag", permanent: false },
+      { source: "/desk/tasks", destination: "/desk/doctype/ToDo", permanent: false },
+      { source: "/desk/users", destination: "/desk/doctype/User", permanent: false },
+      { source: "/desk/web-forms", destination: "/desk/doctype/Web%20Form", permanent: false },
+      { source: "/desk/website-builder", destination: "/desk/doctype/Web%20Page", permanent: false },
+    ];
+  },
+
   // Security: HTTP headers for all routes
   async headers() {
     return [

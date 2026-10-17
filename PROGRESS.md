@@ -31,6 +31,11 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 1 #6 done: realtime rooms (`useListRealtime`, `useDocRealtime` in `lib/services/realtime.ts`):
   lists refresh on list_update; a clean form reloads on doc_update, a dirty one shows a conflict banner; avatars of
   other viewers (doc_viewers) in the form header. Verified by `e2e/realtime.mjs`.
+- Tier 1 #7 done: 29 prototype routes that are plain DocType lists/forms in Desk (users, roles, notes, server-scripts,
+  web-forms, console-log, list-view-settings, system-health, …) are HTTP redirects in `next.config.ts` to the generic
+  views; routes that weren't Frappe at all (changelog-feed, document-template) go to /desk; ~30 orphaned prototype
+  components deleted. Backups, Permission Manager, Map and Image views redirect for now (Tier 2 rebuilds).
+  Note: virtual singles (System Health Report) show "Not Saved" + Save — Desk renders them read-only.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

@@ -244,7 +244,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/desk/list-view-settings?doctype=${enc(doctype)}`)}>List settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/List%20View%20Settings?name=${enc(doctype)}`)}>List settings</DropdownMenuItem>
               {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setExporting(true)}>Export</DropdownMenuItem>
             </DropdownMenuContent>

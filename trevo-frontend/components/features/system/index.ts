@@ -1,14 +1,3 @@
-export { SystemDoctypeList } from "./SystemDoctypeList";
-export type { SystemDoctypeListProps, SystemColumn } from "./SystemDoctypeList";
-export { BackupManager } from "./BackupManager";
 export { ProfilePage } from "./ProfilePage";
 export { UpdatePasswordPage } from "./UpdatePasswordPage";
-export { RouteHistoryList } from "./RouteHistoryList";
-export { GlobalSearchSettings } from "./GlobalSearchSettings";
-export { DocumentTemplateList } from "./DocumentTemplateList";
-export { ChangelogFeed } from "./ChangelogFeed";
-export { ConsoleLogList } from "./ConsoleLogList";
-export { ServerScriptEditor } from "./ServerScriptEditor";
 export { SystemConsole } from "../system-console/SystemConsole";
-export { SystemHealthReport } from "../system-console/SystemHealthReport";
-export { NotificationSettings } from "../system-console/NotificationSettings";
