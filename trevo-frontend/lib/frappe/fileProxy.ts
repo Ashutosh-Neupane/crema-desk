@@ -1,4 +1,4 @@
-/** Serve Frappe files (/files/*, /private/files/*) from Trevo's origin with the caller's session. */
+/** Serve Frappe files (/files/*, /private/files/*) and built assets (/assets/*) from Trevo's origin. */
 import { NextResponse, type NextRequest } from "next/server";
 import { FRAPPE_BACKEND_URL, FRAPPE_SITE_NAME, backendFetch } from "@/lib/frappe/server";
 
@@ -17,7 +17,7 @@ function fileOrigin(): string {
   }
 }
 
-export async function proxyFile(req: NextRequest, prefix: "/files" | "/private/files", parts: string[]) {
+export async function proxyFile(req: NextRequest, prefix: "/files" | "/private/files" | "/assets", parts: string[]) {
   const path = `${prefix}/${parts.map(encodeURIComponent).join("/")}`;
   const res = await backendFetch(`${fileOrigin()}${path}`, {
     headers: { cookie: req.headers.get("cookie") ?? "" },
@@ -30,6 +30,7 @@ export async function proxyFile(req: NextRequest, prefix: "/files" | "/private/f
     if (v) headers.set(h, v);
   }
   // public files can be cached briefly; private files stay per-session
-  headers.set("cache-control", prefix === "/files" ? "public, max-age=300" : "private, no-store");
+  // built assets are content-hashed; public files can be cached briefly; private files stay per-session
+  headers.set("cache-control", prefix === "/assets" ? "public, max-age=86400" : prefix === "/files" ? "public, max-age=300" : "private, no-store");
   return new NextResponse(res.body, { status: 200, headers });
 }

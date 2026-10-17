@@ -16,6 +16,13 @@ Newest entries on top. Each session: append what was done, what's verified, what
   like/info/workflow logs; New Email composer (`EmailComposer.tsx` → communication.email.make, contacts, CC/BCC,
   print attachment). Docinfo reloads after save/workflow. Verified by `e2e/timeline.mjs` (this site has no outgoing
   email account, so the test checks Desk's error path; with an account it checks the Communication).
+- Tier 1 #4 (print view) done: `/desk/print/<dt>/<dn>` (`components/views/PrintView.tsx`): format + letterhead
+  pickers, server HTML (`printview.get_html_and_style`) in a sandboxed same-origin iframe, Print, PDF
+  (`download_pdf`, server errors shown). Form toolbar printer button, menu item, ⌘P. `/assets/*` proxied like /files.
+  Bench: vendor needs `GUNICORN_CMD_ARGS="--workers 3 --timeout 120"` (docker-compose, uncommitted in School_saas) —
+  wkhtmltopdf fetches /assets from the same single gunicorn worker and deadlocked; `host_name` set to
+  http://localhost:8000 for the site. ERPNext "Classic/Modern" formats need Chromium (not in the image) → PDF error,
+  same as Desk. Verified by `e2e/print.mjs`. Print Format Builder still to do.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

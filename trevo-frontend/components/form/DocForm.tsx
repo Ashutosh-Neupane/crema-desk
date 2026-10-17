@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, CopyPlus, Printer, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
@@ -330,8 +330,7 @@ export default function DocForm({ doctype, name }: Props) {
         action: () => {
           const c = ctlRef.current;
           if (!c || isNewDoc(c.getDoc())) return;
-          const base = process.env.NEXT_PUBLIC_FRAPPE_BASE_URL ?? "";
-          window.open(`${base}/printview?doctype=${enc(doctype)}&name=${enc(c.docname)}&trigger_print=1`, "_blank", "noopener,noreferrer");
+          router.push(`/desk/print/${enc(doctype)}/${enc(c.docname)}`);
         },
       },
     ],
@@ -473,6 +472,11 @@ export default function DocForm({ doctype, name }: Props) {
             ),
           )}
           {!isNewDoc(doc) && (
+            <Link href={`/desk/print/${enc(doctype)}/${enc(doc.name)}`} aria-label="Print" title="Print (⌘P)" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
+              <Printer className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
+            </Link>
+          )}
+          {!isNewDoc(doc) && (
             <DropdownMenu>
               <DropdownMenuTrigger aria-label="More actions" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
                 <MoreHorizontal className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
@@ -481,6 +485,7 @@ export default function DocForm({ doctype, name }: Props) {
                 {can("create") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}><Plus className="h-4 w-4" /> New {doctype}</DropdownMenuItem>}
                 {can("create") && meta.allow_copy !== 0 && <DropdownMenuItem onClick={() => openCopy(false)}><CopyPlus className="h-4 w-4" /> Duplicate</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Reload</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/desk/print/${enc(doctype)}/${enc(doc.name)}`)}><Printer className="h-4 w-4" /> Print</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(doc.name); toast.success("Copied"); }}><Copy className="h-4 w-4" /> Copy name</DropdownMenuItem>
                 {can("delete") && docstatus !== 1 && (
                   <>
