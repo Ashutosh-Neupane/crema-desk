@@ -43,6 +43,10 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 1 #9 done: grid drag-to-reorder (dnd-kit handle on the No. column, `ctl.reorder_row`), 50-row pagination,
   CSV Download/Upload when the Table field has allow_bulk_edit (like Desk). Layout parser now keeps every raw docfield
   property (it dropped allow_bulk_edit, cannot_add_rows, …). Verified by `e2e/grid.mjs`.
+- Tier 2 #10 done: Calendar view `/desk/doctype/X/view/calendar` (`components/views/CalendarView.tsx`) from the DocType's
+  calendar JS (field_map, get_events_method, style_map; fallback first Date field): month/week, drag to reschedule
+  (update_event, duration kept), + on a day creates a prefilled doc, filters. Offered in the list view switcher when
+  `__calendar_js` exists; `/desk/calendar` redirects to the Event calendar. Verified by `e2e/calendar.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

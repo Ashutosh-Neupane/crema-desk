@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/desk/assignments", destination: "/desk/doctype/ToDo", permanent: false },
       { source: "/desk/backups", destination: "/desk/doctype/System%20Settings/System%20Settings", permanent: false },
+      { source: "/desk/calendar", destination: "/desk/doctype/Event/view/calendar", permanent: false },
       { source: "/desk/changelog-feed", destination: "/desk", permanent: false },
       { source: "/desk/console-log", destination: "/desk/doctype/Console%20Log", permanent: false },
       { source: "/desk/custom-html-block", destination: "/desk/doctype/Custom%20HTML%20Block", permanent: false },
