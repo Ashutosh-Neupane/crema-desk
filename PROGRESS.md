@@ -28,6 +28,9 @@ Newest entries on top. Each session: append what was done, what's verified, what
   (`lib/form/compat.ts` → mapper.map_docs → `frm.__sync`, doc stays unsaved). Unknown `frm.*` members now return the
   chainable NOOP, which unblocked Sales Invoice's refresh (`frm.msgbox.$wrapper.is`) and its "Get Items From" menu.
   Verified by `e2e/getitems.mjs` (SI ← SO, saved rows keep sales_order).
+- Tier 1 #6 done: realtime rooms (`useListRealtime`, `useDocRealtime` in `lib/services/realtime.ts`):
+  lists refresh on list_update; a clean form reloads on doc_update, a dirty one shows a conflict banner; avatars of
+  other viewers (doc_viewers) in the form header. Verified by `e2e/realtime.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 

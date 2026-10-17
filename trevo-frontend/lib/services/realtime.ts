@@ -264,3 +264,76 @@ export function subscribeMsgprint(handler: (data: MsgprintEvent) => void) {
   return subscribeToRealtime<MsgprintEvent>("msgprint", handler);
 }
 
+
+// ---------------------------------------------------------------------------
+// Rooms (Desk: socketio_client.js) — the server only sends list_update / doc_update /
+// doc_viewers to sockets that joined the doctype or document room. Re-joined on reconnect.
+// ---------------------------------------------------------------------------
+
+function joinRoom(join: () => void, leave: () => void): () => void {
+  if (!REALTIME_ENABLED || typeof window === "undefined") return () => {};
+  const s = getRealtimeSocket();
+  if (s.connected) join();
+  s.on("connect", join);
+  return () => {
+    s.off("connect", join);
+    if (s.connected) leave();
+  };
+}
+
+/** List views: refresh when any document of the DocType changes (list_update). */
+export function useListRealtime(doctype: string | undefined, onUpdate: (e: ListUpdateEvent) => void) {
+  const cb = React.useRef(onUpdate);
+  React.useEffect(() => {
+    cb.current = onUpdate;
+  });
+  React.useEffect(() => {
+    if (!doctype) return;
+    const s = REALTIME_ENABLED && typeof window !== "undefined" ? getRealtimeSocket() : null;
+    const leave = joinRoom(() => s?.emit("doctype_subscribe", doctype), () => s?.emit("doctype_unsubscribe", doctype));
+    const off = subscribeToRealtime<ListUpdateEvent>("list_update", (e) => e?.doctype === doctype && cb.current(e));
+    return () => {
+      off();
+      leave();
+    };
+  }, [doctype]);
+}
+
+export interface DocViewersEvent {
+  doctype: string;
+  docname: string;
+  users: string[];
+}
+
+/** Forms: doc_update (someone saved) and doc_viewers (who has it open). */
+export function useDocRealtime(
+  doctype: string | undefined,
+  name: string | undefined,
+  handlers: { onUpdate?: (e: DocUpdateEvent) => void; onViewers?: (users: string[]) => void },
+) {
+  const cb = React.useRef(handlers);
+  React.useEffect(() => {
+    cb.current = handlers;
+  });
+  React.useEffect(() => {
+    if (!doctype || !name) return;
+    const s = REALTIME_ENABLED && typeof window !== "undefined" ? getRealtimeSocket() : null;
+    const leave = joinRoom(
+      () => {
+        s?.emit("doc_subscribe", doctype, name);
+        s?.emit("doc_open", doctype, name);
+      },
+      () => {
+        s?.emit("doc_close", doctype, name);
+        s?.emit("doc_unsubscribe", doctype, name);
+      },
+    );
+    const offUpdate = subscribeToRealtime<DocUpdateEvent>("doc_update", (e) => e?.doctype === doctype && e?.name === name && cb.current.onUpdate?.(e));
+    const offViewers = subscribeToRealtime<DocViewersEvent>("doc_viewers", (e) => e?.doctype === doctype && e?.docname === name && cb.current.onViewers?.(e.users ?? []));
+    return () => {
+      offUpdate();
+      offViewers();
+      leave();
+    };
+  }, [doctype, name]);
+}

@@ -25,6 +25,7 @@ import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import FormSidebar from "@/components/form/FormSidebar";
+import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
@@ -247,6 +248,25 @@ export default function DocForm({ doctype, name }: Props) {
     [workflow, qc, doctype, load],
   );
 
+  // Realtime (Desk: form.js doc_update / form_viewers.js): reload a clean form when someone else saves,
+  // warn on a dirty one; show who else has it open
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [viewers, setViewers] = useState<string[]>([]);
+  useDocRealtime(isNew ? undefined : doctype, isNew ? undefined : name, {
+    onUpdate: (e) => {
+      const c = ctlRef.current;
+      if (!c || !e.modified || e.modified === c.getDoc().modified) return;
+      if (c.isDirty()) setConflict(String(e.modified));
+      else void load();
+    },
+    onViewers: (users) => setViewers(users.filter((u) => u !== ctx?.user)),
+  });
+  const [prevLoaded, setPrevLoaded] = useState(loaded);
+  if (prevLoaded !== loaded) {
+    setPrevLoaded(loaded);
+    setConflict(null);
+  }
+
   // Warn before leaving with unsaved changes (Desk does the same)
   useEffect(() => {
     if (!snap?.dirty) return;
@@ -450,6 +470,15 @@ export default function DocForm({ doctype, name }: Props) {
       <div className="sticky top-12 z-20 -mx-4 flex flex-wrap items-center gap-3 bg-[var(--bg-color)]/95 px-4 py-2 backdrop-blur">
         <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
         {indicator && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${INDICATOR_PILL[indicator[1]] ?? INDICATOR_PILL.gray}`}>{indicator[0]}</span>}
+        {viewers.length > 0 && (
+          <span className="flex items-center -space-x-1.5" aria-label={`Also viewing: ${viewers.join(", ")}`} title={`Also viewing: ${viewers.join(", ")}`}>
+            {viewers.slice(0, 4).map((u) => (
+              <span key={u} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-100 text-[10px] font-semibold uppercase text-emerald-800 dark:border-zinc-950 dark:bg-emerald-900 dark:text-emerald-200">
+                {u.charAt(0)}
+              </span>
+            ))}
+          </span>
+        )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {[...groups.entries()].map(([g, btns]) =>
             g ? (
@@ -533,6 +562,14 @@ export default function DocForm({ doctype, name }: Props) {
         </div>
       </div>
 
+      {conflict && (
+        <div role="alert" className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          This document was changed by someone else after you opened it.
+          <button type="button" onClick={() => void load()} className="ml-auto font-medium underline">
+            Reload (discards your changes)
+          </button>
+        </div>
+      )}
       {snap.intro?.message && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200" dangerouslySetInnerHTML={{ __html: snap.intro.message }} />
       )}

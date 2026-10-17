@@ -9,7 +9,7 @@
  *  - sort, group-by counts, page size + load more, bulk actions (components/list/BulkActions)
  *  - only the views that make sense for the DocType; quick entry for New when allowed
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +41,7 @@ import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
 import BulkActions from "@/components/list/BulkActions";
 import ExportDialog from "@/components/list/ExportDialog";
 import { useShortcuts } from "@/lib/shortcuts";
+import { useListRealtime } from "@/lib/services/realtime";
 import type { DocField } from "@/lib/frappe/types";
 
 const enc = encodeURIComponent;
@@ -144,6 +145,19 @@ export default function ListView({ doctype }: { doctype: string }) {
     qc.invalidateQueries({ queryKey: ["list", doctype] });
     qc.invalidateQueries({ queryKey: ["list-count", doctype] });
   };
+
+  // Desk refreshes the list when anyone creates/changes/deletes a document (list_update); bursts coalesce
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useListRealtime(doctype, () => {
+    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+    realtimeTimer.current = setTimeout(() => {
+      qc.invalidateQueries({ queryKey: ["list", doctype] });
+      qc.invalidateQueries({ queryKey: ["list-count", doctype] });
+    }, 800);
+  });
+  useEffect(() => () => {
+    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+  }, []);
 
   const views = useMemo(() => {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
