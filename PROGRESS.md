@@ -55,6 +55,9 @@ Newest entries on top. Each session: append what was done, what's verified, what
   there; cards via reportview + /files proxy, search, filters, load more. Verified by `e2e/image.mjs`.
 - Tier 2 #12 (part): File manager `/desk/files` rebuilt on frappe.core.api.file (folders, breadcrumbs, new folder,
   upload into folder, search, move, delete); "Home" view on the File list. Verified by `e2e/files.mjs`.
+- Tier 2 #12 (part): Inbox `/desk/inbox` rebuilt (`components/views/InboxView.tsx`): account folders (boot.email_accounts,
+  else site accounts) + Sent/Spam/Trash with Desk's filters, unread bold, mark read/unread (email.inbox flag queue —
+  Frappe only flags IMAP mail with a uid), trash, close, compose (EmailComposer without a doc). `e2e/inbox.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
