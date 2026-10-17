@@ -15,7 +15,12 @@ export interface DeskContext {
   /** permission lists from boot.user (can_create, in_create, …) for app scripts */
   perms: Record<string, string[]>;
   developer_mode: boolean;
+  /** the rest of frappe.boot (party_account_types, current_fiscal_year, …) for app JS */
+  boot: Record<string, unknown>;
 }
+
+// large or Desk-shell-only keys that app JS never reads
+const HEAVY_BOOT_KEYS = new Set(["module_sidebars", "user", "docs", "allowed_reports", "workspaces", "canonical_shell", "assets_json", "print_css", "desktop_icon_urls", "app_data", "dock", "page_info", "__messages"]);
 
 export async function GET() {
   const boot = await getDeskBoot(await getCookieHeader());
@@ -32,6 +37,7 @@ export async function GET() {
         .map((k) => [k, user[k] as string[]]),
     ),
     developer_mode: !!boot?.developer_mode,
+    boot: Object.fromEntries(Object.entries((boot ?? {}) as Record<string, unknown>).filter(([k]) => !HEAVY_BOOT_KEYS.has(k))),
   };
   return NextResponse.json(ctx, { headers: { "Cache-Control": "private, max-age=60" } });
 }

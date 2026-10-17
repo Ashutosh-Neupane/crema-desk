@@ -2,6 +2,24 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-17 — session 2: Tree view, Query reports
+Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
+- Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)
+- Query/Script report page `/desk/query-report/<name>` (`components/views/QueryReport.tsx`, `lib/report/columns.ts`):
+  report JS via `query_report.get_script` → `frappe.query_reports[name]` (filters + defaults, on_change, get_data,
+  formatter, onload inner buttons, get_chart_data); `frappe.query_report` API bridged to page state;
+  auto-run on filter change; table with sort/search/column picker, tree reports (indent, collapse, initial_depth),
+  server total row as footer, report_summary cards, chart, CSV export; prepared reports (Generate/poll);
+  Report Builder reports redirect to the list (`?view=report` — report view still to build)
+- Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
+  runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
+
+Next
+1. Report view (`?view=report`: editable grid of a DocType, Report Builder saved reports, group-by/totals)
+2. Kanban, workflow actions on forms, bulk edit, data import/export (rebuild properly)
+3. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
+4. Remaining React Doctor warnings
+
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):
 - `e2e/form.salesorder.mjs` — new SO: customer → party details, item → rate (get_item_details), live totals,

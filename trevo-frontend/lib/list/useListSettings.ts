@@ -24,6 +24,7 @@ export function useListSettings(meta: DocTypeMeta | undefined): Record<string, u
       sysdefaults: ctx.sysdefaults,
       perms: ctx.perms,
       developer_mode: ctx.developer_mode,
+      boot: ctx.boot,
       metas: { [meta.name]: meta },
       navigate: (href) => router.push(href),
     });

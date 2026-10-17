@@ -185,6 +185,7 @@ export default function DocForm({ doctype, name }: Props) {
       sysdefaults: ctx.sysdefaults,
       perms: ctx.perms,
       developer_mode: ctx.developer_mode,
+      boot: ctx.boot,
       navigate: (href) => router.push(href),
     });
     attachDoctypeAdapters(c);

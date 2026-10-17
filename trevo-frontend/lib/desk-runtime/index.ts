@@ -19,6 +19,8 @@ export interface RuntimeContext {
   roles?: string[];
   defaults?: Record<string, unknown>;
   sysdefaults?: Record<string, unknown>;
+  /** extra frappe.boot keys (party_account_types, current_fiscal_year, …) */
+  boot?: Record<string, unknown>;
   /** boot.user permission lists (can_create, in_create, …) */
   perms?: Record<string, string[]>;
   developer_mode?: boolean;
@@ -248,7 +250,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     session: { user: ctx.user, user_fullname: ctx.full_name ?? ctx.user },
     user: { name: ctx.user, has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)) },
     user_roles: ctx.roles ?? [],
-    boot: { developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
+    boot: { ...(ctx.boot ?? {}), developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
     sys_defaults: ctx.sysdefaults ?? {},
     defaults: {
       get_user_default: (k: string) => {
@@ -283,6 +285,15 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       round_floats_in: () => {},
       is_submittable: (dt: string) => !!metas[dt]?.is_submittable,
       get_value: () => undefined,
+      /** locals cache filled by with_doc (Desk: frappe.model.with_doc → locals[dt][dn]) */
+      get_doc: (dt: string, dn: string) => ((globals.locals as Record<string, Record<string, unknown>> | undefined)?.[dt] ?? {})[dn],
+      with_doc: async (dt: string, dn: string, cb?: (name: string, r: unknown) => unknown) => {
+        const d = (await call({ method: "frappe.client.get", args: { doctype: dt, name: dn } })).message as Record<string, unknown>;
+        const locals = (globals.locals ??= {}) as Record<string, Record<string, unknown>>;
+        (locals[dt] ??= {})[dn] = d;
+        cb?.(dn, d);
+        return d;
+      },
     },
     call,
     xcall: async (method: string, args?: Record<string, unknown>) => (await call({ method, args })).message,
@@ -299,6 +310,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       set_value: async (doctype: string, name: string, fieldname: unknown, value?: unknown) =>
         (await call({ method: "frappe.client.set_value", args: { doctype, name, fieldname, value } })).message,
       get_doc: async (doctype: string, name: string) => (await call({ method: "frappe.client.get", args: { doctype, name } })).message,
+      /** MultiSelectList options: [{ value, description }] */
+      get_link_options: async (doctype: string, txt = "", filters: unknown = {}) =>
+        (await call({ method: "frappe.desk.search.search_link", args: { doctype, txt, filters, page_length: 20 } })).message ?? [],
     },
     prompt: deskPrompt,
     confirm: deskConfirm,
@@ -354,6 +368,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   globals.jQuery = globals.$;
   // App scripts call ERPNext bundle helpers (erpnext.utils.get_tree_options, …) we don't ship:
   // a lenient namespace turns missing ones into no-ops instead of aborting the script
+  const erpnextUtils = provide("erpnext.utils");
+  // erpnext.utils.get_fiscal_year from boot (Desk falls back to a sync ajax call we can't make)
+  erpnextUtils.get_fiscal_year = (date?: string, withDates = false) => {
+    const fy = ctx.boot?.current_fiscal_year as [string, string, string] | undefined;
+    const d = date || datetime.get_today();
+    if (!fy || d < fy[1] || d > fy[2]) return withDates ? ["", "", ""] : "";
+    return withDates ? fy : fy[0];
+  };
   globals.erpnext = lenient(provide("erpnext") as Record<string, unknown>);
 
   const scope = new Proxy(globals, {

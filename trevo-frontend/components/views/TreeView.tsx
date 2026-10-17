@@ -45,7 +45,7 @@ export default function TreeView({ doctype }: { doctype: string }) {
   // frappe.treeview_settings[doctype] from the DocType's tree JS
   const settings = useMemo(() => {
     if (!meta || !ctx) return null;
-    const rt = createRuntime({ user: ctx.user, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, metas: { [meta.name]: meta } });
+    const rt = createRuntime({ user: ctx.user, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, boot: ctx.boot, metas: { [meta.name]: meta } });
     rt.evalScript(String((meta as { __tree_js?: string }).__tree_js ?? ""), `${doctype} tree js`);
     const ts = (rt.frappe as unknown as { treeview_settings?: Record<string, Record<string, unknown>> }).treeview_settings?.[doctype];
     return ts ?? {};

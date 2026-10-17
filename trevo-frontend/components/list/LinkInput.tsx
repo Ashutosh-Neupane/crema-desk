@@ -12,6 +12,7 @@ export default function LinkInput({
   className = "",
   autoFocus,
   getQuery,
+  id,
 }: {
   doctype: string;
   value: string;
@@ -19,6 +20,7 @@ export default function LinkInput({
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  id?: string;
   getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
 }) {
   const [text, setText] = useState(value);
@@ -63,6 +65,7 @@ export default function LinkInput({
   return (
     <div className={`relative ${className}`}>
       <input
+        id={id}
         value={text}
         autoFocus={autoFocus}
         placeholder={placeholder ?? doctype}
