@@ -38,10 +38,15 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
+- Hub hub run (frappe + hub, no ERPNext): crud.todo, workflow, kanban, bulk, doctype.create
+  (`TREVO_MODULE=Hub`) all pass; smoke of /desk, hub workspace, Vendor Listing list/form, report
+  view, Script Reports, data-import → 0 errors. Run it with env overrides (no .env edit):
+  `docker start sm-hub` then `FRAPPE_BACKEND_URL=http://localhost:8000 NEXT_PUBLIC_FRAPPE_BASE_URL=http://localhost:8000
+  FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
+
 Next
-1. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
-2. Remaining React Doctor warnings
-3. Gantt view, Inbox compose, print view/format builder parity
+1. Remaining React Doctor warnings
+2. Gantt view, Inbox compose, print view/format builder parity
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):

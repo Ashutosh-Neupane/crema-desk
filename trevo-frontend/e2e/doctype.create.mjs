@@ -18,16 +18,17 @@ await shot("doctype_dialog", false);
 
 step("fill name, module, custom → Create & Continue");
 await dlg.getByRole("textbox", { name: /^Name/ }).fill(NAME);
+const MODULE = process.env.TREVO_MODULE ?? "Custom Vendor";
 const mod = dlg.getByRole("combobox", { name: /^Module/ });
 await mod.click();
-await mod.fill("Hub");
-await page.getByRole("option", { name: /Custom Vendor/ }).first().click();
+await mod.fill(MODULE);
+await page.getByRole("option", { name: MODULE, exact: true }).first().click();
 const custom = dlg.getByLabel(/Custom\?/);
 if (!(await custom.isChecked())) await custom.check();
 await dlg.getByRole("button", { name: "Create & Continue" }).click();
 await page.waitForURL(/\/desk\/doctype\/DocType\/Trevo/, { timeout: 30000 });
 const created = (await api(`api/resource/DocType/${encodeURIComponent(NAME)}`)).data;
-check(created?.custom === 1 && created?.module === "Custom Vendor", `DocType created (custom=${created?.custom}, module=${created?.module})`);
+check(created?.custom === 1 && created?.module === MODULE, `DocType created (custom=${created?.custom}, module=${created?.module})`);
 await page.waitForTimeout(3000);
 await shot("doctype_form", true);
 
