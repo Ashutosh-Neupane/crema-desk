@@ -111,7 +111,7 @@ export default function QueryReport({ name }: { name: string }) {
         const m = (s.env.message ?? {}) as { script?: string; filters?: ReportFilter[] };
         const info = (meta?.env.message ?? {}) as { report_type?: string; ref_doctype?: string };
         if (info.report_type === "Report Builder" && info.ref_doctype) {
-          router.replace(`/desk/doctype/${enc(info.ref_doctype)}?view=report&report=${enc(name)}`);
+          router.replace(`/desk/doctype/${enc(info.ref_doctype)}/view/report/${enc(name)}`);
           return;
         }
         const qs = buildSettings(name, m, ctx, { valuesRef, resultRef, setFilterValues, setRunToken, setInnerButtons });

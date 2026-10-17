@@ -11,14 +11,19 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   auto-run on filter change; table with sort/search/column picker, tree reports (indent, collapse, initial_depth),
   server total row as footer, report_summary cards, chart, CSV export; prepared reports (Generate/poll);
   Report Builder reports redirect to the list (`?view=report` — report view still to build)
+- Report view `/desk/doctype/X/view/report` and saved Report Builder reports `/view/report/<name>`
+  (`components/views/ReportView.tsx`): pick columns incl. child-table fields (rows fan out like Desk), inline edit
+  of drafts (`frappe.client.set_value`, child rows via `<cdt>:name`), column menu (sort/move/remove), filters,
+  group by with count/sum/avg, totals, page size, CSV; settings remembered in user_settings "Report";
+  Save / Save As → `frappe.desk.reportview.save_report`. Verified by `e2e/reportview.mjs`.
+  Filter editor / group-by / URL filters moved to `components/list/filters.tsx` (shared by list + report)
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
 Next
-1. Report view (`?view=report`: editable grid of a DocType, Report Builder saved reports, group-by/totals)
-2. Kanban, workflow actions on forms, bulk edit, data import/export (rebuild properly)
-3. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
-4. Remaining React Doctor warnings
+1. Kanban, workflow actions on forms, bulk edit, data import/export (rebuild properly)
+2. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
+3. Remaining React Doctor warnings
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):
