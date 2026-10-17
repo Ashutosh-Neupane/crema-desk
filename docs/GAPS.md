@@ -11,9 +11,9 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
 ## Phase 1 — transcription
 
 ### Tier 1: broken or missing in everyday flows
-1. **Attach / Attach Image fields don't save** — `AttachmentField` uploads but never calls `onChange`.
+1. ✅ **Attach / Attach Image fields don't save** — `AttachmentField` uploads but never calls `onChange`.
    Image preview, private/public, `image_field` header avatar.
-2. **Form sidebar is read-only** — Desk lets you add/remove assignments (assign_to.add/remove), attach files,
+2. ✅ **Form sidebar is read-only** — Desk lets you add/remove assignments (assign_to.add/remove), attach files,
    add/remove tags, share (docshare), follow, like. Trevo only lists them.
 3. **Timeline / activity** — comment edit/delete and @mentions, version diffs ("changed X from A to B"),
    communications (emails), assignment/attachment/like/share events, "New Email" composer

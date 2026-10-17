@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, Tag, Trash2, UserPlus } from "lucide-react";
+import { ChevronDown, Copy, CopyPlus, Loader2, MoreHorizontal, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
@@ -24,6 +24,7 @@ import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
+import FormSidebar from "@/components/form/FormSidebar";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
@@ -625,42 +626,9 @@ export default function DocForm({ doctype, name }: Props) {
           )}
         </div>
 
-        {/* Form sidebar (Desk shows assigned / attachments / tags / meta) */}
+        {/* Form sidebar (Desk: assigned / attachments / tags / shared / follow / like) */}
         {!isNewDoc(doc) && (
-          <aside className="space-y-4 text-sm xl:sticky xl:top-28 xl:self-start">
-            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><UserPlus className="h-3.5 w-3.5" /> Assigned to</h3>
-              {(docinfo.assignments ?? []).length ? (
-                <ul className="space-y-1">{(docinfo.assignments ?? []).map((a) => <li key={String(a.name)} className="truncate text-zinc-700 dark:text-zinc-200">{String(a.owner ?? a.allocated_to ?? a.name)}</li>)}</ul>
-              ) : (
-                <p className="text-zinc-400">Nobody</p>
-              )}
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><Paperclip className="h-3.5 w-3.5" /> Attachments</h3>
-              {(docinfo.attachments ?? []).length ? (
-                <ul className="space-y-1">
-                  {(docinfo.attachments ?? []).map((a) => (
-                    <li key={String(a.name)}><a href={String(a.file_url)} target="_blank" rel="noreferrer" className="block truncate text-zinc-700 hover:underline dark:text-zinc-200">{String(a.file_name ?? a.name)}</a></li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-zinc-400">None</p>
-              )}
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-400"><Tag className="h-3.5 w-3.5" /> Tags</h3>
-              {docinfo.tags ? (
-                <div className="flex flex-wrap gap-1">{String(docinfo.tags).split(",").filter(Boolean).map((t) => <span key={t} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">{t}</span>)}</div>
-              ) : (
-                <p className="text-zinc-400">No tags</p>
-              )}
-            </div>
-            <div className="space-y-1 px-1 text-xs text-zinc-500">
-              <p>Created by <b className="font-medium text-zinc-700 dark:text-zinc-300">{String(doc.owner ?? "")}</b> · {timeAgo(doc.creation)}</p>
-              <p>Updated by <b className="font-medium text-zinc-700 dark:text-zinc-300">{String(doc.modified_by ?? "")}</b> · {timeAgo(doc.modified)}</p>
-            </div>
-          </aside>
+          <FormSidebar doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} user={ctx?.user} canWrite={can("write")} trackChanges={!!meta.track_changes} onChanged={load} />
         )}
       </div>
 

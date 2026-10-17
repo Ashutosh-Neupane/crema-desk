@@ -8,6 +8,9 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 1 #1 done: Attach / Attach Image save their value (upload_file attached to the doc; loose upload on new
   docs, Frappe attaches on save), image preview, link mode, clear. `/files/*` and `/private/files/*` are served
   from Trevo's origin (`lib/frappe/fileProxy.ts`; public files need Host = site). Verified by `e2e/attach.mjs`.
+- Tier 1 #2 done: form sidebar is editable (`components/form/FormSidebar.tsx`): assign/unassign, attach/remove
+  files, add/remove tags, share/unshare, like; Follow shown only where Frappe allows it (track_changes, not
+  Administrator, not ToDo/Communication/…). Verified by `e2e/sidebar.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
