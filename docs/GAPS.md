@@ -28,7 +28,7 @@ Frappe's frontend is four kinds of code; each gets a different strategy.
 | **L1 Metadata UI** | DocType forms, lists, views, reports | Native React driven by meta; the site's JS (`__js`, `__list_js`, `__tree_js`, `__calendar_js`, report JS, Client Scripts) runs in the Desk runtime (`lib/desk-runtime`) against a `frappe` / `frm` / `cur_frm` compatibility API | ✅ core done |
 | **L2 Script DOM** | Form scripts that write into the page: `frm.fields_dict.x.$wrapper.html()`, `$(frm.wrapper).find()`, `frm.dashboard.add_section()` | Load **real jQuery** into the runtime and give scripts real DOM nodes: each HTML field renders a container whose node is `fields_dict[f].wrapper` / `$wrapper`; `frm.dashboard`, `frm.page.body`, `frm.layout.wrapper` get containers too. Unknown members stay chainable no-ops (NOOP) | 🟡 NOOP stubs today; real-DOM containers ❌ |
 | **L3 Desk widgets** | jQuery widgets Desk mounts inside forms: RoleEditor, ModuleEditor, Permission Manager, form tour, dashboard heatmap/graph | Rebuild natively, keyed by DocType + HTML field (`components/form/widgets`), writing to the **same child tables** as Desk so saving is identical | ✅ RoleEditor + ModuleEditor |
-| **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page in a same-origin frame (served through the BFF proxy like `/assets` and `/files`), Desk chrome hidden by an injected stylesheet, route/title bridged with `postMessage`. Full fidelity on day one; replace page by page with native rebuilds where UX matters (POS first) | ❌ |
+| **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page (served at Trevo's `/app/<path>`) in a same-origin frame; `/assets`, `/files`, `/api/method`, `/api/resource` proxied; Desk chrome hidden; title and Form/List/Report navigation bridged back to Trevo. Replace page by page with native rebuilds where UX matters (POS first) | ✅ (`e2e/legacy.mjs` — ERPNext POS) |
 
 Why not import Frappe's whole `desk.bundle.js` into React? It assumes it owns `document`, the router,
 `frappe.boot`, global CSS and jQuery event delegation; mixing it with React rendering breaks both. L4 isolates it in
@@ -43,7 +43,7 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
   custom buttons (verify), impersonation banner, API key dialog.
 
 ### POS, Banking and other app pages (next step)
-1. L4 host: `/desk/page/point-of-sale`, `/desk/page/<any page>`; sidebar/awesomebar links to Pages go there.
+1. ✅ L4 host: `/desk/page/point-of-sale`, `/desk/page/<any page>`; sidebar/workspace Page links go there.
 2. Native POS (phase 2 candidate): ERPNext POS is `erpnext.PointOfSale.Controller` (jQuery) over whitelisted APIs
    (`erpnext.selling.page.point_of_sale.point_of_sale.*`) — rebuildable on the same APIs.
 3. Vue / frappe-ui apps with their own SPA at `/<app>` (Helpdesk, CRM, Banking) aren't Desk pages — link out.
@@ -90,10 +90,10 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 | permission-manager | L3 native on `core.page.permission_manager.*` | ❌ (redirects to Role list) |
 | print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ |
 | backups | L3 native (backup files, schedule files backup) | ❌ (redirects) |
-| setup-wizard | L4 host, later native | ❌ |
-| point-of-sale | L4 host now, native later | ❌ |
-| sales-funnel, stock-balance, warehouse-capacity-summary, bom-comparison-tool, visual-plant-floor | L4 host | ❌ |
-| workspace-restore, component-explorer | L4 host | ❌ |
+| setup-wizard | L4 host, later native | ✅ via L4 |
+| point-of-sale | L4 host now, native later | ✅ via L4 |
+| sales-funnel, stock-balance, warehouse-capacity-summary, bom-comparison-tool, visual-plant-floor | L4 host | ✅ via L4 |
+| workspace-restore, component-explorer | L4 host | ✅ via L4 |
 | workflow-builder | 🟡 prototype — verify against the Workflow doc | 🟡 |
 | desktop, dashboard-view, print | native | ✅ |
 

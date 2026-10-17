@@ -64,6 +64,12 @@ Newest entries on top. Each session: append what was done, what's verified, what
   containers, L3 native widgets, L4 legacy page host for POS/Vue/jQuery pages), full remaining checklist, phase 3
   (Trevo as a Frappe custom app) plan. `e2e/run-all.mjs` runs every suite (26/26 passing).
 - Breadcrumbs show DocType/document names verbatim; form.salesorder deletes its cancelled order.
+- L4 legacy page host done: `/desk/page/<name>` frames Frappe's own Desk page served at Trevo's `/app/<path>`
+  (`app/app/[[...path]]/route.ts`: fetches bench `/desk/<path>` HTML, rewrites the frame URL to /desk before the
+  router runs, hides navbar/sidebar/dock, points socket.io at the published port, bridges title + Form/List/Report
+  navigation back to Trevo). `/api/method/*` and `/api/resource/*` proxied on Trevo's origin
+  (`lib/frappe/proxy.ts`, shared with /api/frappe — now forwards the caller's CSRF token and original content
+  type). ERPNext POS runs unmodified. Sidebar/workspace Page links go there. Verified by `e2e/legacy.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
@@ -110,9 +116,8 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. L4 legacy page host (/desk/page/<name>) → POS and other app pages
-2. L2 real jQuery + DOM containers for HTML fields
-3. Permission Manager (native), Map view, list sidebar + saved filters
+1. L2 real jQuery + DOM containers for HTML fields
+2. Permission Manager (native), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):

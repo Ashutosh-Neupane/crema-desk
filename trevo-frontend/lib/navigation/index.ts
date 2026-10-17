@@ -82,7 +82,7 @@ export function buildNavigationFromWorkspaces(
           return {
             type: "link",
             label: l.label ?? target,
-            href: `/desk/reports?report=${encodeURIComponent(target)}`,
+            href: linkType === "Page" ? `/desk/page/${encodeURIComponent(target)}` : `/desk/query-report/${encodeURIComponent(target)}`,
             icon: l.icon,
             color: l.color,
           };
