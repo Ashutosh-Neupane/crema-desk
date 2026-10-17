@@ -29,7 +29,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
    /desk/notification-settings call `/api/resource/api/resource/...`; /desk/follow, /desk/backups, /desk/system-health,
    /desk/tags, /desk/map use removed or invented endpoints. Desk has no custom pages for most of these — they are
    DocType lists/forms. → Redirect to the generic list/form; rebuild only real Desk pages (below).
-8. **Form menu** — Rename (title/name, `frappe.model.rename_doc.update_document_title`), Links (linked_with),
+8. ✅ **Form menu** (undo/redo still ❌) — Rename (title/name, `frappe.model.rename_doc.update_document_title`), Links (linked_with),
    Customize, Copy to Clipboard, Remind Me, Undo/Redo, Email, "Set User Permissions".
 9. **Grid** — drag to reorder rows, pagination over 50 rows, download/upload rows as CSV, multi-row edit.
 

@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, Copy, CopyPlus, Printer, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlarmClock, ChevronDown, ClipboardCopy, Copy, CopyPlus, FileCode, Link2, Pencil, Printer, Settings2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
@@ -27,6 +27,7 @@ import { PREFILL_KEY } from "@/lib/form/prefill";
 import FormSidebar from "@/components/form/FormSidebar";
 import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
+import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
@@ -191,7 +192,12 @@ export default function DocForm({ doctype, name }: Props) {
     ctlRef.current = c;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time controller creation once inputs are ready
     setCtl(c);
-    void c.runLoadEvents(true);
+    // Desk route_options: ?field=value on the URL is applied after load (fires field events, e.g.
+    // Customize Form ?doc_type=X loads that DocType)
+    const routeOptions = typeof window !== "undefined" ? [...new URLSearchParams(window.location.search).entries()].filter(([k]) => metas.meta.fields?.some((f) => f.fieldname === k)) : [];
+    void c.runLoadEvents(true).then(async () => {
+      for (const [k, v] of routeOptions) await c.set_value(k, v);
+    });
   }, [metas, ctx, loaded, isNew, prefill, router]);
 
   // Later reloads (Reload / after cancel) feed the same controller
@@ -333,6 +339,7 @@ export default function DocForm({ doctype, name }: Props) {
   }, [ctl, run, load]);
 
   const [jumpOpen, setJumpOpen] = useState(false);
+  const [formDialog, setFormDialog] = useState<null | "rename" | "links" | "remind">(null);
   const [focusRequest, setFocusRequest] = useState<{ fieldname: string; n: number } | null>(null);
   const docstatusNow = () => Number(ctlRef.current?.getDoc().docstatus ?? 0);
   // Desk form shortcuts (frappe/public/js/frappe/form/toolbar.js, form.js)
@@ -424,6 +431,9 @@ export default function DocForm({ doctype, name }: Props) {
   const indicator: [string, string] | null =
     workflow && wfState && !isNewDoc(doc) && !snap.dirty ? [wfState, stateColour(workflow, wfState, stateStyles)] : getIndicator(meta, doc, snap.dirty);
   const titleField = typeof meta.title_field === "string" ? meta.title_field : "";
+  // Desk: the title is clickable to rename when the DocType allows renaming or has an editable title field
+  const titleDf = titleField ? meta.fields?.find((f) => f.fieldname === titleField) : undefined;
+  const canRename = !isNewDoc(doc) && can("write") && (!!meta.allow_rename || (!!titleDf && !titleDf.read_only && docstatus === 0));
   const titleValue = titleField ? doc[titleField] : "";
   const title = isNewDoc(doc) ? `New ${doctype}` : typeof titleValue === "string" && titleValue ? titleValue : doc.name;
 
@@ -468,7 +478,15 @@ export default function DocForm({ doctype, name }: Props) {
     <div className="space-y-4 pb-16">
       {/* Header (sticks under the navbar so actions stay reachable on long forms) */}
       <div className="sticky top-12 z-20 -mx-4 flex flex-wrap items-center gap-3 bg-[var(--bg-color)]/95 px-4 py-2 backdrop-blur">
-        <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
+        {canRename ? (
+          <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+            <button type="button" onClick={() => setFormDialog("rename")} title="Rename" className="max-w-full truncate rounded px-1 -mx-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              {title}
+            </button>
+          </h1>
+        ) : (
+          <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
+        )}
         {indicator && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${INDICATOR_PILL[indicator[1]] ?? INDICATOR_PILL.gray}`}>{indicator[0]}</span>}
         {viewers.length > 0 && (
           <span className="flex items-center -space-x-1.5" aria-label={`Also viewing: ${viewers.join(", ")}`} title={`Also viewing: ${viewers.join(", ")}`}>
@@ -515,7 +533,18 @@ export default function DocForm({ doctype, name }: Props) {
                 {can("create") && meta.allow_copy !== 0 && <DropdownMenuItem onClick={() => openCopy(false)}><CopyPlus className="h-4 w-4" /> Duplicate</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Reload</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push(`/desk/print/${enc(doctype)}/${enc(doc.name)}`)}><Printer className="h-4 w-4" /> Print</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFormDialog("links")}><Link2 className="h-4 w-4" /> Links</DropdownMenuItem>
+                {canRename && <DropdownMenuItem onClick={() => setFormDialog("rename")}><Pencil className="h-4 w-4" /> Rename</DropdownMenuItem>}
+                <DropdownMenuItem onClick={() => setFormDialog("remind")}><AlarmClock className="h-4 w-4" /> Remind Me</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(doc.name); toast.success("Copied"); }}><Copy className="h-4 w-4" /> Copy name</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(JSON.stringify(ctl.getDoc(), null, 2)); toast.success("Document copied as JSON"); }}><ClipboardCopy className="h-4 w-4" /> Copy to Clipboard</DropdownMenuItem>
+                {(ctx?.roles ?? []).includes("System Manager") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize%20Form/Customize%20Form?doc_type=${enc(doctype)}`)}><Settings2 className="h-4 w-4" /> Customize</DropdownMenuItem>
+                    {!!ctx?.developer_mode && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}><FileCode className="h-4 w-4" /> Edit DocType</DropdownMenuItem>}
+                  </>
+                )}
                 {can("delete") && docstatus !== 1 && (
                   <>
                     <DropdownMenuSeparator />
@@ -609,6 +638,24 @@ export default function DocForm({ doctype, name }: Props) {
           <FormSidebar doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} user={ctx?.user} canWrite={can("write")} trackChanges={!!meta.track_changes} onChanged={load} />
         )}
       </div>
+
+      {formDialog === "rename" && (
+        <RenameDialog
+          doctype={doctype}
+          name={doc.name}
+          titleField={titleDf && !titleDf.read_only && docstatus === 0 ? titleField : undefined}
+          title={titleField ? String(doc[titleField] ?? "") : undefined}
+          allowRename={!!meta.allow_rename}
+          onClose={() => setFormDialog(null)}
+          onDone={(n) => {
+            setFormDialog(null);
+            if (n !== doc.name) router.replace(`/desk/doctype/${enc(doctype)}/${enc(n)}`);
+            else void load();
+          }}
+        />
+      )}
+      {formDialog === "links" && <LinksDialog doctype={doctype} name={doc.name} onClose={() => setFormDialog(null)} />}
+      {formDialog === "remind" && <ReminderDialog doctype={doctype} name={doc.name} onClose={() => setFormDialog(null)} />}
 
       {/* Ctrl+J — Jump to field */}
       {jumpOpen && (

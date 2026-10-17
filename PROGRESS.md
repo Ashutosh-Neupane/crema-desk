@@ -36,6 +36,10 @@ Newest entries on top. Each session: append what was done, what's verified, what
   views; routes that weren't Frappe at all (changelog-feed, document-template) go to /desk; ~30 orphaned prototype
   components deleted. Backups, Permission Manager, Map and Image views redirect for now (Tier 2 rebuilds).
   Note: virtual singles (System Health Report) show "Not Saved" + Save — Desk renders them read-only.
+- Tier 1 #8 done: form menu (`components/form/FormDialogs.tsx`): click title / Rename (update_document_title: title,
+  name, merge), Links (linked_with.get), Remind Me (Reminder), Copy to Clipboard (JSON), Customize, Edit DocType (dev
+  mode). URL query values apply to fields after load like Desk route_options (Customize Form ?doc_type=X).
+  Verified by `e2e/formmenu.mjs`. Undo/redo still missing.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
