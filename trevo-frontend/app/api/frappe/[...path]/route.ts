@@ -103,9 +103,13 @@ async function proxyRequest(
     responseHeaders.append("Set-Cookie", sc);
   }
 
-  // Stream the response body through
-  const body = await res.text();
+  // Pass the body through as bytes — downloads (xlsx, pdf, attachments) must not be re-encoded as text
+  const body = await res.arrayBuffer();
   responseHeaders.set("Content-Type", res.headers.get("content-type") ?? "application/json");
+  for (const h of ["content-disposition", "cache-control"]) {
+    const v = res.headers.get(h);
+    if (v) responseHeaders.set(h, v);
+  }
 
   return new NextResponse(body, {
     status: res.status,

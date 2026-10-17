@@ -39,6 +39,7 @@ import LinkInput from "@/components/list/LinkInput";
 import { FilterEditor, GroupBy, NO_VALUE, OPERATORS, describeValue, fieldLabel, filtersFromParams } from "@/components/list/filters";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
 import BulkActions from "@/components/list/BulkActions";
+import ExportDialog from "@/components/list/ExportDialog";
 import { useShortcuts } from "@/lib/shortcuts";
 import type { DocField } from "@/lib/frappe/types";
 
@@ -69,6 +70,7 @@ export default function ListView({ doctype }: { doctype: string }) {
   const [pageLength, setPageLength] = useState(20);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [quickEntry, setQuickEntry] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const setFilters = useCallback(
     (next: Filter[]) => {
@@ -229,6 +231,8 @@ export default function ListView({ doctype }: { doctype: string }) {
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/desk/list-view-settings?doctype=${enc(doctype)}`)}>List settings</DropdownMenuItem>
+              {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
+              <DropdownMenuItem onClick={() => setExporting(true)}>Export</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           {selected.size > 0 ? (
@@ -476,6 +480,8 @@ export default function ListView({ doctype }: { doctype: string }) {
           </div>
         )}
       </div>
+
+      {exporting && <ExportDialog doctype={doctype} filters={allFilters} onClose={() => setExporting(false)} />}
 
       {quickEntry && (
         <QuickEntry

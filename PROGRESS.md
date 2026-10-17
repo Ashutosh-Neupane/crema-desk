@@ -30,13 +30,18 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   Assign To (assign_to.add_multiple), Add Tags, Export CSV, workflow actions common to the selection
   (get_common_transition_actions → bulk_workflow_approval), Submit/Cancel, Delete. Verified by `e2e/bulk.mjs`.
   LinkInput now has combobox/listbox ARIA; list view links don't prefetch (dev compile stalls router.replace)
+- Data export + import: list menu Export (`components/list/ExportDialog.tsx` → data_import.download_template;
+  fields incl. child tables, all/filtered/5/blank, CSV/Excel) and Import (`/desk/data-import`,
+  `components/views/DataImport.tsx`: Data Import doc + upload_file → preview with mapping/warnings →
+  form_start_import → polled get_import_status → failed-row log). Verified by `e2e/dataimport.mjs`.
+  BFF proxy now passes response bytes + Content-Disposition (Excel/PDF downloads were re-encoded as text)
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
 Next
-1. Data import/export (rebuild properly)
-2. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
-3. Remaining React Doctor warnings
+1. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
+2. Remaining React Doctor warnings
+3. Gantt view, Inbox compose, print view/format builder parity
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):
