@@ -164,6 +164,8 @@ export default function ListView({ doctype }: { doctype: string }) {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
     const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}` }];
     v.push({ id: "report", label: "Report", href: `/desk/doctype/${enc(doctype)}/view/report` });
+    // Desk offers Kanban for any DocType with a Select field to build columns from
+    if (meta.fields?.some((f) => f.fieldtype === "Select" && !f.hidden)) v.push({ id: "kanban", label: "Kanban", href: `/desk/doctype/${enc(doctype)}/view/kanban` });
     if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `/desk/doctype/${enc(doctype)}/view/tree` });
     if (meta.image_field) v.push({ id: "image", label: "Image", href: `/desk/doctype/${enc(doctype)}/view/image` });
     return v;

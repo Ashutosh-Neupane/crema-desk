@@ -21,11 +21,16 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   `get_transitions` (role + self-approval) replacing Save/Submit/Cancel, `before/after_workflow_action` hooks,
   `apply_workflow`, action confirmation, state indicator coloured by Workflow State style, read-only when the
   user's roles can't edit the state. Verified by `e2e/workflow.mjs` (custom submittable DocType + workflow)
+- Kanban `/desk/doctype/X/view/kanban[/<board>]` (`components/views/KanbanView.tsx`) on the v16 board APIs:
+  board picker + New board (quick_kanban_board on a Select field), get_kanban_board_data, saved column order,
+  drag between/within columns (dnd-kit, pointer-first collision, keyboard) → update_order_for_single_card,
+  "Move to" card menu, per-column load more, + card prefilled with the column value, add/archive/restore column,
+  card fields/assignees/footer date from the board. Verified by `e2e/kanban.mjs` (ToDo board)
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
 Next
-1. Kanban, bulk edit, data import/export (rebuild properly); workflow bulk actions in list
+1. Bulk edit + workflow bulk actions in list; data import/export (rebuild properly)
 2. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
 3. Remaining React Doctor warnings
 
