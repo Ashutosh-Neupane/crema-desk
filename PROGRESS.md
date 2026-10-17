@@ -51,6 +51,8 @@ Newest entries on top. Each session: append what was done, what's verified, what
   enables gantt (Task, ToDo, Work Order, …): Day/Week/Month scales, progress, today line, drag to move / edge to
   extend → frappe.desk.gantt.update_task. Calendar settings loader shared (`lib/views/calendarSettings.ts`).
   Verified by `e2e/gantt.mjs`.
+- Tier 2 #12 (part): Image view `/desk/doctype/X/view/image` (`components/views/ImageView.tsx`) — the list already linked
+  there; cards via reportview + /files proxy, search, filters, load more. Verified by `e2e/image.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
