@@ -1,55 +1,148 @@
-# What's left for 1:1 Frappe Desk parity (audit 2026-10-17)
+# Trevo ↔ Frappe Desk: what's left, and how we get there
 
-Method: Frappe v16 Desk source (`frappe/public/js/frappe/{views,form,list,ui}`, `desk/page`, `core/page`)
-compared module by module with Trevo, plus a smoke run of every `/desk/*` route against vendor1.localhost.
-Order = impact on daily use. Phase 2 (UI/UX redesign) starts after phase 1 is green.
+Last audit: 2026-10-17 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
+Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (26 today, all passing).
 
-Done and covered by e2e: DocType CRUD + two-step New DocType + form builder, Desk form engine (client/server
-scripts, ERPNext transaction logic, grid, quick entry, shortcuts), list (filters, group-by, sort, bulk actions),
-report view, query/script reports, tree, kanban, workflow, data import/export, workspaces, dashboards.
+---
 
-## Phase 1 — transcription
+## 0. Phases
 
-### Tier 1: broken or missing in everyday flows
-1. ✅ **Attach / Attach Image fields don't save** — `AttachmentField` uploads but never calls `onChange`.
-   Image preview, private/public, `image_field` header avatar.
-2. ✅ **Form sidebar is read-only** — Desk lets you add/remove assignments (assign_to.add/remove), attach files,
-   add/remove tags, share (docshare), follow, like. Trevo only lists them.
-3. ✅ **Timeline / activity** — comment edit/delete and @mentions, version diffs ("changed X from A to B"),
-   communications (emails), assignment/attachment/like/share events, "New Email" composer
-   (`frappe.core.doctype.communication.email.make`).
-4. 🟡 **Print** (view/PDF ✅, Print Format Builder ❌) — print view with format selection, letterhead, PDF download (`frappe.utils.print_format.download_pdf`),
-   "Print" in form menu; Print Format Builder.
-5. ✅ **ERPNext "Get Items From"** — `frappe.ui.form.MultiSelectDialog` / `erpnext.utils.map_current_doc` (e.g. Sales
-   Invoice ← Sales Order, Delivery Note ← Sales Order) and grid "Add Multiple" (link_selector) aren't available to scripts.
-6. ✅ **Realtime** — list auto-refresh on `list_update`, form "This document has been modified" notice on `doc_update`,
-   form viewers.
-7. ✅ **Broken prototype routes** (smoke): /desk/notes, /desk/assignments, /desk/roles, /desk/users crash (functions passed
-   to client components); /desk/permissions, /desk/web-forms, /desk/website-builder, /desk/server-scripts,
-   /desk/notification-settings call `/api/resource/api/resource/...`; /desk/follow, /desk/backups, /desk/system-health,
-   /desk/tags, /desk/map use removed or invented endpoints. Desk has no custom pages for most of these — they are
-   DocType lists/forms. → Redirect to the generic list/form; rebuild only real Desk pages (below).
-8. ✅ **Form menu** (undo/redo still ❌) — Rename (title/name, `frappe.model.rename_doc.update_document_title`), Links (linked_with),
-   Customize, Copy to Clipboard, Remind Me, Undo/Redo, Email, "Set User Permissions".
-9. ✅ **Grid** (multi-row edit ❌) — drag to reorder rows, pagination over 50 rows, download/upload rows as CSV, multi-row edit.
+| Phase | Goal | Repos |
+|---|---|---|
+| **1 — transcription** (now) | Everything a user can do in Desk works in Trevo, verified against a live bench | `trevo` (Next.js) + benches in `School_saas` |
+| **2 — UI/UX** | Improve space use, navigation, density, inline editing once behaviour is pinned by e2e | same |
+| **3 — Frappe app** | Ship Trevo as a Frappe custom app that replaces `/desk` on any site | `trevo` becomes an app (python package + built frontend) |
 
-### Tier 2: Desk views and pages not yet rebuilt
-10. ✅ Calendar view per DocType (`/view/calendar`, `__calendar_js` field map, drag to reschedule).
-11. ✅ Gantt view (Task, Project, Production Plan).
-12. Image view ✅, Map view (Geolocation), Inbox ✅, File manager ✅ (folders, upload, move).
-13. List sidebar: "Assigned To / Created By / Tags" counts, saved filters (List Filter), "Assigned to me".
-14. List settings: choose columns, count/likes/comments in list, per-user list settings.
-15. Awesomebar extras: calculator, "New X", search in reports, help results.
-16. Permission Manager page, Role Permissions for Page and Report, backups page (routes redirect for now).
-16b. Virtual/single DocTypes (System Health Report) render read-only like Desk — no "Not Saved"/Save.
-17. Workspace editing (blocks, shortcuts, cards, charts) and Dashboard editing.
-18. User language / translations (`__` with lang_dict), user settings dialog, setup wizard on fresh sites.
-19. Form tour, success action, form dashboard heatmap, reminders.
+Rule for phase 1: never hard-code an app (ERPNext, hub). Behaviour comes from metadata, the site's own JS,
+and whitelisted methods — so any Frappe app works.
 
-### Tier 3: polish and hardening
-20. React Doctor warnings (112), complexity of DocForm/ListView.
-21. Print/report/list virtualization for large data.
-22. Run every suite on both benches in CI.
+---
 
-## Phase 2 — UI/UX improvements (after phase 1)
-Space usage, navigation, dark/light consistency, density modes, inline editing everywhere, faster search.
+## 1. How Frappe's JavaScript runs in Trevo (compatibility architecture)
+
+Frappe's frontend is four kinds of code; each gets a different strategy.
+
+| Layer | What it is | Strategy | Status |
+|---|---|---|---|
+| **L1 Metadata UI** | DocType forms, lists, views, reports | Native React driven by meta; the site's JS (`__js`, `__list_js`, `__tree_js`, `__calendar_js`, report JS, Client Scripts) runs in the Desk runtime (`lib/desk-runtime`) against a `frappe` / `frm` / `cur_frm` compatibility API | ✅ core done |
+| **L2 Script DOM** | Form scripts that write into the page: `frm.fields_dict.x.$wrapper.html()`, `$(frm.wrapper).find()`, `frm.dashboard.add_section()` | Load **real jQuery** into the runtime and give scripts real DOM nodes: each HTML field renders a container whose node is `fields_dict[f].wrapper` / `$wrapper`; `frm.dashboard`, `frm.page.body`, `frm.layout.wrapper` get containers too. Unknown members stay chainable no-ops (NOOP) | 🟡 NOOP stubs today; real-DOM containers ❌ |
+| **L3 Desk widgets** | jQuery widgets Desk mounts inside forms: RoleEditor, ModuleEditor, Permission Manager, form tour, dashboard heatmap/graph | Rebuild natively, keyed by DocType + HTML field (`components/form/widgets`), writing to the **same child tables** as Desk so saving is identical | ✅ RoleEditor + ModuleEditor |
+| **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page in a same-origin frame (served through the BFF proxy like `/assets` and `/files`), Desk chrome hidden by an injected stylesheet, route/title bridged with `postMessage`. Full fidelity on day one; replace page by page with native rebuilds where UX matters (POS first) | ❌ |
+
+Why not import Frappe's whole `desk.bundle.js` into React? It assumes it owns `document`, the router,
+`frappe.boot`, global CSS and jQuery event delegation; mixing it with React rendering breaks both. L4 isolates it in
+a frame instead — which is exactly how it will run in phase 3 (same origin, no proxy).
+
+### User & roles (done)
+- User form: `roles_html` / `modules_html` render native editors (filter, select all/none, counts). Checked roles ⇔
+  `roles` rows (Has Role); unchecked modules ⇔ `block_modules` rows (Block Module), like `frappe.RoleEditor` /
+  `frappe.ModuleEditor`. Disabled when Role Profiles / a Module Profile drive them.
+- Role Profile and Module Profile use the same editors. Verified by `e2e/users.mjs`.
+- Still to do for users: Permission Manager page (L3), User Permission flows, "Reset Password" / "Send Login Link"
+  custom buttons (verify), impersonation banner, API key dialog.
+
+### POS, Banking and other app pages (next step)
+1. L4 host: `/desk/page/point-of-sale`, `/desk/page/<any page>`; sidebar/awesomebar links to Pages go there.
+2. Native POS (phase 2 candidate): ERPNext POS is `erpnext.PointOfSale.Controller` (jQuery) over whitelisted APIs
+   (`erpnext.selling.page.point_of_sale.point_of_sale.*`) — rebuildable on the same APIs.
+3. Vue / frappe-ui apps with their own SPA at `/<app>` (Helpdesk, CRM, Banking) aren't Desk pages — link out.
+
+---
+
+## 2. Remaining features (phase 1 checklist)
+
+### 2.1 Forms
+- ✅ Save/submit/cancel/amend/delete, scripts, ERPNext transaction logic, grid (drag, pages, CSV), quick entry,
+  shortcuts, sidebar, timeline + mentions + email, print, rename/links/remind/customize, workflow, realtime,
+  Get Items From, attach fields, route_options.
+- ❌ L2 real-DOM containers + real jQuery (app scripts that draw HTML).
+- ❌ Form dashboard beyond Connections: heatmap, stats, `frm.dashboard.add_indicator/add_progress/add_comment`.
+- ❌ Undo/redo (form/undo_manager.js), form tour, success action.
+- ❌ Grid: multi-row edit, "Insert Above", per-user grid column settings.
+- 🟡 Virtual / single DocTypes (System Health Report) should render read-only like Desk.
+- ❌ Email Template picker, reply/forward from a timeline email, composer attachments.
+- ❌ Permlevel read-only sections and permission banners; Attachment Gallery control; header avatar from image_field.
+
+### 2.2 Field controls (lib/trevo-form/controls)
+- ✅ Data, Int, Float, Currency, Percent, Check, Select, Link, Dynamic Link, Date, Datetime, Table, Attach,
+  Attach Image, HTML, Code.
+- 🟡 Exist but not verified against Desk: Text Editor (Quill: images, mentions, tables), Markdown, HTML Editor, JSON,
+  Small/Long Text, Time, Duration, Rating, Color, Phone, Password, Signature, Barcode, Geolocation, Icon,
+  Autocomplete (method-backed), Table MultiSelect, MultiSelect/Pills, MultiCheck, Button, Heading, Date Range.
+- ❌ Attachment Gallery; Data `options` validation (Email/URL/Phone/IBAN); `show_title_field_in_link`.
+
+### 2.3 Lists and views
+- ✅ List (filters, group-by, sort, paging, bulk actions, realtime), Report view, Kanban, Calendar, Gantt, Tree, Image,
+  Inbox, File manager, Import/Export.
+- ❌ Map view (Geolocation, Leaflet).
+- ❌ List sidebar (Assigned To / Created By / Tags counts), saved filters (List Filter), "Assigned to me".
+- ❌ List settings dialog, likes / comment counts / assignee avatars in rows.
+
+### 2.4 Reports
+- ✅ Query/Script reports (filters, formatter, tree, totals, chart, summary, prepared), Report Builder reports.
+- ❌ Save a Query Report as a custom report, report PDF (`report_to_pdf`), Auto Email Report setup, column
+  reorder/resize persistence.
+
+### 2.5 Pages (Page doctype — 17 on this site)
+| Page | Plan | Status |
+|---|---|---|
+| permission-manager | L3 native on `core.page.permission_manager.*` | ❌ (redirects to Role list) |
+| print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ |
+| backups | L3 native (backup files, schedule files backup) | ❌ (redirects) |
+| setup-wizard | L4 host, later native | ❌ |
+| point-of-sale | L4 host now, native later | ❌ |
+| sales-funnel, stock-balance, warehouse-capacity-summary, bom-comparison-tool, visual-plant-floor | L4 host | ❌ |
+| workspace-restore, component-explorer | L4 host | ❌ |
+| workflow-builder | 🟡 prototype — verify against the Workflow doc | 🟡 |
+| desktop, dashboard-view, print | native | ✅ |
+
+### 2.6 Shell, navigation, search
+- ✅ Sidebar from boot, workspaces, ⌘K awesomebar, shortcuts, notifications, breadcrumbs.
+- ❌ Awesomebar extras: calculator, "New X", "Search X in DocType", help, recents ranking.
+- ❌ Workspace editing (blocks, sidebar customization), user language (`__()` + lang_dict), desk theme per user,
+  user settings dialog, Module Onboarding, What's New.
+
+### 2.7 Customization and builders
+- ✅ DocType create + form builder, Client/Server Scripts.
+- 🟡 Customize Form (opens with doc_type ✅) — verify field edits save, Reset to defaults.
+- ❌ Print Format Builder, Web Form field builder, Workflow builder parity, Custom Field from the form menu,
+  Translation tool, Naming Series tool.
+
+### 2.8 Admin and integrations
+- ✅ Users + role/module editors, generic forms for settings, Data Import.
+- 🟡 System Console (verify).
+- ❌ Permission Manager, User Permissions UX, Backups, scheduler/RQ status, Recorder, OAuth/Connected Apps,
+  Email Account setup messages.
+
+### 2.9 Email and notifications
+- ✅ Timeline email, composer, Inbox.
+- ❌ Email templates, Auto Email Report, reply/forward, energy points.
+
+### 2.10 Hardening
+- ❌ React Doctor warnings (~110); split DocForm/ListView further.
+- ❌ Virtualized lists and report grids for large data.
+- ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
+- ❌ Mobile layouts, keyboard-only pass, a11y labels everywhere.
+
+---
+
+## 3. Phase 3 — Trevo as a Frappe custom app
+
+Target: `bench get-app trevo && bench --site X install-app trevo` → `/desk` is Trevo.
+
+1. **App skeleton**: `trevo/` python package, `hooks.py` with `website_route_rules` mapping `/desk/<path:app_path>`
+   to the built SPA shell; built assets in `trevo/public/`.
+2. **Build**: Next.js `output: "export"` served by Frappe (or a Node server behind nginx). Static export fits best:
+   the BFF routes (`app/api/*`) go away because the SPA is same-origin with Frappe.
+3. **Data layer**: every call already goes through `deskCall` / `lib/frappe/client`; switch the base from
+   `/api/frappe/*` (proxy) to `/api/*` (direct) with one flag. CSRF token and boot come from the inlined
+   `frappe.boot` instead of scraping `/desk`.
+4. **Assets and files**: `/assets`, `/files`, `/private/files` served by Frappe/nginx — proxy routes removed.
+5. **L4 pages** become same-origin frames of Frappe's own `/app/<page>`.
+6. **Realtime**: socket.io on the same host (no `NEXT_PUBLIC_SOCKETIO_URL`).
+7. **Rollout**: keep classic Desk at `/app` with a "Use classic Desk" link; a `Trevo Settings` single DocType for
+   feature flags.
+
+Prep now (while repos stay separate): keep backend calls behind `deskCall` / `frappeServerFetch`, no Node-only
+APIs in client components, BFF routes stay thin.
