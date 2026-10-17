@@ -8,28 +8,9 @@
  *  - frappe.model.open_mapped_doc — "Create → Delivery Note" style mapping via
  *    the app's whitelisted make_* method, opened as a new unsaved form
  */
-import type { Runtime } from "@/lib/desk-runtime";
+import { lenient, type Runtime } from "@/lib/desk-runtime";
 import { deskCall } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
-
-/** Chainable no-op: callable, constructible, any property → itself */
-const NOOP: unknown = new Proxy(function () {}, {
-  get: (_t, p) => (p === "prototype" ? {} : p === Symbol.toPrimitive ? () => "" : p === "then" ? undefined : NOOP),
-  apply: () => undefined,
-  construct: () => ({}),
-});
-
-/** Namespace proxy: real members as-is (namespaces wrapped too), missing ones → NOOP */
-function lenient(obj: Record<string, unknown>): Record<string, unknown> {
-  return new Proxy(obj, {
-    get(target, prop) {
-      if (typeof prop === "symbol") return (target as Record<symbol, unknown>)[prop];
-      if (!(prop in target)) return NOOP;
-      const v = target[prop];
-      return v && typeof v === "object" && !Array.isArray(v) ? lenient(v as Record<string, unknown>) : v;
-    },
-  });
-}
 
 export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unknown>; navigate?: (href: string) => void }) {
   const g = rt.globals;

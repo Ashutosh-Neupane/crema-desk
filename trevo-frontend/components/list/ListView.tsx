@@ -310,11 +310,16 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   const views = useMemo(() => {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
-    const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}` }];
+    const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}` }];
     if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `/desk/doctype/${enc(doctype)}/view/tree` });
     if (meta.image_field) v.push({ id: "image", label: "Image", href: `/desk/doctype/${enc(doctype)}/view/image` });
     return v;
   }, [meta, doctype]);
+
+  // Desk opens tree DocTypes (Account, Item Group, …) in Tree view unless the list is asked for
+  useEffect(() => {
+    if (meta?.is_tree && params.get("view") !== "list") router.replace(`/desk/doctype/${enc(doctype)}/view/tree`);
+  }, [meta?.is_tree, params, router, doctype]);
 
   // ?new=1 (e.g. /desk/doctype/new redirect) opens New / the primary action once the list JS is loaded
   const wantNew = params.get("new") === "1";

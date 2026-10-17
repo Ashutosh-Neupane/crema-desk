@@ -153,6 +153,29 @@ function makeJQueryStub(): unknown {
   return $;
 }
 
+/** Chainable no-op: callable, constructible, any property → itself */
+const NOOP: unknown = new Proxy(function () {}, {
+  get: (_t, p) => (p === "prototype" ? {} : p === Symbol.toPrimitive ? () => "" : p === "then" || p === Symbol.iterator ? undefined : NOOP),
+  apply: () => undefined,
+  construct: () => ({}),
+});
+
+/**
+ * Namespace proxy: real members as-is, missing ones → NOOP. `deep` also wraps
+ * nested namespaces (erpnext.utils.*); frappe is shallow so data maps like
+ * frappe.listview_settings[dt] still return undefined for missing keys.
+ */
+export function lenient(obj: Record<string, unknown>, deep = true): Record<string, unknown> {
+  return new Proxy(obj, {
+    get(target, prop) {
+      if (typeof prop === "symbol") return (target as Record<symbol, unknown>)[prop];
+      if (!(prop in target)) return NOOP;
+      const v = target[prop];
+      return deep && v && typeof v === "object" && !Array.isArray(v) ? lenient(v as Record<string, unknown>) : v;
+    },
+  });
+}
+
 export interface Runtime {
   frappe: Record<string, unknown> & {
     listview_settings: Record<string, Record<string, unknown>>;
@@ -194,7 +217,12 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   };
 
   const frappe = {
+    // registries app JS assigns into directly (Desk predefines them)
     listview_settings: {} as Record<string, Record<string, unknown>>,
+    treeview_settings: {} as Record<string, Record<string, unknown>>,
+    query_reports: {} as Record<string, Record<string, unknown>>,
+    views: {} as Record<string, unknown>,
+    flags: {} as Record<string, unknown>,
     ui: {
       form: {
         handlers,
@@ -288,6 +316,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       throw new Error(text);
     },
     format: (v: unknown) => cstr(v),
+    get_meta: (dt: string) => metas[dt],
+    get_doc: (dt: string, name: string) => ((globals.locals as Record<string, Record<string, unknown>>)?.[dt] ?? {})[name],
+    get_list: (dt: string) => Object.values(((globals.locals as Record<string, Record<string, unknown>>)?.[dt] ?? {})),
     route_options: null as unknown,
     set_route: (...parts: unknown[]) => {
       const p = parts.flat().map(cstr);
@@ -302,7 +333,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   };
 
   Object.assign(globals, {
-    frappe,
+    // Desk's API is large: unknown frappe.* helpers become no-ops rather than aborting app scripts
+    frappe: lenient(frappe as unknown as Record<string, unknown>, false),
     __,
     flt,
     cint,
@@ -320,6 +352,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     format_currency: (v: unknown, currency?: string) => `${currency ?? ""} ${flt(v, 2).toLocaleString()}`.trim(),
   });
   globals.jQuery = globals.$;
+  // App scripts call ERPNext bundle helpers (erpnext.utils.get_tree_options, …) we don't ship:
+  // a lenient namespace turns missing ones into no-ops instead of aborting the script
+  globals.erpnext = lenient(provide("erpnext") as Record<string, unknown>);
 
   const scope = new Proxy(globals, {
     has: () => true,
@@ -349,5 +384,5 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     }
   };
 
-  return { frappe: frappe as Runtime["frappe"], globals, evalScript };
+  return { frappe: globals.frappe as Runtime["frappe"], globals, evalScript };
 }
