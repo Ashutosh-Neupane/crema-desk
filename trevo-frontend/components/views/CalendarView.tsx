@@ -22,30 +22,14 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { ChevronLeft, ChevronRight, Filter as FilterIcon, ListFilter, Plus, X } from "lucide-react";
-import { createRuntime } from "@/lib/desk-runtime";
 import { deskCall } from "@/lib/frappe/form";
 import { useDoctype } from "@/lib/hooks/useDoctype";
-import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { useCalendarSettings } from "@/lib/views/calendarSettings";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import type { Filter } from "@/lib/list/api";
 import { FilterEditor, OPERATORS, describeValue, fieldLabel } from "@/components/list/filters";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
 
-interface FieldMap {
-  start: string;
-  end?: string;
-  id?: string;
-  title?: string;
-  allDay?: string;
-  color?: string;
-  status?: string;
-}
-interface CalSettings {
-  field_map?: FieldMap;
-  get_events_method?: string;
-  style_map?: Record<string, string>;
-  filters?: Array<{ fieldname: string; options?: string; label?: string }>;
-}
 interface CalEvent {
   id: string;
   title: string;
@@ -79,44 +63,8 @@ export default function CalendarView({ doctype }: { doctype: string }) {
   const router = useRouter();
   const qc = useQueryClient();
   const { data: meta, error } = useDoctype(doctype);
-  const { data: ctx } = useDeskContext();
 
-  // frappe.views.calendar[doctype] from the DocType's calendar JS; fallback: first Date/Datetime field
-  const settings = useMemo<CalSettings | null>(() => {
-    if (!meta || !ctx) return null;
-    const rt = createRuntime({
-      user: ctx.user,
-      roles: ctx.roles,
-      defaults: ctx.defaults,
-      sysdefaults: ctx.sysdefaults,
-      perms: ctx.perms,
-      boot: ctx.boot,
-      metas: { [meta.name]: meta },
-    });
-    const views = (rt.frappe as unknown as { views: Record<string, unknown> }).views;
-    views.calendar ??= {};
-    rt.evalScript(
-      String((meta as { __calendar_js?: string }).__calendar_js ?? ""),
-      `${doctype} calendar js`
-    );
-    const s = (views.calendar as Record<string, CalSettings>)[doctype];
-    if (s?.field_map?.start) return s;
-    const dateField = meta.fields?.find(
-      (f) => f.fieldtype === "Datetime" || f.fieldtype === "Date"
-    );
-    if (!dateField) return {};
-    const title =
-      typeof meta.title_field === "string" && meta.title_field ? meta.title_field : "name";
-    return {
-      field_map: {
-        start: dateField.fieldname,
-        end: dateField.fieldname,
-        id: "name",
-        title,
-        allDay: dateField.fieldtype === "Date" ? "__all_day" : undefined,
-      },
-    };
-  }, [meta, ctx, doctype]);
+  const settings = useCalendarSettings(meta);
   const fm = settings?.field_map;
 
   const [mode, setMode] = useState<"month" | "week">("month");

@@ -35,7 +35,7 @@ report view, query/script reports, tree, kanban, workflow, data import/export, w
 
 ### Tier 2: Desk views and pages not yet rebuilt
 10. ✅ Calendar view per DocType (`/view/calendar`, `__calendar_js` field map, drag to reschedule).
-11. Gantt view (Task, Project, Production Plan).
+11. ✅ Gantt view (Task, Project, Production Plan).
 12. Image view, Map view (Geolocation), Inbox (Communication), File manager (folders, upload, private).
 13. List sidebar: "Assigned To / Created By / Tags" counts, saved filters (List Filter), "Assigned to me".
 14. List settings: choose columns, count/likes/comments in list, per-user list settings.

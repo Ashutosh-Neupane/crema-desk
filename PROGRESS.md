@@ -47,6 +47,10 @@ Newest entries on top. Each session: append what was done, what's verified, what
   calendar JS (field_map, get_events_method, style_map; fallback first Date field): month/week, drag to reschedule
   (update_event, duration kept), + on a day creates a prefilled doc, filters. Offered in the list view switcher when
   `__calendar_js` exists; `/desk/calendar` redirects to the Event calendar. Verified by `e2e/calendar.mjs`.
+- Tier 2 #11 done: Gantt `/desk/doctype/X/view/gantt` (`components/views/GanttView.tsx`) for DocTypes whose calendar JS
+  enables gantt (Task, ToDo, Work Order, …): Day/Week/Month scales, progress, today line, drag to move / edge to
+  extend → frappe.desk.gantt.update_task. Calendar settings loader shared (`lib/views/calendarSettings.ts`).
+  Verified by `e2e/gantt.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
