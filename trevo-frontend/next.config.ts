@@ -24,6 +24,11 @@ if (frappeUrl?.includes(":8080")) {
 // ---------------------------------------------------------------------------
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // the persistent dev cache grew to ~19 GB and stalled the machine for minutes while flushing;
+    // in-memory caching keeps HMR fast, cold starts recompile once
+    turbopackFileSystemCacheForDev: false,
+  },
   poweredByHeader: false,
   compress: true,
 

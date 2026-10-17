@@ -1,131 +1,134 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
-import type { FieldControlProps } from "./index";
-import { uploadFile } from "@/lib/frappe/upload";
-
 /**
- * Attachment field — drag & drop file upload with preview, progress, and file list.
- * Significantly better than Frappe's basic file attach.
+ * Attach / Attach Image (Desk: ControlAttach + FileUploader). The value is one file URL.
+ * Upload goes to upload_file attached to this document (doctype/docname/fieldname); on an
+ * unsaved doc the file is uploaded loose and Frappe attaches it on save
+ * (File.attach_files_to_document). Drop, pick or paste a URL; preview for images.
  */
-export default function AttachmentField({ field, value, onChange: _onChange, disabled }: FieldControlProps) {
-  const [files, setFiles] = useState<Array<{ name: string; url?: string; uploading?: boolean }>>([]);
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+import { useRef, useState } from "react";
+import { FileUp, Link2, Loader2, Paperclip, X } from "lucide-react";
+import { toast } from "sonner";
+import type { FieldControlProps } from "./index";
+import { fileNameFromUrl, isImageUrl, uploadFile } from "@/lib/frappe/upload";
 
-  const handleFiles = useCallback(async (fileList: FileList) => {
-    const newFiles = Array.from(fileList).map((f) => ({
-      name: f.name,
-      uploading: true,
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
+export default function AttachmentField({ field, value, onChange, disabled, doc, inputId }: FieldControlProps) {
+  const url = typeof value === "string" ? value : "";
+  const image = field.fieldtype === "Attach Image";
+  const [progress, setProgress] = useState<number | null>(null);
+  const [drag, setDrag] = useState(false);
+  const [linkMode, setLinkMode] = useState(false);
+  const [link, setLink] = useState("");
+  const input = useRef<HTMLInputElement>(null);
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      try {
-        const result = await uploadFile(file, {
-          doctype: field.options || "",
-          docname: typeof value === "string" ? value : "",
-        });
-        setFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === prev.length - fileList.length + i
-              ? { ...f, url: result.file_url, uploading: false }
-              : f,
-          ),
-        );
-      } catch {
-        setFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === prev.length - fileList.length + i ? { ...f, uploading: false } : f,
-          ),
-        );
-      }
+  const saved = doc && doc.name && !doc.__islocal && !String(doc.name).startsWith("new-");
+  const upload = async (file: File) => {
+    if (image && !file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
     }
-  }, [field.options, value]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
+    setProgress(0);
+    try {
+      const r = await uploadFile(file, {
+        doctype: saved ? String(doc!.doctype ?? "") : undefined,
+        docname: saved ? String(doc!.name) : undefined,
+        fieldname: saved ? field.fieldname : undefined,
+        // Desk's uploader defaults to private; images shown on the web are usually public
+        is_private: !image,
+        onProgress: setProgress,
+      });
+      onChange(r.file_url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed", { duration: 8000 });
+    } finally {
+      setProgress(null);
     }
-  }, [handleFiles]);
+  };
 
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  if (url) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
+        {isImageUrl(url) ? (
+          // eslint-disable-next-line @next/next/no-img-element -- served by the Frappe file proxy at runtime
+          <img src={url} alt={String(field.label ?? field.fieldname)} className="h-12 w-12 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-700" />
+        ) : (
+          <Paperclip className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
+        )}
+        <a href={url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-sm text-zinc-800 hover:underline dark:text-zinc-200">
+          {fileNameFromUrl(url)}
+        </a>
+        {!disabled && (
+          <button type="button" onClick={() => onChange("")} aria-label={`Clear ${field.label ?? field.fieldname}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (disabled) return <div className="text-sm text-zinc-400">—</div>;
 
   return (
-    <div>
-      <div
-        role="button"
-        tabIndex={0}
-        onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        className={[
-          "relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer",
-          dragOver
-            ? "border-zinc-900 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-800/50"
-            : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600",
-          (disabled || !!field.read_only) && "opacity-50 cursor-not-allowed",
-        ].join(" ")}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          disabled={disabled || !!field.read_only}
-          className="hidden"
-        />
-        <div className="flex flex-col items-center gap-2">
-          <svg className="h-8 w-8 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Drop files here or click to browse
-          </p>
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) void upload(f);
+      }}
+      className={`rounded-lg border border-dashed px-3 py-2.5 text-sm transition-colors ${drag ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : "border-zinc-300 dark:border-zinc-700"}`}
+    >
+      {progress !== null ? (
+        <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400" role="status">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Uploading… {progress}%
         </div>
-      </div>
-
-      {files.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {files.map((file, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">{file.name}</span>
-                {file.uploading && (
-                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
-                )}
-              </div>
-              {!disabled && !field.read_only && (
-                <button aria-label="Remove file"
-                  type="button"
-                  onClick={() => removeFile(i)}
-                  className="text-zinc-400 hover:text-red-600"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+      ) : linkMode ? (
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && link.trim()) onChange(link.trim());
+              if (e.key === "Escape") setLinkMode(false);
+            }}
+            placeholder="https://… or /files/…"
+            aria-label="File URL"
+            className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+          <button type="button" disabled={!link.trim()} onClick={() => onChange(link.trim())} className="rounded-md bg-zinc-900 px-3 text-sm text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900">
+            Set
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 font-medium text-zinc-800 hover:underline dark:text-zinc-200">
+            <FileUp className="h-4 w-4" aria-hidden /> {image ? "Upload image" : "Attach"}
+          </button>
+          <button type="button" onClick={() => setLinkMode(true)} className="inline-flex items-center gap-1.5 text-zinc-500 hover:underline">
+            <Link2 className="h-4 w-4" aria-hidden /> Link
+          </button>
+          <span className="text-xs text-zinc-400">or drop a file here</span>
         </div>
       )}
+      <input
+        ref={input}
+        id={inputId}
+        type="file"
+        accept={image ? "image/*" : undefined}
+        className="sr-only"
+        aria-label={String(field.label ?? field.fieldname)}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void upload(f);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,15 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-17 — session 2 (cont.): gap audit, Tier 1
+- `docs/GAPS.md`: audit of what's left for 1:1 Desk parity (Tier 1 everyday gaps, Tier 2 views/pages, Tier 3
+  polish), then phase 2 UI/UX. Work through it top-down.
+- Tier 1 #1 done: Attach / Attach Image save their value (upload_file attached to the doc; loose upload on new
+  docs, Frappe attaches on save), image preview, link mode, clear. `/files/*` and `/private/files/*` are served
+  from Trevo's origin (`lib/frappe/fileProxy.ts`; public files need Host = site). Verified by `e2e/attach.mjs`.
+- Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
+  `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)

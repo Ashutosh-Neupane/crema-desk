@@ -38,7 +38,13 @@ await page.waitForURL(/\/desk/, { timeout: 30000 });
 
 for (const p of paths) {
   const [path, action] = p.split("#");
-  await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  try {
+    await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  } catch (e) {
+    // a server/client redirect can abort the first navigation — note it and keep going
+    errors.push(`goto ${path}: ${String(e.message).split("\n")[0]}`);
+  }
+  errors.push(`--- ${path} -> ${page.url().replace(BASE, "")}`);
   await page.waitForTimeout(5000); // not networkidle: the realtime socket keeps the network busy
   if (action?.startsWith("k=")) {
     await page.keyboard.press("Meta+k");

@@ -1,36 +1,63 @@
 /**
- * File upload — delegates to frappe.client.upload via the BFF proxy.
+ * File upload (Desk: frappe.ui.FileUploader → POST /api/method/upload_file) via the BFF proxy.
+ * XHR so callers can show progress; the response is Frappe's { message: File } envelope.
  */
-import { frappeClient } from "./client";
+import { frappeErrorMessage, parseServerMessages } from "@/lib/frappe/errors";
 
 export interface UploadResult {
+  name: string;
   file_url: string;
   file_name: string;
-  name: string;
-  url?: string;
+  is_private?: number;
 }
 
 export interface UploadOptions {
   doctype?: string;
   docname?: string;
+  fieldname?: string;
+  folder?: string;
   is_private?: boolean;
-  onProgress?: (progress: number) => void;
+  onProgress?: (percent: number) => void;
 }
 
-export async function uploadFile(file: File, opts?: UploadOptions): Promise<UploadResult> {
-  const formData = new FormData();
-  formData.append("file", file);
-  if (opts?.doctype) formData.append("doctype", opts.doctype);
-  if (opts?.docname) formData.append("docname", opts.docname);
-  if (opts?.is_private !== undefined) formData.append("is_private", String(opts.is_private));
+export function uploadFile(file: File, opts: UploadOptions = {}): Promise<UploadResult> {
+  const fd = new FormData();
+  fd.append("file", file, file.name);
+  if (opts.doctype) fd.append("doctype", opts.doctype);
+  if (opts.docname) fd.append("docname", opts.docname);
+  if (opts.fieldname) fd.append("fieldname", opts.fieldname);
+  if (opts.folder) fd.append("folder", opts.folder);
+  fd.append("is_private", opts.is_private === false ? "0" : "1");
 
-  const res = await frappeClient.post<{ data: UploadResult }>("/api/method/upload_file", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress: (progressEvent) => {
-      if (opts?.onProgress && progressEvent.total) {
-        opts.onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/frappe/api/method/upload_file");
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.upload.onprogress = (e) => e.lengthComputable && opts.onProgress?.(Math.round((e.loaded * 100) / e.total));
+    xhr.onerror = () => reject(new Error("Upload failed: network error"));
+    xhr.onload = () => {
+      let env: { message?: UploadResult; exc_type?: string; _server_messages?: string } = {};
+      try {
+        env = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON error page */
       }
-    },
+      if (xhr.status >= 200 && xhr.status < 300 && env.message?.file_url) resolve(env.message);
+      else reject(new Error(frappeErrorMessage(env, parseServerMessages(env._server_messages), xhr.status) || "Upload failed"));
+    };
+    xhr.send(fd);
   });
-  return res.data.data;
 }
+
+/** Display name for a stored file URL (/private/files/a%20b.pdf → a b.pdf) */
+export function fileNameFromUrl(url: string): string {
+  const last = url.split("?")[0].split("/").pop() ?? url;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+}
+
+export const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?|$)/i.test(url);
