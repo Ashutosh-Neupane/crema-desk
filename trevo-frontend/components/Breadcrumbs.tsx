@@ -17,6 +17,9 @@ const LABEL_OVERRIDES: Record<string, string> = {
   edit: "Edit",
 };
 
+const DATA_ROUTES = new Set(["doctype", "print", "query-report", "workspace", "dashboard", "modules"]);
+const ROUTE_WORDS = new Set(["new", "view", "edit", "builder", "report", "kanban", "tree", "calendar", "gantt", "image"]);
+
 export default function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
@@ -24,8 +27,16 @@ export default function Breadcrumbs() {
   const items = segments.map((segment, index) => {
     const href = "/" + segments.slice(0, index + 1).join("/");
     const isLast = index === segments.length - 1;
-    const label = decodeURIComponent(segment);
-    const display = LABEL_OVERRIDES[label] || label.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    let label = segment;
+    try {
+      label = decodeURIComponent(segment);
+    } catch {
+      /* keep raw */
+    }
+    // under data routes (/desk/doctype/<DocType>/<name>, /desk/print/…, /desk/query-report/<name>) the
+    // segments are DocType and document names — show them verbatim; only route keywords are prettified
+    const isData = index >= 2 && DATA_ROUTES.has(segments[1]) && !ROUTE_WORDS.has(label);
+    const display = LABEL_OVERRIDES[label] || (isData ? label : label.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
 
     return { href, label: display, isLast };
   });

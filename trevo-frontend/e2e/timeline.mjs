@@ -52,6 +52,8 @@ await comment.hover();
 await comment.getByRole("button", { name: "Edit comment" }).click();
 await comment.getByLabel("Edit comment text").fill("Edited text");
 await comment.getByRole("button", { name: "Save" }).click();
+// the edit box closes once update_comment returned and docinfo reloaded (its textarea also "contains" the text)
+await page.getByLabel("Edit comment text").waitFor({ state: "detached", timeout: 20000 });
 await activity.getByText("Edited text").waitFor({ timeout: 20000 });
 c = (await post("frappe.client.get_value", { doctype: "Comment", filters: { name: c.name }, fieldname: ["content"] }));
 check(String(c?.content).includes("Edited text"), "comment updated on server");

@@ -58,6 +58,12 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 2 #12 (part): Inbox `/desk/inbox` rebuilt (`components/views/InboxView.tsx`): account folders (boot.email_accounts,
   else site accounts) + Sent/Spam/Trash with Desk's filters, unread bold, mark read/unread (email.inbox flag queue —
   Frappe only flags IMAP mail with a uid), trash, close, compose (EmailComposer without a doc). `e2e/inbox.mjs`.
+- User & roles: native RoleEditor / ModuleEditor (`components/form/widgets`) for User.roles_html/modules_html,
+  Role Profile, Module Profile — writes Has Role / Block Module rows like Desk. `e2e/users.mjs`.
+- `docs/GAPS.md` rewritten: compatibility architecture for Frappe JS (L1 metadata UI, L2 real jQuery + DOM
+  containers, L3 native widgets, L4 legacy page host for POS/Vue/jQuery pages), full remaining checklist, phase 3
+  (Trevo as a Frappe custom app) plan. `e2e/run-all.mjs` runs every suite (26/26 passing).
+- Breadcrumbs show DocType/document names verbatim; form.salesorder deletes its cancelled order.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
   `experimental.turbopackFileSystemCacheForDev: false`. Smoke script survives redirecting routes.
 
@@ -103,9 +109,10 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   `docker start sm-hub` then `FRAPPE_BACKEND_URL=http://localhost:8000 NEXT_PUBLIC_FRAPPE_BASE_URL=http://localhost:8000
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
-Next
-1. Remaining React Doctor warnings
-2. Gantt view, Inbox compose, print view/format builder parity
+Next (see docs/GAPS.md)
+1. L4 legacy page host (/desk/page/<name>) → POS and other app pages
+2. L2 real jQuery + DOM containers for HTML fields
+3. Permission Manager (native), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
 Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):

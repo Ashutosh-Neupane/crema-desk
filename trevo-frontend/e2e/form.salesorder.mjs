@@ -112,5 +112,8 @@ await page.waitForURL(/Sales%20Order$/, { timeout: 20000 });
 const gone = await page.request.get(`${BASE}/api/frappe/api/resource/Sales%20Order/${encodeURIComponent(amended)}`);
 check(gone.status() === 404, "deleted on server");
 
+// remove the cancelled original too so repeated runs don't pile up orders (list tests page on 20 rows)
+await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.delete`, { data: { doctype: "Sales Order", name } });
+
 if (warnings.length) console.log("script warnings:\n" + warnings.slice(0, 15).join("\n"));
 await t.finish();

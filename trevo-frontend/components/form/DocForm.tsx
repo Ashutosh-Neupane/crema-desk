@@ -27,6 +27,7 @@ import { PREFILL_KEY } from "@/lib/form/prefill";
 import FormSidebar from "@/components/form/FormSidebar";
 import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
+import { getHtmlWidget } from "@/components/form/widgets";
 import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
@@ -624,6 +625,10 @@ export default function DocForm({ doctype, name }: Props) {
                 errors={snap.errors}
               />
             )}
+            renderHtml={(df) => {
+              const widget = getHtmlWidget(doctype, df.fieldname);
+              return widget ? widget({ ctl, readOnly }) : undefined;
+            }}
             tabExtras={tabExtras}
             focusRequest={focusRequest}
           />

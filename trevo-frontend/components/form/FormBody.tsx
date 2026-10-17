@@ -33,6 +33,8 @@ interface Props {
   getQuery?: (fieldname: string) => () => { filters?: unknown; query?: string } | undefined;
   /** renders Table fields (Grid) — omitted in child row forms */
   renderTable?: (df: DocField) => React.ReactNode;
+  /** HTML fields Desk fills with a widget or script DOM (undefined → static `options` HTML) */
+  renderHtml?: (df: DocField) => React.ReactNode | undefined;
   /** tighter spacing (row editor, quick entry) */
   compact?: boolean;
   /** extra content appended to a tab (e.g. Connections) */
@@ -61,6 +63,7 @@ export default function FormBody({
   onChange,
   getQuery,
   renderTable,
+  renderHtml,
   compact = false,
   tabExtras,
   focusRequest,
@@ -120,6 +123,10 @@ export default function FormBody({
       );
     }
     if (df.fieldtype === "Table" || df.fieldtype === "Table MultiSelect") return null;
+    if (df.fieldtype === "HTML" && renderHtml) {
+      const node = renderHtml(df);
+      if (node !== undefined) return <div key={df.fieldname}>{node}</div>;
+    }
     return (
       <FormControl
         key={df.fieldname}
