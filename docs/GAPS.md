@@ -1,6 +1,6 @@
 # Trevo ↔ Frappe Desk: what's left, and how we get there
 
-Last audit: 2026-10-17 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
+Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
 Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (29 today, all passing).
 
@@ -54,43 +54,171 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 
 ## 2. Remaining features (phase 1 checklist)
 
-### 2.1 Forms
-- ✅ Save/submit/cancel/amend/delete, scripts, ERPNext transaction logic, grid (drag, pages, CSV), quick entry,
-  shortcuts, sidebar, timeline + mentions + email, print, rename/links/remind/customize, workflow, realtime,
-  Get Items From, attach fields, route_options.
-- ✅ L2: real jQuery; HTML fields are real DOM nodes for `$wrapper.html()` / `.find().on()` / `set_df_property` options.
-- ❌ Form dashboard beyond Connections: heatmap, stats, `frm.dashboard.add_indicator/add_progress/add_comment`.
-- ❌ Undo/redo (form/undo_manager.js), form tour, success action.
-- ❌ Grid: multi-row edit, "Insert Above", per-user grid column settings.
-- 🟡 Virtual / single DocTypes (System Health Report) should render read-only like Desk.
-- ❌ Email Template picker, reply/forward from a timeline email, composer attachments.
-- ❌ Permlevel read-only sections and permission banners; Attachment Gallery control; header avatar from image_field.
+Full inventory of Frappe v16's desk frontend (`frappe/public/js/frappe/**`, the `*.bundle.js` entry points, Desk
+Pages) and ERPNext's scripted UIs (`erpnext/public/js/**`), audited 2026-10-18. Paths in `code` are Frappe/ERPNext
+sources to transcribe from. Every ❌ is something a Desk user can do today that Trevo can't.
 
-### 2.2 Field controls (lib/trevo-form/controls)
+**Order of work (impact on daily use):**
+1. Users track: User form buttons (2.12), User Permissions UX, Session Defaults (2.8), slug routes.
+2. Formatting from settings (2.3 — number systems, precision, date/time formats, time zone).
+3. `frm.dashboard` / `set_intro` / headline (2.1) and the ERPNext form widgets (2.11: address & contact, stock
+   levels, serial/batch selector, ledger preview).
+4. Lists: sidebar counts, saved layouts, list settings dialog, persisted user settings (2.4).
+5. Grid: insert above/below, column settings, keyboard, paste (2.2); field control verification (2.3).
+6. Shell: user menu + theme, user settings dialog, banners, awesomebar extras, language (2.8).
+7. Reports and views extras (2.5, 2.6), Map, Kanban v2; workspace editing + v16 sidebar/desktop (2.7).
+8. Builders: DocType Settings, Print Format Builder, Web Form, Naming Series (2.9); native POS (phase 2).
+
+### 2.1 Forms (`form/form.js`, `toolbar.js`, `save.js`, `layout.js`, `script_manager.js`)
+- ✅ Save / submit / cancel / amend / delete, Client Scripts + app `__js`, ERPNext transaction logic, quick entry,
+  shortcuts (Ctrl+S/B/P…), workflow actions, realtime (doc_update, viewers), route_options, Get Items From
+  (MultiSelectDialog), rename / links / remind / copy / customize / edit DocType in the menu, print, email.
+- ✅ L2 script DOM: real jQuery; HTML fields are real nodes (`$wrapper.html()`, `.find().on()`, set_df_property options).
+- ❌ `frm.dashboard` (`form/dashboard.js`): `add_indicator`, `add_progress`, `add_comment`, `add_section`,
+  `set_headline` / `set_headline_alert` (`frm.set_intro` too), heatmap, stats per link, `frm.dashboard.refresh`.
+  Today these are NOOPs — ERPNext uses them on Customer, Supplier, Item, Project, Sales Order (billing / delivery %).
+- ❌ `frm.page.body`, `frm.layout.wrapper`, `frm.toolbar` containers for scripts (L2 for the rest of the page).
+- ❌ Form toolbar extras (`toolbar.js`): previous / next document (`frappe.desk.form.utils.get_next`), indicator
+  click actions, title editing for `title_field`, star/like in the header, "Jump to field" (Ctrl+J), `frm.page.add_menu_item`
+  / `add_action_item` verification.
+- ❌ Undo / redo (`form/undo_manager.js`, Ctrl+Z / Ctrl+Y on field changes).
+- ❌ Form tour (`form_tour.js`, Form Tour doctype, `onboarding_tours.bundle.js`).
+- ❌ Success action after submit/save (`success_action.js`, Success Action doctype).
+- ❌ Info card (`form/info_card.js`) and side panel record preview (`ui/side_panel.js`) — v16.
+- ❌ Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
+- ❌ Permlevel: sections and fields above the user's permlevel read-only/hidden, "Not permitted" banners,
+  `frm.perm` checks in custom buttons, `read_only_depends_on` re-check after save.
+- ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
+- 🟡 Virtual / Single DocTypes rendered read-only like Desk (System Health Report).
+- 🟡 `frappe.ui.Dialog` from scripts (`ui/dialog.js`, `ui/field_group.js`): fields render through FormBody — verify
+  Table fields with `data` / `get_data`, HTML fields with `$wrapper`, `fields_dict.x.grid`, `set_query` / `get_query`,
+  `onchange`, `depends_on`, size, `disable_primary_action`, `frappe.ui.form.MultiSelect`, `frappe.prompt` with field list,
+  `frappe.msgprint({ primary_action })`, `frappe.show_progress`, `frappe.ui.form.LinkSelector` (`link_selector.js`).
+- ❌ Translation of field values (`views/translation_manager.js`, `translatable` fields).
+- ❌ Interaction composer: New Event / ToDo from a document (`views/interaction.js`).
+- ❌ Print: raw / QZ Tray printing (`form/print_utils.js`), network printer selection, letter head preview in the composer.
+
+### 2.2 Grid / child tables (`form/grid.js`, `grid_row.js`, `grid_row_form.js`, `grid_pagination.js`)
+- ✅ Add/remove/duplicate rows, drag reorder, 50-row pages, CSV download/upload (allow_bulk_edit), row form.
+- ❌ Insert Above / Below, move to row, multi-row select + delete, "Add Multiple" (Link selector).
+- ❌ Per-user column settings (`Configure Columns` dialog, `in_list_view` override, column widths) — saved to user
+  settings / `GridView`.
+- ❌ Grid keyboard navigation (arrows between cells, Enter opens row, Ctrl+Shift+Up/Down).
+- ❌ Paste multiple rows from a spreadsheet (TSV paste into grid).
+- ❌ Grid row `form_render` events, `frm.fields_dict.items.grid.get_field().get_query`, `grid.update_docfield_property`,
+  `grid.toggle_enable/display/reqd`, `cannot_add_rows`, `cannot_delete_rows` — verify each via ERPNext scripts.
+
+### 2.3 Field controls (`form/controls/*`)
 - ✅ Data, Int, Float, Currency, Percent, Check, Select, Link, Dynamic Link, Date, Datetime, Table, Attach,
   Attach Image, HTML, Code.
-- 🟡 Exist but not verified against Desk: Text Editor (Quill: images, mentions, tables), Markdown, HTML Editor, JSON,
-  Small/Long Text, Time, Duration, Rating, Color, Phone, Password, Signature, Barcode, Geolocation, Icon,
-  Autocomplete (method-backed), Table MultiSelect, MultiSelect/Pills, MultiCheck, Button, Heading, Date Range.
-- ❌ Attachment Gallery; Data `options` validation (Email/URL/Phone/IBAN); `show_title_field_in_link`.
+- 🟡 Exist but not verified against Desk: Text Editor (Quill: images, @mentions via `quill-mention`, tables),
+  Markdown Editor, HTML Editor, JSON, Small/Long Text, Time, Duration, Rating, Color (`color_picker/`), Phone
+  (`phone_picker/`, country codes), Password (strength meter), Signature, Barcode (+ camera scanner), Geolocation (map
+  draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
+  MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
+- ❌ Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
+- ❌ Data `options` validation: Email, Name, Phone, URL, IBAN, Barcode — with Desk's inline messages.
+- ❌ Link: `show_title_field_in_link` (title shown instead of name), "Create a new X" + "Advanced search" in the
+  dropdown (`link_selector`), link hover preview card (`ui/link_preview.js`, `components/hover_card.js`), filters
+  description under the field, `ignore_user_permissions`.
+- ❌ Camera capture for Attach (`ui/capture.js`) and barcode/QR scanner dialog (`scanner/`, `frappe.ui.Scanner`).
+- ❌ Address autocomplete (`ui/address_autocomplete`, geocoder setting).
+- ❌ Formatting from settings everywhere (`utils/number_format.js`, `number_systems.js`, `datetime.js`):
+  System Settings / Currency `number_format` (`#,##,###.##` Indian/Nepali grouping, `#.###,##`), float/currency
+  precision, `date_format` + `time_format` in lists/reports/grids, user time zone conversion for Datetime,
+  `rounding_method`. Lists currently use `toLocaleString("en")`.
 
-### 2.3 Lists and views
-- ✅ List (filters, group-by, sort, paging, bulk actions, realtime), Report view, Kanban, Calendar, Gantt, Tree, Image,
-  Inbox, File manager, Import/Export.
-- ❌ Map view (Geolocation, Leaflet).
-- ❌ List sidebar (Assigned To / Created By / Tags counts), saved filters (List Filter), "Assigned to me".
-- ❌ List settings dialog, likes / comment counts / assignee avatars in rows.
+### 2.4 Lists (`list/list_view.js`, `base_list.js`, `bulk_operations.js`, `list_settings.js`, `list_filter/`)
+- ✅ Filters, standard filters, group-by, sort, paging, count, bulk edit/delete/submit/cancel/print/assign/tags/export,
+  indicators, realtime refresh, list settings record, Import/Export.
+- ❌ List sidebar (`list_sidebar_group_by.js`, `list_sidebar_stat.html`): Assigned To / Created By / Tags / group-by
+  field counts (`frappe.desk.listview.get_group_by_count`), "Assigned to me", "Created by me".
+- ❌ Saved layouts / filters (v16 `list_filter/`: List Filter doctype — save, share globally, manage, duplicate,
+  layout field selector).
+- ❌ List Settings dialog (`list_settings.js`): fields shown, disable count / comment count / sidebar stats / auto
+  refresh — saved to List View Settings.
+- ❌ Row extras: comment counts, likes, assignee avatars, `_seen` bold for unread, "Edit" inline for Check fields,
+  `has_indicator_for_draft`, `get_form_link` overrides from `listview_settings`.
+- ❌ `listview_settings` hooks verification: `onload`, `refresh`, `button`, `formatters`, `get_indicator`,
+  `add_fields`, `filters`, `hide_name_column`, `primary_action`, `selectable`, `right_column`.
+- ❌ Restricted-by-user-permission banner (`list_view_permission_restrictions.html`).
+- ❌ Per-user persisted list state (`model/user_settings.js`): last filters, sort, page length, view, report columns.
+- ❌ Virtualized list for 2000+ rows (`list_view_virtualization.js`).
+- ❌ Bulk actions: "Apply Assignment Rule", "Delete" progress via realtime for >500 docs, bulk rename (`bulk_rename`).
 
-### 2.4 Reports
-- ✅ Query/Script reports (filters, formatter, tree, totals, chart, summary, prepared), Report Builder reports.
-- ❌ Save a Query Report as a custom report, report PDF (`report_to_pdf`), Auto Email Report setup, column
-  reorder/resize persistence.
+### 2.5 Views (`views/*`)
+- ✅ Report view, Kanban, Calendar, Gantt, Tree, Image, Inbox, File manager, Dashboard view.
+- ❌ Map view (`views/map`, `leaflet.bundle.js`): Geolocation / latitude+longitude doctypes.
+- ❌ Kanban v2 (`views/kanban_v2`, v16): board settings, card fields, column colours/priority styles, swimlanes —
+  Trevo has the classic Kanban Board doctype flow only.
+- ❌ Report view extras: group-by with aggregates, "Pick columns" from child tables, column resize/reorder persisted,
+  Save As / Save report (Report doctype, `report_type: Report Builder`), print/PDF, link side panel (`link_side_panel.js`).
+- ❌ Tree view extras: drag to move node, "Add Child" with quick entry fields, expand all, root filters per company.
+- ❌ Calendar: Desk's calendar view settings per doctype (`calendar_settings`), quick create on date click with
+  quick entry, filter sidebar.
+- ❌ Communication view features in Inbox: reply / reply-all / forward, "Relink" to a document, assign, email
+  thread grouping, attachments preview.
 
-### 2.5 Pages (Page doctype — 17 on this site)
+### 2.6 Reports (`views/reports/query_report.js`, `report_view.js`, `report_utils.js`)
+- ✅ Query/Script reports (filters, formatter, tree, totals, chart, summary, prepared reports), Report Builder.
+- ❌ Save a Query Report as a custom report (`save_report`), report PDF (`frappe.utils.print_format.report_to_pdf`),
+  print grid templates (`print_grid.html`, `print_tree.html`), CSV/Excel export options dialog (with/without
+  indentation), "Setup Auto Email" from the menu, "Add to Workspace", column reorder/resize persistence, "Pick
+  columns" / custom columns from linked doctypes, report link side panel.
+- ❌ ERPNext report helpers loaded by report JS: `erpnext.financial_statements` (formatter, tree, period selection),
+  `dimension_tree_filter.js` (accounting dimensions added to every finance report), `sales_trends_filters.js`,
+  `purchase_trends_filters.js`, `stock_analytics.js`, `stock_grid_report.js` — verify each family renders, and add
+  shims where the runtime is missing them.
+
+### 2.7 Workspaces, desktop, sidebar (`views/workspace`, `widgets/*`, `ui/sidebar/*`, `desktop_icons.bundle.js`)
+- ✅ Workspace render: header, paragraph, spacer, shortcut (with stats filter count), card links, chart, number card,
+  quick list; sidebar from boot; desktop page.
+- ❌ Workspace blocks: onboarding widget (`onboarding_widget.js`, Module Onboarding steps), custom HTML block
+  (`custom_block_widget.js`, Custom HTML Block doctype with its own JS/CSS).
+- ❌ Workspace editing (`views/workspace/blocks`, Editor.js): add/move/resize blocks, new widget dialogs
+  (`widget_dialog.js`, `new_widget.js`), create/duplicate/delete/hide workspace, public vs private, workspace restore.
+- ❌ v16 sidebar: dock (`ui/sidebar/dock.js`, pinned/floating), sidebar arrangement editor
+  (`arrangement_editor.js` — reorder/hide items per user), sidebar sections/cards (`card.js`), Workspace Sidebar doctype.
+- ❌ v16 desktop icons: drag to arrange, folders, hide (`desktop_icons.bundle.js`, Desktop Icon doctype).
+- ❌ Number card / chart widget menus: refresh, filters dialog, "Set Filters", "Edit", chart type switch, time span.
+
+### 2.8 Shell, navigation, search (`ui/toolbar/*`, `ui/keyboard.js`, `router.js`)
+- ✅ ⌘K awesomebar (doctypes, records, reports, pages), keyboard shortcuts dialog, notifications panel, breadcrumbs,
+  `frappe.set_route` for Desk pages + route_options.
+- ❌ Awesomebar extras (`awesome_bar.js`, `search_utils.js`): calculator, "New X", "Search for X in DocType", tag
+  search (`#tag`), help articles, recent items ranking (`fuzzy_match.js`), global search results page
+  (`frappe.utils.global_search.search`).
+- ❌ Slug routes: `set_route("/app/sales-invoice/new")`, `/app/<slug>` links in HTML — needs boot's slug → DocType map.
+- ❌ Navbar user menu (`toolbar.js`, `navbar.html`): My Settings, Session Defaults dialog (company / fiscal year per
+  session — ERPNext relies on it), Toggle Full Width, Toggle Theme (Light/Dark/Automatic saved to `User.desk_theme`),
+  Reload, View Website, Apps switcher (`/apps`), About dialog (`about.js`), Help dropdown (`help_links.js`).
+- ❌ v16 user settings dialog (`user_settings_dialog.bundle.js`, `ui/settings_dialog.js`): Profile, Email signature +
+  options, Appearance, Language, Notifications, API access.
+- ❌ Site banners (`ui/site_banners.js`): read-only mode, impersonation ("Impersonating X — Stop").
+- ❌ Alt-key accelerators (`alt_keyboard_shortcuts.js`), Ctrl+G go-to, `frappe.ui.keys.add_shortcut` from scripts.
+- ❌ Language: `__()` with `lang_dict` from boot, RTL layout, user language switch.
+- ❌ Notifications panel tabs (`ui/notifications/notifications.js`): Today's Events, Notification Settings link,
+  energy-point / mention / assignment types with icons, open-in-place.
+- ❌ Telemetry / billing banners (Frappe Cloud only) — out of scope.
+
+### 2.9 Customization and builders
+- ✅ DocType create + form builder, Client/Server Scripts, Customize Form opens with doc_type.
+- 🟡 Customize Form: verify field edits save, Reset to defaults, "Customize Form" from list/form menus.
+- ❌ v16 DocType Settings dialog (`form/doctype_settings/*`, `embedded_list.bundle.js`): tabs General, Naming,
+  Workflow, Print Formats, Roles, User Permissions, Notifications, Email Templates, Global Search — from the list menu.
+- ❌ DocType permission editor dialog (`ui/permission_dialog.js`, v16) used by the form builder / DocType form.
+- ❌ Print Format Builder (`print_format_builder/`, page + beta Vue builder) and Print Format editing (Jinja + CSS).
+- ❌ Web Form builder (`web_form/`, field list editor), Workflow builder parity (`workflow_builder/` Vue flow),
+  Custom Field from the form menu, Translation tool, Naming Series dialog (`ui/naming_series.js`, v16 Document
+  Naming Settings), Letter Head builder, Email Template preview (`utils/preview_email.js`, `views/render_preview.js`).
+- ❌ Onboarding: Module Onboarding steps (create/show/watch video), Onboarding Tours, What's New / changelog
+  dialog, setup wizard native (`ui/slides.js`) — currently via L4.
+
+### 2.10 Pages (Page doctype — 17 on this site)
 | Page | Plan | Status |
 |---|---|---|
 | permission-manager | L3 native on `core.page.permission_manager.*` | ✅ native |
-| print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ |
+| print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ (L4 works) |
 | backups | L3 native (backup files, schedule files backup) | ❌ (redirects) |
 | setup-wizard | L4 host, later native | ✅ via L4 |
 | point-of-sale | L4 host now, native later | ✅ via L4 |
@@ -99,37 +227,51 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 | workflow-builder | 🟡 prototype — verify against the Workflow doc | 🟡 |
 | desktop, dashboard-view, print | native | ✅ |
 
-### 2.6 Shell, navigation, search
-- ✅ Sidebar from boot, workspaces, ⌘K awesomebar, shortcuts, notifications, breadcrumbs.
-- ✅ `frappe.set_route` from scripts: Form/List/Tree/report/workspace and any Desk page; `frappe.route_options` →
-  `?field=value` (list filters, new-form values). `lib/navigation/deskRoute.ts`.
-- ❌ Slug routes (`set_route("/app/sales-invoice/new")`) — need the boot's slug → DocType map.
-- ❌ Awesomebar extras: calculator, "New X", "Search X in DocType", help, recents ranking.
-- ❌ Workspace editing (blocks, sidebar customization), user language (`__()` + lang_dict), desk theme per user,
-  user settings dialog, Module Onboarding, What's New.
+### 2.11 ERPNext scripted UIs inside forms (L3 candidates — today NOOP or broken)
+Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-use ERPNext.
+- ❌ Address & Contact cards on Customer, Supplier, Lead, Company, Sales Partner, Shareholder…
+  (`address_html` / `contact_html`, `frappe.contacts.render_address_and_contact`, `utils/address_and_contact.js`).
+- ❌ Item stock levels dashboard (`erpnext.stock.ItemDashboard`, `item-dashboard.bundle.js`) on Item / Warehouse.
+- ❌ Serial & Batch selector dialog (`utils/serial_no_batch_selector.js` — SerialBatchPackageSelector) on stock
+  transactions; barcode scanning into items (`utils/barcode_scanner.js`, `scan_barcode` field).
+- ❌ Accounting / stock ledger preview (`utils/ledger_preview.js`) on draft invoices / stock entries.
+- ❌ Unreconcile dialog (`utils/unreconcile.js`), Payment Reconciliation allocation, Bank Reconciliation Tool
+  (`bank-reconciliation-tool.bundle.js` — datatable + dialogs inside a Single doctype).
+- ❌ Item selector / quick add (`utils/item_selector.js`), party quick entries (`customer_quick_entry.js`,
+  `supplier_quick_entry.js`, `contact_address_quick_entry.js` — extended quick entry dialogs).
+- ❌ BOM configurator (`bom_configurator/`, tree editor), Project / Task gantt in forms, CRM activities on Lead /
+  Opportunity (`utils/crm_activities.js` — notes, events, todos tabs).
+- ❌ Telephony / call popup (`call_popup/`, `telephony.js`), SMS manager (`sms_manager.js`).
+- ❌ Stock reservation dialogs (`stock_reservation.js`), bulk transaction processing (`bulk_transaction_processing.js`).
+- ❌ Plant floor visual (`plant_floor_visual/`) — via L4 page today.
 
-### 2.7 Customization and builders
-- ✅ DocType create + form builder, Client/Server Scripts.
-- 🟡 Customize Form (opens with doc_type ✅) — verify field edits save, Reset to defaults.
-- ❌ Print Format Builder, Web Form field builder, Workflow builder parity, Custom Field from the form menu,
-  Translation tool, Naming Series tool.
+### 2.12 Admin and integrations
+- ✅ Users + role/module editors, Permission Manager, generic forms for settings, Data Import, Inbox.
+- 🟡 System Console (verify), Data Import wizard parity (`data_import_wizard.bundle.js`, v16 wizard).
+- ❌ User Permissions UX (add from the User form, "Show User Permissions" on a doctype, `Apply To All Doctypes`).
+- ❌ User form buttons: Reset Password, Send Login Link, Impersonate, Generate Keys (API key dialog), Reset OTP —
+  verify user.js custom buttons render and work.
+- ❌ Backups page, scheduler / RQ job status (RQ Job, RQ Worker virtual doctypes), Recorder UI, Error Log viewer
+  with traceback formatting, Log settings.
+- ❌ OAuth / Connected Apps flows, Email Account setup messages (OAuth authorize buttons), Social Login Keys.
+- ❌ Document Follow digest settings, Energy Point log/leaderboard, Auto Repeat dialog from the form menu.
 
-### 2.8 Admin and integrations
-- ✅ Users + role/module editors, generic forms for settings, Data Import.
-- 🟡 System Console (verify).
-- ✅ Permission Manager.
-- ❌ User Permissions UX, Backups, scheduler/RQ status, Recorder, OAuth/Connected Apps,
-  Email Account setup messages.
+### 2.13 Email and notifications
+- ✅ Timeline email, composer, Inbox (read/unread, trash, close).
+- ❌ Composer: Email Template picker, reply / reply-all / forward from a timeline email, attach existing files and
+  uploads, print format + letter head attachment preview, signature, "Send After", read receipt, CC/BCC defaults.
+- ❌ Auto Email Report setup, Notification (doctype) preview, Newsletter send/schedule dialogs.
 
-### 2.9 Email and notifications
-- ✅ Timeline email, composer, Inbox.
-- ❌ Email templates, Auto Email Report, reply/forward, energy points.
-
-### 2.10 Hardening
+### 2.14 Hardening
 - ❌ React Doctor warnings (~110); split DocForm/ListView further.
 - ❌ Virtualized lists and report grids for large data.
 - ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
 - ❌ Mobile layouts, keyboard-only pass, a11y labels everywhere.
+- ❌ Error reporting parity: server tracebacks in a collapsible dialog for System Managers (Desk shows them).
+
+### Out of scope (Frappe Cloud / dev-only)
+`billing.bundle.js` (Frappe Cloud trial banners), `telemetry.bundle.js`, `sentry.bundle.js`, `build_events`
+(bench dev rebuild toasts), `component-explorer` page (dev showcase, available via L4).
 
 ---
 
