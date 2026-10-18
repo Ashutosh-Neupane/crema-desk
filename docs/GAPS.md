@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-17 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (28 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (29 today, all passing).
 
 ---
 
@@ -39,7 +39,9 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
   `roles` rows (Has Role); unchecked modules ⇔ `block_modules` rows (Block Module), like `frappe.RoleEditor` /
   `frappe.ModuleEditor`. Disabled when Role Profiles / a Module Profile drive them.
 - Role Profile and Module Profile use the same editors. Verified by `e2e/users.mjs`.
-- Still to do for users: Permission Manager page (L3), User Permission flows, "Reset Password" / "Send Login Link"
+- ✅ Role Permissions Manager, native (`/desk/page/permission-manager/<doctype>?role=`, `e2e/permissions.mjs`): add rule,
+  rights per level, Only if Creator, users of a role, remove, Restore Original Permissions — Desk's own methods.
+- Still to do for users: User Permission flows, "Reset Password" / "Send Login Link"
   custom buttons (verify), impersonation banner, API key dialog.
 
 ### POS, Banking and other app pages (next step)
@@ -87,7 +89,7 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 ### 2.5 Pages (Page doctype — 17 on this site)
 | Page | Plan | Status |
 |---|---|---|
-| permission-manager | L3 native on `core.page.permission_manager.*` | ❌ (redirects to Role list) |
+| permission-manager | L3 native on `core.page.permission_manager.*` | ✅ native |
 | print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ |
 | backups | L3 native (backup files, schedule files backup) | ❌ (redirects) |
 | setup-wizard | L4 host, later native | ✅ via L4 |
@@ -99,6 +101,9 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 
 ### 2.6 Shell, navigation, search
 - ✅ Sidebar from boot, workspaces, ⌘K awesomebar, shortcuts, notifications, breadcrumbs.
+- ✅ `frappe.set_route` from scripts: Form/List/Tree/report/workspace and any Desk page; `frappe.route_options` →
+  `?field=value` (list filters, new-form values). `lib/navigation/deskRoute.ts`.
+- ❌ Slug routes (`set_route("/app/sales-invoice/new")`) — need the boot's slug → DocType map.
 - ❌ Awesomebar extras: calculator, "New X", "Search X in DocType", help, recents ranking.
 - ❌ Workspace editing (blocks, sidebar customization), user language (`__()` + lang_dict), desk theme per user,
   user settings dialog, Module Onboarding, What's New.
@@ -112,7 +117,8 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 ### 2.8 Admin and integrations
 - ✅ Users + role/module editors, generic forms for settings, Data Import.
 - 🟡 System Console (verify).
-- ❌ Permission Manager, User Permissions UX, Backups, scheduler/RQ status, Recorder, OAuth/Connected Apps,
+- ✅ Permission Manager.
+- ❌ User Permissions UX, Backups, scheduler/RQ status, Recorder, OAuth/Connected Apps,
   Email Account setup messages.
 
 ### 2.9 Email and notifications

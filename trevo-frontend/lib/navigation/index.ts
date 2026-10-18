@@ -135,7 +135,7 @@ export const SYSTEM_NAV: NavSection[] = [
     items: [
       { type: "link", label: "Users", href: "/desk/users" },
       { type: "link", label: "Roles", href: "/desk/roles" },
-      { type: "link", label: "Permissions", href: "/desk/permissions" },
+      { type: "link", label: "Permissions", href: "/desk/page/permission-manager" },
       { type: "link", label: "Notes", href: "/desk/notes" },
       { type: "link", label: "Assignments", href: "/desk/assignments" },
       { type: "link", label: "Profile", href: "/desk/profile" },

@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
       { source: "/desk/notification-settings", destination: "/desk/doctype/Notification%20Settings", permanent: false },
       { source: "/desk/onboarding-permission", destination: "/desk/doctype/Onboarding%20Permission", permanent: false },
       { source: "/desk/onboarding-step", destination: "/desk/doctype/Onboarding%20Step", permanent: false },
-      { source: "/desk/permissions", destination: "/desk/doctype/Role", permanent: false },
+      { source: "/desk/permissions", destination: "/desk/page/permission-manager", permanent: false },
       { source: "/desk/print-format", destination: "/desk/doctype/Print%20Format", permanent: false },
       { source: "/desk/roles", destination: "/desk/doctype/Role", permanent: false },
       { source: "/desk/route-history", destination: "/desk/doctype/Route%20History", permanent: false },

@@ -8,18 +8,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
+import { trevoUrlForRoute } from "@/lib/navigation/deskRoute";
 
-const enc = encodeURIComponent;
-
-/** Desk route array → Trevo URL */
-export function trevoUrlForRoute(route: string[]): string | null {
-  const [kind, a, b] = route;
-  if (kind === "Form" && a) return b ? `/desk/doctype/${enc(a)}/${enc(b)}` : `/desk/doctype/${enc(a)}/new`;
-  if (kind === "List" && a) return b === "Report" ? `/desk/doctype/${enc(a)}/view/report` : `/desk/doctype/${enc(a)}`;
-  if (kind === "Tree" && a) return `/desk/doctype/${enc(a)}/view/tree`;
-  if (kind === "query-report" && a) return `/desk/query-report/${enc(a)}`;
-  return null;
-}
+export { trevoUrlForRoute } from "@/lib/navigation/deskRoute";
 
 export default function LegacyPage({ route }: { route: string }) {
   const router = useRouter();

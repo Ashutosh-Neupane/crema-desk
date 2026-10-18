@@ -13,6 +13,7 @@ import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
 import { MultiSelectDialog } from "./multiSelect";
 import { makeLenientJQuery } from "./jquery";
+import { deskRouteToUrl } from "@/lib/navigation/deskRoute";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 
 export interface RuntimeContext {
@@ -338,9 +339,15 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     get_list: (dt: string) => Object.values(((globals.locals as Record<string, Record<string, unknown>>)?.[dt] ?? {})),
     route_options: null as unknown,
     set_route: (...parts: unknown[]) => {
-      const p = parts.flat().map(cstr);
-      if (p[0] === "Form" && p[1]) ctx.navigate?.(`/desk/doctype/${encodeURIComponent(p[1])}/${encodeURIComponent(p[2] ?? "new")}`);
-      else if (p[0] === "List" && p[1]) ctx.navigate?.(`/desk/doctype/${encodeURIComponent(p[1])}`);
+      // set_route("Form", dt, name) / ("List", dt, "Report") / ("query-report", r) / ("permission-manager", dt) /
+      // ("/app/x/y"); pending frappe.route_options become ?field=value (list filters, new-form values)
+      const flat = parts.flat().map(cstr);
+      const p = flat.length === 1 && flat[0].includes("/") ? flat[0].replace(/^\/?(app|desk)\//, "").split("/").map(decodeURIComponent) : flat;
+      const options = frappe.route_options as Record<string, unknown> | null;
+      frappe.route_options = null;
+      const url = deskRouteToUrl(p, options);
+      if (url) ctx.navigate?.(url);
+      return Promise.resolve();
     },
     new_doc: (dt: string) => ctx.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`),
     get_route: () => [],

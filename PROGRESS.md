@@ -78,6 +78,13 @@ Newest entries on top. Each session: append what was done, what's verified, what
   `$wrapper.html()`, `.find().on("click")`, `.css()` work; `set_df_property(f, "options", html)` refills it.
   Verified by `e2e/scriptdom.mjs`; full suite (28) green with real jQuery. users.mjs uses a unique Role Profile
   name (a queued Role Profile job locks the doc between runs).
+- Role Permissions Manager rebuilt natively (`components/views/PermissionManager.tsx`, route
+  `/desk/page/permission-manager/[[...doctype]]`, ahead of the legacy host's catch-all): doctype/role pickers, rule
+  table with Desk's right filtering (submit/cancel/amend only when submittable, levels > 0 read/write/mask, Report
+  hidden with Only if Creator), optimistic toggles, add rule, users of a role, remove, Restore Original Permissions.
+  `/desk/permissions` and the nav link point there. `frappe.set_route` now maps any Desk route (pages too) and turns
+  `frappe.route_options` into `?field=value` (`lib/navigation/deskRoute.ts`, shared with the legacy host).
+  Verified by `e2e/permissions.mjs` (custom DocType; Custom DocPerm rows outlive a deleted DocType → cleanup).
 
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
@@ -122,7 +129,7 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. Permission Manager (native L3), User Permission flows, Reset Password / Login Link buttons
+1. User Permission flows, Reset Password / Login Link buttons, slug routes in set_route
 2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor
