@@ -3,6 +3,7 @@
 import { memo, useId } from "react";
 import type { FieldControlProps } from "./index";
 import FormField from "./FormField";
+import { sanitizeHtml } from "@/lib/report/columns";
 import SelectField from "./SelectField";
 import DateField from "./DateField";
 import DateTimeField from "./DateTimeField";
@@ -42,7 +43,7 @@ import HeadingField from "./HeadingField";
 import NumberField from "./NumberField";
 import DynamicLinkField from "./DynamicLinkField";
 
-function FieldControl({ field, value, onChange, error, disabled = false, doc, getQuery }: FieldControlProps) {
+function FieldControl({ field, value, onChange, error, disabled = false, doc, getQuery, onClick }: FieldControlProps) {
   const inputId = `${useId()}-${field.fieldname}`;
   const props = {
     inputId,
@@ -53,6 +54,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
     error,
     doc,
     getQuery,
+    onClick,
   };
 
   const renderInput = () => {
@@ -161,7 +163,9 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
       {renderInput()}
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
       {field.description && !error && (
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">{field.description}</span>
+        // Desk renders descriptions as HTML (links, <b>, <br>) — sanitized here
+        // react-doctor-disable-next-line dangerous-html-sink
+        <span className="text-xs text-zinc-500 dark:text-zinc-400 [&_a]:underline" dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(field.description)) }} />
       )}
     </div>
   );

@@ -14,6 +14,8 @@ export interface FieldControlProps {
   inputId?: string;
   /** set_query result for Link fields: { filters, query } */
   getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
+  /** Button fields: Desk triggers the form event named after the field */
+  onClick?: () => void;
 }
 
 export { default as FormField } from "./FormField";

@@ -35,6 +35,8 @@ interface Props {
   renderTable?: (df: DocField) => React.ReactNode;
   /** HTML fields Desk fills with a widget or script DOM (undefined → static `options` HTML) */
   renderHtml?: (df: DocField) => React.ReactNode | undefined;
+  /** Button field clicked */
+  onButton?: (fieldname: string) => void;
   /** tighter spacing (row editor, quick entry) */
   compact?: boolean;
   /** extra content appended to a tab (e.g. Connections) */
@@ -64,6 +66,7 @@ export default function FormBody({
   getQuery,
   renderTable,
   renderHtml,
+  onButton,
   compact = false,
   tabExtras,
   focusRequest,
@@ -137,6 +140,7 @@ export default function FormBody({
         error={errors[df.fieldname]}
         doc={parent ? { ...parent, ...values } : values}
         getQuery={getQuery?.(df.fieldname)}
+        onClick={df.fieldtype === "Button" && onButton ? () => onButton(df.fieldname) : undefined}
       />
     );
   };

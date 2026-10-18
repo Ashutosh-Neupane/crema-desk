@@ -15,7 +15,7 @@
  *  - `frm` object handed to scripts (Desk's API surface)
  */
 import { toast } from "sonner";
-import { createRuntime, flt, type Runtime, type RuntimeContext, NOOP } from "@/lib/desk-runtime";
+import { createRuntime, flt, lenient, type Runtime, type RuntimeContext, NOOP } from "@/lib/desk-runtime";
 import { deskCall, isNewDoc, type Doc } from "@/lib/frappe/form";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
 import { evalDependsOn } from "@/lib/trevo-form/dependsOn";
@@ -545,8 +545,10 @@ export class FormController {
           return f.fieldtype === "HTML" && self.htmlWrapper(f.fieldname) ? $(self.htmlWrapper(f.fieldname)) : $();
         },
         $input: (self.runtime.globals.$ as () => unknown)(),
-        set_description: () => {},
+        set_description: (d: unknown) => self.setDf(f.fieldname, "description", d),
         set_focus: () => {},
+        // Autocomplete / Select options from scripts (Desk: control.set_data)
+        set_data: (data: unknown) => self.setDf(f.fieldname, "options", Array.isArray(data) ? data.map((x) => (x && typeof x === "object" ? (x as { value?: unknown }).value : x)).join("\n") : data),
         get_query: undefined as unknown,
         // grid API for tables
         grid: TABLE_TYPES.has(f.fieldtype)
@@ -574,6 +576,8 @@ export class FormController {
           return self.queries[f.fieldname];
         },
       });
+      // control methods Trevo doesn't model (set_label, set_formatted_input, …) are no-ops, not crashes
+      fieldsDict[f.fieldname] = lenient(fieldsDict[f.fieldname] as Record<string, unknown>, false);
     }
 
     const frm: Record<string, unknown> = {

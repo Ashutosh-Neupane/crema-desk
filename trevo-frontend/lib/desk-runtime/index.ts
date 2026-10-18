@@ -162,7 +162,8 @@ function makeJQueryStub(): unknown {
 export const NOOP: unknown = new Proxy(function () {}, {
   get: (_t, p) => (p === "prototype" ? {} : p === Symbol.toPrimitive ? () => "" : p === "then" || p === Symbol.iterator ? undefined : NOOP),
   apply: () => undefined,
-  construct: () => ({}),
+  // `new frappe.RoleEditor(...)` → an object whose methods are no-ops too
+  construct: () => NOOP as object,
 });
 
 /**
@@ -249,10 +250,34 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       },
       Dialog: DeskDialog,
       toolbar: {},
+      // frappe/public/js/frappe/utils/user.js
+      show_change_password_dialog(user: string, onSuccess?: () => unknown) {
+        const d = new DeskDialog({
+          title: __("Change Password"),
+          fields: [
+            { label: __("Set New Password"), fieldtype: "Password", fieldname: "new_password", reqd: 1 },
+            { label: __("Logout From All Devices After Changing Password"), fieldtype: "Check", fieldname: "logout_all_sessions", default: 1 },
+          ],
+          primary_action_label: __("Change Password"),
+          primary_action: async (values) => {
+            await call({ method: "frappe.core.doctype.user.user.change_password", args: { user, new_password: values.new_password, logout_all_sessions: values.logout_all_sessions } });
+            d.hide();
+            toast.success(__("Password changed"));
+            onSuccess?.();
+          },
+        });
+        d.show();
+        return d;
+      },
     },
     provide,
     session: { user: ctx.user, user_fullname: ctx.full_name ?? ctx.user },
-    user: { name: ctx.user, has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)) },
+    user: {
+      name: ctx.user,
+      has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)),
+      is_report_manager: () => ["Administrator", "System Manager", "Report Manager"].some((x) => ctx.roles?.includes(x)),
+      full_name: (u?: string) => (!u || u === ctx.user ? (ctx.full_name ?? ctx.user) : u),
+    },
     user_roles: ctx.roles ?? [],
     boot: { ...(ctx.boot ?? {}), developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
     sys_defaults: ctx.sysdefaults ?? {},
@@ -267,6 +292,18 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
         const v = frappe.defaults.get_user_default(k);
         return v == null ? [] : [v];
       },
+      is_enabled: (k: string) => !!cint(frappe.defaults.get_default(k)),
+    },
+    tools: {
+      /** CSV download of rows (Desk: frappe.tools.downloadify(data, roles, title)) */
+      downloadify(data: unknown[][], _roles: unknown, title = "export") {
+        const csv = (data ?? []).map((r) => r.map((c) => `"${cstr(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+        a.download = `${title}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      },
     },
     datetime,
     utils: {
@@ -277,6 +314,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       get_random: (n = 8) => Math.random().toString(36).slice(2, 2 + n),
       sum: (arr: unknown[]) => (arr ?? []).reduce<number>((a, b) => a + flt(b), 0),
       unique: (arr: unknown[]) => [...new Set(arr ?? [])],
+      copy_to_clipboard: async (text: unknown) => {
+        try {
+          await navigator.clipboard.writeText(cstr(text));
+          toast.success(__("Copied to clipboard."));
+        } catch {
+          toast.error(__("Could not copy to clipboard"));
+        }
+      },
       icon: () => "",
     },
     meta: {
@@ -302,6 +347,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     call,
     xcall: async (method: string, args?: Record<string, unknown>) => (await call({ method, args })).message,
     db: {
+      get_single_value: async (doctype: string, field: string) =>
+        (await call({ method: "frappe.client.get_single_value", args: { doctype, field } })).message,
       get_value: (doctype: string, filters: unknown, fieldname: unknown) =>
         call({ method: "frappe.client.get_value", args: { doctype, filters, fieldname } }),
       get_list: async (doctype: string, args: Record<string, unknown> = {}) =>
@@ -341,7 +388,10 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     set_route: (...parts: unknown[]) => {
       // set_route("Form", dt, name) / ("List", dt, "Report") / ("query-report", r) / ("permission-manager", dt) /
       // ("/app/x/y"); pending frappe.route_options become ?field=value (list filters, new-form values)
-      const flat = parts.flat().map(cstr);
+      const last = parts[parts.length - 1];
+      const trailing = last && typeof last === "object" && !Array.isArray(last) ? (last as Record<string, unknown>) : null;
+      if (trailing) frappe.route_options = { ...((frappe.route_options as Record<string, unknown>) ?? {}), ...trailing };
+      const flat = (trailing ? parts.slice(0, -1) : parts).flat().map(cstr);
       const p = flat.length === 1 && flat[0].includes("/") ? flat[0].replace(/^\/?(app|desk)\//, "").split("/").map(decodeURIComponent) : flat;
       const options = frappe.route_options as Record<string, unknown> | null;
       frappe.route_options = null;
@@ -356,6 +406,12 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     _: __,
   };
 
+  // Desk namespaces are large: helpers Trevo hasn't shimmed are no-ops instead of TypeErrors that abort the
+  // rest of a script (frappe.ui.form stays separate so its handlers Map is never proxied)
+  const ns = frappe as unknown as Record<string, Record<string, unknown>>;
+  ns.ui.form = lenient(ns.ui.form as Record<string, unknown>, false);
+  for (const k of ["ui", "utils", "db", "defaults", "model", "meta", "user", "tools", "datetime"]) if (ns[k]) ns[k] = lenient(ns[k], false);
+
   Object.assign(globals, {
     // Desk's API is large: unknown frappe.* helpers become no-ops rather than aborting app scripts
     frappe: lenient(frappe as unknown as Record<string, unknown>, false),
@@ -364,6 +420,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     cint,
     cstr,
     in_list,
+    has_common: (a: unknown[], b: unknown[]) => (a ?? []).some((x) => (b ?? []).includes(x)),
     locals: {} as Record<string, unknown>,
     cur_frm: undefined,
     // Desk globals some scripts still call

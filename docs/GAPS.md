@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (29 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (30 today, all passing).
 
 ---
 
@@ -59,7 +59,7 @@ Pages) and ERPNext's scripted UIs (`erpnext/public/js/**`), audited 2026-10-18. 
 sources to transcribe from. Every ❌ is something a Desk user can do today that Trevo can't.
 
 **Order of work (impact on daily use):**
-1. Users track: User form buttons (2.12), User Permissions UX, Session Defaults (2.8), slug routes.
+1. Users track: User Permissions UX (2.12), Session Defaults + impersonation banner (2.8), slug routes.
 2. Formatting from settings (2.3 — number systems, precision, date/time formats, time zone).
 3. `frm.dashboard` / `set_intro` / headline (2.1) and the ERPNext form widgets (2.11: address & contact, stock
    levels, serial/batch selector, ledger preview).
@@ -89,6 +89,13 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ❌ Permlevel: sections and fields above the user's permlevel read-only/hidden, "Not permitted" banners,
   `frm.perm` checks in custom buttons, `read_only_depends_on` re-check after save.
 - ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
+- ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`).
+- ✅ Field descriptions render as (sanitized) HTML.
+- ✅ Runtime robustness: `frappe.ui/utils/db/defaults/model/meta/user/tools/datetime` and field objects return no-ops
+  for helpers Trevo hasn't shimmed; `new frappe.Unknown()` is a no-op object; `has_common`, `frappe.user.has_role`,
+  `frappe.ui.show_change_password_dialog`, `frappe.db.get_single_value`, `frappe.defaults.is_enabled`,
+  `frappe.tools.downloadify`, `frappe.utils.copy_to_clipboard`, `dialog.show_message`, `control.set_data`; Escape closes
+  script dialogs; `set_route(..., {options})`.
 - 🟡 Virtual / Single DocTypes rendered read-only like Desk (System Health Report).
 - 🟡 `frappe.ui.Dialog` from scripts (`ui/dialog.js`, `ui/field_group.js`): fields render through FormBody — verify
   Table fields with `data` / `get_data`, HTML fields with `$wrapper`, `fields_dict.x.grid`, `set_query` / `get_query`,
@@ -249,8 +256,10 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ✅ Users + role/module editors, Permission Manager, generic forms for settings, Data Import, Inbox.
 - 🟡 System Console (verify), Data Import wizard parity (`data_import_wizard.bundle.js`, v16 wizard).
 - ❌ User Permissions UX (add from the User form, "Show User Permissions" on a doctype, `Apply To All Doctypes`).
-- ❌ User form buttons: Reset Password, Send Login Link, Impersonate, Generate Keys (API key dialog), Reset OTP —
-  verify user.js custom buttons render and work.
+- ✅ User form buttons from Frappe's own user.js (`e2e/useractions.mjs`): Permissions ▾ (Set User Permissions, View
+  Permitted Documents, View Doctype Permissions), Password ▾ (Change Password, Reset Password), Impersonate prompt,
+  Generate Keys → API Keys dialog, Create User Email.
+- ❌ Impersonation end-to-end (session switch + banner, 2.8), Reset OTP Secret / LDAP reset (need 2FA / LDAP enabled).
 - ❌ Backups page, scheduler / RQ job status (RQ Job, RQ Worker virtual doctypes), Recorder UI, Error Log viewer
   with traceback formatting, Log settings.
 - ❌ OAuth / Connected Apps flows, Email Account setup messages (OAuth authorize buttons), Social Login Keys.

@@ -85,6 +85,13 @@ Newest entries on top. Each session: append what was done, what's verified, what
   `/desk/permissions` and the nav link point there. `frappe.set_route` now maps any Desk route (pages too) and turns
   `frappe.route_options` into `?field=value` (`lib/navigation/deskRoute.ts`, shared with the legacy host).
   Verified by `e2e/permissions.mjs` (custom DocType; Custom DocPerm rows outlive a deleted DocType → cleanup).
+- `docs/GAPS.md` section 2 rewritten as a full inventory of Frappe v16's desk frontend + ERPNext scripted UIs
+  (2.1–2.14, with source paths and an order of work).
+- User form actions: Frappe's user.js aborted at `has_common` (undefined global) so only Impersonate showed. Fixed
+  generally — Desk namespaces and field objects are lenient, unknown constructors return no-op objects — plus real
+  shims (change-password dialog, get_single_value, defaults.is_enabled, downloadify, copy_to_clipboard,
+  dialog.show_message, set_data). Button fields now trigger their form event (Generate Keys); Escape closes script
+  dialogs; descriptions render HTML. `e2e/useractions.mjs`; full suite 30/30.
 
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
@@ -129,7 +136,7 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. User Permission flows, Reset Password / Login Link buttons, slug routes in set_route
+1. User Permissions UX, Session Defaults dialog, impersonation banner, slug routes in set_route
 2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor

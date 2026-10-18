@@ -72,6 +72,16 @@ export default function DialogHost() {
   useEffect(() => {
     for (const d of dialogStore.get()) d.hide();
   }, [pathname]);
+  // Escape closes the topmost dialog, like Desk's bootstrap modals (static dialogs stay open)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const top = dialogStore.get().at(-1);
+      if (top && !top.opts.static) top.hide();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <>
       {dialogs.map((d) => (

@@ -129,6 +129,15 @@ export class DeskDialog {
     if (field) (field.df as Record<string, unknown>)[prop] = v;
     this.touch();
   }
+  /** Desk: a coloured message strip above the fields */
+  show_message(message: string) {
+    this.opts.message = message;
+    this.touch();
+  }
+  clear_message() {
+    this.opts.message = undefined;
+    this.touch();
+  }
   disable_primary_action() {}
   enable_primary_action() {}
   /** Desk returns null (and highlights fields) when mandatory values are missing */
