@@ -126,7 +126,9 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
   MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
 - ❌ Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
-- ❌ Data `options` validation: Email, Name, Phone, URL, IBAN, Barcode — with Desk's inline messages.
+- ✅ Data `options` validation (`lib/trevo-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
+  Phone, URL, Name — red field + message, `aria-invalid`; native email/tel/url inputs — `e2e/datavalidation.mjs`
+  (agent-built, judged). IBAN: Desk has no client check either.
 - ❌ Link: `show_title_field_in_link` (title shown instead of name), "Create a new X" + "Advanced search" in the
   dropdown (`link_selector`), link hover preview card (`ui/link_preview.js`, `components/hover_card.js`), filters
   description under the field, `ignore_user_permissions`.
