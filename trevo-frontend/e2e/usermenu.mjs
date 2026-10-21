@@ -13,8 +13,13 @@ const company = (await post("frappe.client.get_list", { doctype: "Company", fiel
 const original = (await sessionDefaults()).find((f) => f.fieldname === "company")?.default ?? "";
 const originalTheme = (await post("frappe.client.get_value", { doctype: "User", filters: "Administrator", fieldname: "desk_theme" }))?.desk_theme ?? "Light";
 const openMenu = async () => {
-  await page.getByRole("button", { name: "User menu" }).click().catch(() => page.getByLabel("User menu").click());
-  await page.getByRole("menuitem", { name: "Log out" }).waitFor({ timeout: 10000 });
+  const logout = page.getByRole("menuitem", { name: "Log out" });
+  // the shell can still be hydrating right after a navigation: click again if the menu didn't open
+  for (let i = 0; i < 2; i++) {
+    await page.getByLabel("User menu").click();
+    if (await logout.waitFor({ timeout: 15000 }).then(() => true, () => false)) return;
+  }
+  await logout.waitFor({ timeout: 5000 });
 };
 
 step("menu items");

@@ -114,6 +114,11 @@ Newest entries on top. Each session: append what was done, what's verified, what
   the site's format. Found + fixed: `/api/desk/context` and `/api/desk/shell` were browser-cached 30–60 s, so a
   settings change (or Reload) showed stale formats → `no-store`. System Settings can't be saved with an empty
   language (test sets "en"). `e2e/formats.mjs`; full suite 32/32.
+- Form dashboard: `lib/form/dashboard.ts` models Desk's dashboard.js + layout.show_message (headlines with colour /
+  permanent / dismiss, add_comment 10 s expiry, set_intro replacing its own, indicators, progress, add_section with
+  a real DOM node), reset + headlines cleared at the start of every refresh (FormController.runLoadEvents).
+  `components/form/FormDashboard.tsx` renders it (headline HTML sanitized); DocForm adds Desk's submit message.
+  `e2e/dashboard.mjs`; usermenu's menu-open helper retries once (hydration timing late in a full run); 33 suites.
 
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
@@ -158,7 +163,7 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. `frm.dashboard` / set_intro / headline, then ERPNext form widgets (Address & Contact, stock levels, serial/batch, ledger preview)
+1. ERPNext form widgets: Address & Contact cards, Item stock levels, serial/batch selector, ledger preview
 2. User Permissions UX, impersonation banner
 2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 

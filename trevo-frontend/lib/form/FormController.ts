@@ -10,11 +10,12 @@
  *  - trigger(event): awaits async handlers; frappe.throw or
  *    frappe.validated = false inside validate/before_save aborts the save
  *  - df overrides (set_df_property / toggle_*), set_query, custom buttons,
- *    intro, dashboard indicators — read by the view
+ *    dashboard (headlines / intro, indicators, progress, sections) — read by the view
  *  - mandatory validation incl. child rows ("Row #2: Item Code")
  *  - `frm` object handed to scripts (Desk's API surface)
  */
 import { toast } from "sonner";
+import { FormDashboard, type DashboardState } from "@/lib/form/dashboard";
 import { createRuntime, flt, lenient, type Runtime, type RuntimeContext, NOOP } from "@/lib/desk-runtime";
 import { deskCall, isNewDoc, type Doc } from "@/lib/frappe/form";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
@@ -37,7 +38,8 @@ export interface FormSnapshot {
   dirty: boolean;
   overrides: Record<string, Record<string, unknown>>;
   buttons: CustomButton[];
-  intro: { message: string; color: string } | null;
+  /** frm.dashboard / set_intro / layout.show_message output */
+  dashboard: DashboardState;
   errors: Record<string, string>;
   version: number;
 }
@@ -65,7 +67,12 @@ export class FormController {
   private dirty = false;
   private overrides: Record<string, Record<string, unknown>> = {};
   private buttons: CustomButton[] = [];
-  private intro: FormSnapshot["intro"] = null;
+  /** frm.dashboard (lib/form/dashboard.ts) */
+  readonly dash: FormDashboard = new FormDashboard(
+    () => this.emit(),
+    (el?: unknown) => (this.runtime.globals.$ as (el?: unknown) => unknown)(el),
+  );
+  private introHandle: { remove: () => void } | undefined;
   private errors: Record<string, string> = {};
   private version = 0;
   private listeners = new Set<() => void>();
@@ -103,7 +110,7 @@ export class FormController {
   };
   snapshot = (): FormSnapshot => {
     if (!this.snap) {
-      this.snap = { doc: this.doc, dirty: this.dirty, overrides: this.overrides, buttons: this.buttons, intro: this.intro, errors: this.errors, version: this.version };
+      this.snap = { doc: this.doc, dirty: this.dirty, overrides: this.overrides, buttons: this.buttons, dashboard: this.dash.state, errors: this.errors, version: this.version };
     }
     return this.snap;
   };
@@ -601,16 +608,7 @@ export class FormController {
         btn_primary: { removeClass() {}, addClass() {}, html() {} },
         wrapper: { find: () => ({ length: 0 }) },
       }),
-      dashboard: {
-        add_indicator: () => {},
-        set_headline: (html: string) => self.setIntro(html, "blue"),
-        set_headline_alert: (html: string) => self.setIntro(html, "blue"),
-        clear_headline: () => self.setIntro("", ""),
-        add_comment: () => {},
-        refresh: () => {},
-        add_section: () => {},
-        stats_area: { removeClass() {}, addClass() {} },
-      },
+      dashboard: lenient(self.dash.api(), false),
       timeline: { insert_comment() {} },
       sidebar: { add_user_action() {} },
       set_value: (f: string | Record<string, unknown>, v?: unknown) => self.set_value(f, v),
@@ -650,7 +648,11 @@ export class FormController {
       },
       clear_custom_buttons: () => self.clearButtons(),
       change_custom_button_type: () => {},
-      set_intro: (msg: string, color?: string) => self.setIntro(msg, color ?? "blue"),
+      // Desk: replaces the intro this form set before (other headlines stay)
+      set_intro: (msg: string, color?: string) => {
+        self.introHandle?.remove();
+        self.introHandle = msg ? (self.dash.api().set_headline_alert as (t: string, c?: string) => { remove: () => void })(msg, color) : undefined;
+      },
       add_child: (table: string, values?: Record<string, unknown>) => {
         const row = self.makeRow(table, values);
         const rows = [...((self.doc[table] as Row[]) ?? []), row];
@@ -692,7 +694,7 @@ export class FormController {
       has_perm: () => true,
       email_doc: () => {},
       print_doc: () => {},
-      layout: { refresh_sections() {} },
+      layout: { refresh_sections() {}, show_message: (html?: string, color?: string, permanent?: boolean) => self.dash.showMessage(html, color, permanent) },
       perm: [{ read: 1, write: 1, create: 1, submit: 1, cancel: 1, delete: 1 }],
       toolbar: { refresh() {} },
       events: {},
@@ -751,10 +753,6 @@ export class FormController {
     ];
     this.emit();
   }
-  private setIntro(message: string, color: string) {
-    this.intro = message ? { message, color } : null;
-    this.emit();
-  }
 
   /** Evaluate the DocType's app JS + Client Scripts so their handlers register */
   loadScripts() {
@@ -770,6 +768,10 @@ export class FormController {
   /** Desk's load sequence: setup → onload → refresh → onload_post_render */
   async runLoadEvents(first: boolean) {
     this.buttons = [];
+    // Desk refresh_header: layout.show_message() + dashboard.refresh() before the refresh handlers
+    this.dash.reset();
+    this.dash.clearHeadlines();
+    this.introHandle = undefined;
     if (first) {
       await this.trigger("setup");
       await this.trigger("onload");

@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (32 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (33 today, all passing).
 
 ---
 
@@ -73,9 +73,11 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   shortcuts (Ctrl+S/B/P…), workflow actions, realtime (doc_update, viewers), route_options, Get Items From
   (MultiSelectDialog), rename / links / remind / copy / customize / edit DocType in the menu, print, email.
 - ✅ L2 script DOM: real jQuery; HTML fields are real nodes (`$wrapper.html()`, `.find().on()`, set_df_property options).
-- ❌ `frm.dashboard` (`form/dashboard.js`): `add_indicator`, `add_progress`, `add_comment`, `add_section`,
-  `set_headline` / `set_headline_alert` (`frm.set_intro` too), heatmap, stats per link, `frm.dashboard.refresh`.
-  Today these are NOOPs — ERPNext uses them on Customer, Supplier, Item, Project, Sales Order (billing / delivery %).
+- ✅ `frm.dashboard` (`lib/form/dashboard.ts`, `components/form/FormDashboard.tsx`): headlines (`set_headline`,
+  `set_headline_alert`, `add_comment` expiring after 10 s, `frm.set_intro` replacing its own, `layout.show_message`,
+  colours, dismiss), `add_indicator`, `add_progress` / `show_progress` / `hide_progress`, `add_section` (a real node for
+  jQuery), reset on every refresh, Desk's "Submit this document to confirm" — `e2e/dashboard.mjs`.
+- ❌ Dashboard heatmap (`timeline_data` from `get_open_count`) and graph (`data.graph_method`).
 - ❌ `frm.page.body`, `frm.layout.wrapper`, `frm.toolbar` containers for scripts (L2 for the rest of the page).
 - ❌ Form toolbar extras (`toolbar.js`): previous / next document (`frappe.desk.form.utils.get_next`), indicator
   click actions, title editing for `title_field`, star/like in the header, "Jump to field" (Ctrl+J), `frm.page.add_menu_item`

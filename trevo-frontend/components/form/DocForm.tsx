@@ -29,6 +29,7 @@ import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
 import { getHtmlWidget } from "@/components/form/widgets";
 import HtmlHost from "@/components/form/HtmlHost";
+import FormDashboard, { FormHeadlines } from "@/components/form/FormDashboard";
 import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
@@ -601,9 +602,13 @@ export default function DocForm({ doctype, name }: Props) {
           </button>
         </div>
       )}
-      {snap.intro?.message && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200" dangerouslySetInnerHTML={{ __html: snap.intro.message }} />
-      )}
+      <FormHeadlines
+        state={snap.dashboard}
+        onDismiss={(id) => ctl.dash.removeHeadline(id)}
+        // Desk show_submit_message: a saved, clean draft of a submittable doctype without a workflow
+        extra={meta.is_submittable && can("submit") && !snap.dirty && !isNew && !workflow && docstatus === 0 ? [{ key: "submit", html: "Submit this document to confirm", color: "blue" }] : undefined}
+      />
+      <FormDashboard state={snap.dashboard} />
       {docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
