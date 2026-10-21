@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (30 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (31 today, all passing).
 
 ---
 
@@ -59,7 +59,7 @@ Pages) and ERPNext's scripted UIs (`erpnext/public/js/**`), audited 2026-10-18. 
 sources to transcribe from. Every ❌ is something a Desk user can do today that Trevo can't.
 
 **Order of work (impact on daily use):**
-1. Users track: User Permissions UX (2.12), Session Defaults + impersonation banner (2.8), slug routes.
+1. Users track: User Permissions UX (2.12), impersonation banner (2.8).
 2. Formatting from settings (2.3 — number systems, precision, date/time formats, time zone).
 3. `frm.dashboard` / `set_intro` / headline (2.1) and the ERPNext form widgets (2.11: address & contact, stock
    levels, serial/batch selector, ledger preview).
@@ -96,6 +96,7 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   `frappe.ui.show_change_password_dialog`, `frappe.db.get_single_value`, `frappe.defaults.is_enabled`,
   `frappe.tools.downloadify`, `frappe.utils.copy_to_clipboard`, `dialog.show_message`, `control.set_data`; Escape closes
   script dialogs; `set_route(..., {options})`.
+- ✅ Singles open their form from the list route (Desk router); `/desk/system-health-report` → the single.
 - 🟡 Virtual / Single DocTypes rendered read-only like Desk (System Health Report).
 - 🟡 `frappe.ui.Dialog` from scripts (`ui/dialog.js`, `ui/field_group.js`): fields render through FormBody — verify
   Table fields with `data` / `get_data`, HTML fields with `$wrapper`, `fields_dict.x.grid`, `set_query` / `get_query`,
@@ -195,10 +196,15 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ❌ Awesomebar extras (`awesome_bar.js`, `search_utils.js`): calculator, "New X", "Search for X in DocType", tag
   search (`#tag`), help articles, recent items ranking (`fuzzy_match.js`), global search results page
   (`frappe.utils.global_search.search`).
-- ❌ Slug routes: `set_route("/app/sales-invoice/new")`, `/app/<slug>` links in HTML — needs boot's slug → DocType map.
-- ❌ Navbar user menu (`toolbar.js`, `navbar.html`): My Settings, Session Defaults dialog (company / fiscal year per
-  session — ERPNext relies on it), Toggle Full Width, Toggle Theme (Light/Dark/Automatic saved to `User.desk_theme`),
-  Reload, View Website, Apps switcher (`/apps`), About dialog (`about.js`), Help dropdown (`help_links.js`).
+- ✅ Desk URLs resolved like Desk's router (`app/(desk)/desk/[slug]`, `resolveDeskPath`): shell prefix, workspace
+  slug, DocType slug (list / `view/x` / `new` / record), standard routes (`List/User`), else Desk Page; query kept.
+  Used by pasted Desk links, Navbar Settings routes and `frappe.set_route("/app/…")` (`e2e/usermenu.mjs`).
+- ✅ User menu (`ui/sidebar/sidebar_header.js`): My Settings, Session Defaults dialog (saved via
+  `set_session_default_values`, boot cache cleared), Reload (`clear_cache`), View Website, Apps, About (`about.js`),
+  Navbar Settings rows (settings_dropdown / help_dropdown, conditions + actions run in the desk runtime via
+  `frappe.utils.eval`), theme saved to `User.desk_theme` (`switch_theme`) — `e2e/usermenu.mjs`.
+- ❌ Toggle Full Width, Apps switcher page (`/apps`), initial theme from `boot.user.desk_theme` on a new device,
+  "Edit Sidebar" item.
 - ❌ v16 user settings dialog (`user_settings_dialog.bundle.js`, `ui/settings_dialog.js`): Profile, Email signature +
   options, Appearance, Language, Notifications, API access.
 - ❌ Site banners (`ui/site_banners.js`): read-only mode, impersonation ("Impersonating X — Stop").
@@ -275,7 +281,9 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ React Doctor warnings (~110); split DocForm/ListView further.
 - ❌ Virtualized lists and report grids for large data.
 - ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
-- ❌ Mobile layouts, keyboard-only pass, a11y labels everywhere.
+- ❌ Mobile layouts, keyboard-only pass, a11y labels everywhere (✅ dialogs are now named by their title).
+- ❌ Shared `Dialog` caps every dialog at max-w-lg (DialogContent's `max-w-*` is stripped) — wide dialogs
+  (email composer, report pickers) need the panel width to follow the content.
 - ❌ Error reporting parity: server tracebacks in a collapsible dialog for System Managers (Desk shows them).
 
 ### Out of scope (Frappe Cloud / dev-only)

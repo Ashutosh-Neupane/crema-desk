@@ -54,6 +54,10 @@ export default function ListView({ doctype }: { doctype: string }) {
   const params = useSearchParams();
   const qc = useQueryClient();
   const { data: meta, isLoading: metaLoading, error: metaError } = useDoctype(doctype);
+  // a Single has no list: Desk's router opens its only document (router.set_doctype_route)
+  useEffect(() => {
+    if (meta?.issingle) router.replace(`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(doctype)}`);
+  }, [meta?.issingle, doctype, router]);
   const { data: ctx } = useDeskContext();
   const settings = useListSettings(meta);
 
@@ -126,13 +130,13 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   const rowsQuery = useQuery<Row[]>({
     queryKey: ["list", doctype, fetchFields, allFilters, sort, pageLength],
-    enabled: !!meta && settings !== undefined,
+    enabled: !!meta && !meta.issingle && settings !== undefined,
     queryFn: () => fetchRows({ doctype, fields: fetchFields, filters: allFilters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength }),
     placeholderData: keepPreviousData,
   });
   const countQuery = useQuery({
     queryKey: ["list-count", doctype, allFilters],
-    enabled: !!meta,
+    enabled: !!meta && !meta.issingle,
     queryFn: () => fetchCount(doctype, allFilters),
   });
 
@@ -199,6 +203,7 @@ export default function ListView({ doctype }: { doctype: string }) {
     [doctype, router],
   );
 
+  if (meta?.issingle) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
   if (metaError) return <p className="p-6 text-sm text-red-600">{(metaError as Error).message}</p>;
   if (metaLoading || !meta) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
 

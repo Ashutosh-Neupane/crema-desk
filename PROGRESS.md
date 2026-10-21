@@ -93,6 +93,19 @@ Newest entries on top. Each session: append what was done, what's verified, what
   dialog.show_message, set_data). Button fields now trigger their form event (Generate Keys); Escape closes script
   dialogs; descriptions render HTML. `e2e/useractions.mjs`; full suite 30/30.
 
+## 2026-10-21 — session 3: user menu, Desk URLs (audit of uncommitted work + completion)
+- Picked up uncommitted user-menu work (Session Defaults + About dialogs, /api/desk/shell, boot cache clear) and
+  finished it: menu moved to `components/desk/UserMenu.tsx`; Navbar Settings conditions/actions now run in the desk
+  runtime (new `runtime.evalExpr` = `frappe.utils.eval`; `frappe.ui.toolbar.show_about/setup_session_defaults/
+  clear_cache/show_shortcuts` wired); duplicate About removed; internal routes use the router; View Website goes
+  to the bench; dialogs load through react-query (lint); theme saved to `User.desk_theme`.
+- Desk URL resolver: `resolveDeskPath` + `app/(desk)/desk/[slug]/[[...rest]]` (shell → workspace → DocType slug
+  → standard route → Desk Page, from boot can_read / workspaces / module_sidebars). `frappe.set_route` sends unknown
+  routes there.
+- Singles redirect from list to form; the shared Dialog is named by its title (aria-labelledby/-describedby) —
+  bulk.mjs locator scoped accordingly.
+- `e2e/usermenu.mjs`; full suite 31/31.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)
@@ -136,7 +149,8 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. User Permissions UX, Session Defaults dialog, impersonation banner, slug routes in set_route
+1. Formatting from settings (number systems, precision, date/time, time zone) — highest impact
+2. User Permissions UX, impersonation banner
 2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 
 ## 2026-10-16 — session 1 (cont. 2): Desk engine, Sales Order parity, React Doctor

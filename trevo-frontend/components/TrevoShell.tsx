@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/frappe/auth";
@@ -11,6 +11,8 @@ import DeskSidebar from "@/components/DeskSidebar";
 import DialogHost from "@/components/desk/DialogHost";
 import MultiSelectHost from "@/components/desk/MultiSelectHost";
 import ShortcutsDialog from "@/components/desk/ShortcutsDialog";
+import UserMenu from "@/components/desk/UserMenu";
+import { deskCall } from "@/lib/frappe/form";
 import { useShortcuts } from "@/lib/shortcuts";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,7 +23,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import type { DeskNavigation } from "@/lib/navigation";
@@ -31,7 +32,6 @@ import {
   Monitor,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut,
   Home,
   FileText,
   BarChart3,
@@ -53,9 +53,6 @@ import {
   Settings2,
   Globe,
   Layout,
-  ChevronDown,
-  User,
-  Lock,
   Users,
   ScrollText,
   StickyNote,
@@ -262,10 +259,16 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
   const { data: navigation } = useNavigation();
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const realtimeStatus = useRealtimeStatus();
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
+  // Desk saves the choice on the user (User.desk_theme) so it follows them across devices
+  const pickTheme = (t: "light" | "dark" | "system") => {
+    setTheme(t);
+    setThemeMenuOpen(false);
+    void deskCall("frappe.core.doctype.user.user.switch_theme", { theme: t === "system" ? "Automatic" : t === "dark" ? "Dark" : "Light" }).catch(() => undefined);
+  };
   const queryClient = useQueryClient();
   // Desk's global shortcuts (frappe/public/js/frappe/ui/keyboard.js, desk.js, sidebar.js)
   useShortcuts(
@@ -363,19 +366,19 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <button
-                  onClick={() => setTheme("light")}
+                  onClick={() => pickTheme("light")}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
                 >
                   <Sun className="mr-1 h-4 w-4" /> Light
                 </button>
                 <button
-                  onClick={() => setTheme("dark")}
+                  onClick={() => pickTheme("dark")}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
                 >
                   <Moon className="mr-1 h-4 w-4" /> Dark
                 </button>
                 <button
-                  onClick={() => setTheme("system")}
+                  onClick={() => pickTheme("system")}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700 text-left"
                 >
                   <Monitor className="mr-1 h-4 w-4" /> System
@@ -385,49 +388,8 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
 
             <NotificationsPanel />
 
-            {/* User menu */}
-            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-              <DropdownMenuTrigger>
-                <span className="flex items-center gap-1.5 rounded-lg p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                    {(user?.full_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="border-b border-zinc-200 px-3 py-2 dark:border-zinc-700">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {user?.full_name || user?.email || "User"}
-                  </div>
-                  <div className="truncate text-xs text-zinc-500">{user?.email}</div>
-                </div>
-                <div className="py-1">
-                  <DropdownMenuItem>
-                    <Link href="/desk/profile" className="flex items-center gap-2">
-                      <User className="h-4 w-4" /> Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/desk/update-password" className="flex items-center gap-2">
-                      <Lock className="h-4 w-4" /> Change Password
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/desk/settings" className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" /> Settings
-                    </Link>
-                  </DropdownMenuItem>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => logout()}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <LogOut className="h-4 w-4" /> Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* User menu (Desk v16 sidebar_header.js + Navbar Settings rows) */}
+            <UserMenu fullName={user?.full_name} email={user?.email} onLogout={() => void logout()} onShortcuts={openShortcuts} />
           </div>
         </div>
       </header>

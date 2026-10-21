@@ -89,6 +89,12 @@ export function parseBootFromHtml(html: string): DeskBoot | null {
   }
 }
 
+/** Drop a session's cached boot so the next read re-fetches /desk (Desk: `frappe.sessions.clear` then reload). */
+export function clearDeskBootCache(sid?: string): void {
+  if (sid) cache.delete(sid);
+  else cache.clear();
+}
+
 export async function getDeskBoot(cookieHeader: string): Promise<DeskBoot | null> {
   const sid = sidFromCookie(cookieHeader);
   if (!sid) return null;

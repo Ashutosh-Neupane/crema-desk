@@ -52,7 +52,7 @@ for (const n of names) {
 step("Add Tags");
 await openList();
 await page.getByRole("menuitem", { name: "Add Tags" }).click();
-await page.getByLabel("Tags").fill(`trevo-${tag.toLowerCase()}`);
+await page.getByRole("dialog").getByRole("textbox", { name: "Tags" }).fill(`trevo-${tag.toLowerCase()}`);
 await page.getByRole("dialog").getByRole("button", { name: "Add" }).click();
 await page.waitForTimeout(2500);
 for (const n of names) {

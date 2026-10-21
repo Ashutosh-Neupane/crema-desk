@@ -190,6 +190,8 @@ export interface Runtime {
   globals: Record<string, unknown>;
   /** Evaluate app/client JS; errors are caught and reported, never thrown */
   evalScript: (code: string, label: string) => boolean;
+  /** Evaluate a JS expression in the runtime scope (Desk: frappe.utils.eval); `eval:` prefix allowed. Errors → undefined */
+  evalExpr: (expr: string, label?: string) => unknown;
 }
 
 export function createRuntime(ctx: RuntimeContext): Runtime {
@@ -473,5 +475,18 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     }
   };
 
-  return { frappe: globals.frappe as Runtime["frappe"], globals, evalScript };
+  const evalExpr = (expr: string, label = "expression") => {
+    const code = String(expr ?? "").replace(/^\s*eval:\s*/, "").trim();
+    if (!code) return undefined;
+    try {
+      // eslint-disable-next-line no-new-func
+      return new Function("__scope", `with (__scope) { return (${code}\n); }`)(scope); // react-doctor-disable-line no-eval
+    } catch (err) {
+      console.warn(`[desk-runtime] ${label} failed:`, err);
+      return undefined;
+    }
+  };
+  (frappe.utils as Record<string, unknown>).eval = (code: string) => evalExpr(code, "frappe.utils.eval");
+
+  return { frappe: globals.frappe as Runtime["frappe"], globals, evalScript, evalExpr };
 }
