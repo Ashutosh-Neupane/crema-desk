@@ -185,8 +185,11 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 
 ### 2.6 Reports (`views/reports/query_report.js`, `report_view.js`, `report_utils.js`)
 - ✅ Query/Script reports (filters, formatter, tree, totals, chart, summary, prepared reports), Report Builder.
-- ❌ Save a Query Report as a custom report (`save_report`), report PDF (`frappe.utils.print_format.report_to_pdf`),
-  print grid templates (`print_grid.html`, `print_tree.html`), CSV/Excel export options dialog (with/without
+- ✅ Query Report "Save As" (`save_report` → Custom Report; saved filters/columns restored via `are_default_filters`
+  + `custom_filters`; custom reports run their reference report's JS) and "PDF" (orientation / include filters /
+  pick columns → print_grid HTML → `report_to_pdf`) — `e2e/reportsave.mjs` (agent-built, judged).
+- ❌ Report PDF with Print Format / Letter Head, report `get_pdf_format` / `html_format`, print.bundle.css styling,
+  Print (`frappe.render_grid`), print_tree.html, CSV/Excel export options dialog (with/without
   indentation), "Setup Auto Email" from the menu, "Add to Workspace", column reorder/resize persistence, "Pick
   columns" / custom columns from linked doctypes, report link side panel.
 - ❌ ERPNext report helpers loaded by report JS: `erpnext.financial_statements` (formatter, tree, period selection),

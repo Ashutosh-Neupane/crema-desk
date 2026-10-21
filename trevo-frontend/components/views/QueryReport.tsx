@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BarChart3, ChevronDown, ChevronRight, Download, Loader2, RefreshCw, Search, Settings2, X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Download, FileText, Loader2, RefreshCw, Save, Search, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createRuntime, lenient } from "@/lib/desk-runtime";
 import { deskCall } from "@/lib/frappe/form";
@@ -30,7 +30,9 @@ import {
   type ReportColumn,
   type ReportRow,
 } from "@/lib/report/columns";
+import { buildReportHtml, downloadReportPdf } from "@/lib/report/printGrid";
 import { formatValue } from "@/lib/utils/formatNumber";
+import { PdfSettingsDialog, SaveReportDialog, type PdfSettings } from "@/components/views/ReportDialogs";
 
 interface ReportFilter {
   fieldname: string;
@@ -92,6 +94,9 @@ export default function QueryReport({ name }: { name: string }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [refDoctype, setRefDoctype] = useState<string | undefined>();
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [reportDoc, setReportDoc] = useState<{ report_type?: string; reference_report?: string; is_standard?: string }>({});
+  // Desk refresh(have_filters_changed): saved Custom Report filters apply only while the user hasn't edited filters
+  const changedRef = useRef(false);
 
   const setFilterValues = useCallback((patch: Record<string, unknown>) => {
     valuesRef.current = { ...valuesRef.current, ...patch };
@@ -104,17 +109,19 @@ export default function QueryReport({ name }: { name: string }) {
     let cancelled = false;
     Promise.all([
       deskCall("frappe.desk.query_report.get_script", { report_name: name }),
-      deskCall("frappe.client.get_value", { doctype: "Report", filters: { name }, fieldname: ["report_type", "ref_doctype"] }).catch(() => null),
+      deskCall("frappe.client.get_value", { doctype: "Report", filters: { name }, fieldname: ["report_type", "ref_doctype", "reference_report", "is_standard"] }).catch(() => null),
     ])
       .then(([s, meta]) => {
         if (cancelled) return;
         const m = (s.env.message ?? {}) as { script?: string; filters?: ReportFilter[] };
-        const info = (meta?.env.message ?? {}) as { report_type?: string; ref_doctype?: string };
+        const info = (meta?.env.message ?? {}) as { report_type?: string; ref_doctype?: string; reference_report?: string; is_standard?: string };
         if (info.report_type === "Report Builder" && info.ref_doctype) {
           router.replace(`/desk/doctype/${enc(info.ref_doctype)}/view/report/${enc(name)}`);
           return;
         }
-        const qs = buildSettings(name, m, ctx, { valuesRef, resultRef, setFilterValues, setRunToken, setInnerButtons });
+        // Desk get_local_report_settings: a Custom Report runs the script of its reference report
+        const scriptName = info.report_type === "Custom Report" && info.reference_report ? info.reference_report : name;
+        const qs = buildSettings(name, scriptName, m, ctx, { valuesRef, resultRef, setFilterValues, setRunToken, setInnerButtons });
         const init: Record<string, unknown> = {};
         for (const f of qs.filters ?? []) {
           if (f.default != null && f.default !== "" && typeof f.default !== "function") init[f.fieldname] = f.default;
@@ -124,6 +131,8 @@ export default function QueryReport({ name }: { name: string }) {
         setValues(init);
         setInnerButtons([]);
         setRefDoctype(info.ref_doctype);
+        setReportDoc(info);
+        changedRef.current = false;
         setSettings(qs);
         try {
           qs.onload?.(qs.__report);
@@ -161,9 +170,16 @@ export default function QueryReport({ name }: { name: string }) {
         report_name: name,
         filters: JSON.stringify(cleanFilters(valuesRef.current)),
         ignore_prepared_report: 0,
-        are_default_filters: false,
+        are_default_filters: !changedRef.current,
       });
       const m = (env.message ?? {}) as Record<string, unknown>;
+      // Custom Report: the server swaps in the saved filters on an unmodified run; show them (Desk set_filters)
+      const saved = m.custom_filters as Record<string, unknown> | undefined;
+      if (saved && typeof saved === "object" && !changedRef.current) {
+        changedRef.current = true;
+        valuesRef.current = { ...valuesRef.current, ...saved };
+        setValues(valuesRef.current);
+      }
       if (m.prepared_report) {
         const doc = m.doc as { status?: string; name?: string } | null;
         setPrepared(doc ?? {});
@@ -218,6 +234,7 @@ export default function QueryReport({ name }: { name: string }) {
   }, []);
 
   const changeFilter = (f: ReportFilter, v: unknown) => {
+    changedRef.current = true;
     setFilterValues({ [f.fieldname]: v });
     if (f.on_change) {
       try {
@@ -348,6 +365,66 @@ export default function QueryReport({ name }: { name: string }) {
     URL.revokeObjectURL(url);
   };
 
+  // ── Save As / PDF (Desk menu: Save, PDF) ───────────────────────────────────
+  const isReportManager = !!ctx && (ctx.user === "Administrator" || ctx.roles.includes("System Manager") || ctx.roles.includes("Report Manager"));
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const saveReport = async (reportName: string) => {
+    setBusy(true);
+    try {
+      // Desk posts form-encoded JSON strings (the server embeds them into Report.json verbatim)
+      const { env } = await deskCall("frappe.desk.query_report.save_report", {
+        reference_report: name,
+        report_name: reportName,
+        columns: JSON.stringify(columns),
+        filters: JSON.stringify(cleanFilters(valuesRef.current)),
+      });
+      setSaveOpen(false);
+      toast.success(`${String(env.message)} saved successfully`);
+      router.push(`/desk/query-report/${enc(String(env.message))}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save report");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pdfReport = async (s: PdfSettings) => {
+    if (!result) return;
+    setBusy(true);
+    try {
+      const fmt = { currency, dateFormat };
+      const printCols = s.columns ? columns.filter((c) => s.columns!.includes(c.fieldname)) : columns;
+      const applied = cleanFilters(valuesRef.current);
+      const html = buildReportHtml({
+        title: name,
+        columns: printCols,
+        rows: rows.map((r) => r.row),
+        totals: total,
+        filters: filters.filter((f) => f.fieldname in applied && !SKIP.has(f.fieldtype)).map((f) => ({ label: String(f.label ?? f.fieldname), value: applied[f.fieldname], fieldtype: f.fieldtype })),
+        includeFilters: s.includeFilters,
+        landscape: s.orientation === "Landscape",
+        fmt,
+      });
+      // Desk names the file after the report and its filter values (capped at 200 chars)
+      const parts: string[] = [];
+      let len = 0;
+      for (const v of Object.values(applied)) {
+        len += String(v).length;
+        if (len > 200) break;
+        parts.push(String(v));
+      }
+      await downloadReportPdf(html, s.orientation, `${name}${parts.length ? `_${parts.join("_")}` : ""}.pdf`);
+      setPdfOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed", { duration: 10000 });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loadErr) return <div className="p-6 text-sm text-red-600">{loadErr}</div>;
 
   return (
@@ -383,6 +460,14 @@ export default function QueryReport({ name }: { name: string }) {
         <button type="button" onClick={exportCsv} disabled={!shown?.rows.length} className="inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 gap-1.5 border border-zinc-200 bg-white px-3 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800">
           <Download className="h-4 w-4" aria-hidden /> Export
         </button>
+        <button type="button" onClick={() => setPdfOpen(true)} disabled={!shown?.rows.length} className="inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 gap-1.5 border border-zinc-200 bg-white px-3 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800">
+          <FileText className="h-4 w-4" aria-hidden /> PDF
+        </button>
+        {isReportManager && (
+          <button type="button" onClick={() => setSaveOpen(true)} disabled={!shown} className="inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 gap-1.5 border border-zinc-200 bg-white px-3 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800">
+            <Save className="h-4 w-4" aria-hidden /> Save As
+          </button>
+        )}
         {prepared ? (
           <button type="button" onClick={generatePrepared} className="inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 bg-zinc-900 px-3 text-sm text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
             {prepared.name ? "Rebuild" : "Generate New Report"}
@@ -393,6 +478,9 @@ export default function QueryReport({ name }: { name: string }) {
           </button>
         )}
       </div>
+
+      {saveOpen && <SaveReportDialog open onClose={() => setSaveOpen(false)} defaultName={reportDoc.is_standard === "No" ? name : ""} busy={busy} onSave={(n) => void saveReport(n)} />}
+      {pdfOpen && <PdfSettingsDialog open onClose={() => setPdfOpen(false)} columns={columns} busy={busy} onSubmit={(s) => void pdfReport(s)} />}
 
       {/* filters */}
       {visibleFilters.length > 0 && (
@@ -783,6 +871,7 @@ interface ReportBridge {
 /** Evaluate the report JS with a frappe.query_report object wired to this page */
 function buildSettings(
   name: string,
+  scriptName: string,
   m: { script?: string; filters?: ReportFilter[] },
   ctx: { user: string; full_name: string; roles: string[]; defaults: Record<string, unknown>; sysdefaults: Record<string, unknown>; perms: Record<string, string[]>; developer_mode: boolean; boot?: Record<string, unknown> },
   b: ReportBridge,
@@ -821,7 +910,7 @@ function buildSettings(
   });
   (rt.frappe as Record<string, unknown>).query_report = report;
   rt.evalScript(m.script ?? "", `${name} report js`);
-  const qr = (rt.frappe as unknown as { query_reports: Record<string, Settings> }).query_reports[name] ?? {};
+  const qr = (rt.frappe as unknown as { query_reports: Record<string, Settings> }).query_reports[scriptName] ?? {};
   const filters = [...(qr.filters ?? []), ...(m.filters ?? [])].filter((f) => f?.fieldname);
   return { ...qr, filters, __report: report };
 }
