@@ -17,6 +17,8 @@ export interface DeskContext {
   developer_mode: boolean;
   /** the rest of frappe.boot (party_account_types, current_fiscal_year, …) for app JS */
   boot: Record<string, unknown>;
+  /** boot.docs Desk keeps in locals for formatting (":Currency" symbol/number_format, ":Company" default_currency) */
+  docs: Record<string, Record<string, Record<string, unknown>>>;
 }
 
 // large or Desk-shell-only keys that app JS never reads
@@ -38,6 +40,12 @@ export async function GET() {
     ),
     developer_mode: !!boot?.developer_mode,
     boot: Object.fromEntries(Object.entries((boot ?? {}) as Record<string, unknown>).filter(([k]) => !HEAVY_BOOT_KEYS.has(k))),
+    docs: {},
   };
-  return NextResponse.json(ctx, { headers: { "Cache-Control": "private, max-age=60" } });
+  for (const d of (Array.isArray(boot?.docs) ? boot.docs : []) as Array<Record<string, unknown>>) {
+    const dt = String(d.doctype ?? "").replace(/^:/, "");
+    if (dt !== "Currency" && dt !== "Company") continue;
+    (ctx.docs[dt] ??= {})[String(d.name)] = d;
+  }
+  return NextResponse.json(ctx, { headers: { "Cache-Control": "private, no-store" } });
 }

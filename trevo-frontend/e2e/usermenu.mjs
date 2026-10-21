@@ -20,6 +20,8 @@ const openMenu = async () => {
 step("menu items");
 await page.goto(`${BASE}/desk`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await openMenu();
+// site rows (Navbar Settings) arrive with the shell settings, shortly after the page
+await page.getByRole("menuitem", { name: "About", exact: true }).waitFor({ timeout: 20000 });
 for (const item of ["My Settings", "Session Defaults", "Reload", "View Website", "Apps", "About", "System Health", "Log out"]) {
   check(await page.getByRole("menuitem", { name: item, exact: true }).isVisible(), `${item} in the menu`);
 }

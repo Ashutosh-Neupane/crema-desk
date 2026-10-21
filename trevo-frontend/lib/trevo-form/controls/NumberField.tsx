@@ -9,12 +9,11 @@
 import { useState } from "react";
 import type { FieldControlProps } from "./index";
 import { formatCell } from "@/lib/list/format";
+import { flt, getFieldCurrency, getFieldPrecision } from "@/lib/frappe/format";
 
+/** frappe.meta.get_field_currency — the field's currency field, "Company:company:default_currency", or the default */
 export function currencyFor(field: FieldControlProps["field"], doc?: Record<string, unknown>): string | undefined {
-  const opt = typeof field.options === "string" ? field.options : "";
-  if (opt && doc && typeof doc[opt] === "string") return doc[opt] as string;
-  if (opt.includes(":")) return (doc?.company_currency as string) || (doc?.currency as string) || undefined;
-  return (doc?.currency as string) || undefined;
+  return getFieldCurrency(field, doc, (doc?.currency as string) || undefined);
 }
 
 export default function NumberField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
@@ -25,10 +24,11 @@ export default function NumberField({ field, inputId, value, onChange, disabled,
 
   const commit = () => {
     if (editing === null) return;
-    const raw = editing.trim().replace(/,/g, "");
+    const raw = editing.trim();
     setEditing(null);
-    const next = raw === "" ? null : field.fieldtype === "Int" ? Math.trunc(Number(raw)) : Number(raw);
-    if (next !== num && !(next !== null && Number.isNaN(next))) onChange(next);
+    // Desk's control.parse: groups stripped per the site's number format, rounded to the field's precision
+    const next = raw === "" ? null : field.fieldtype === "Int" ? Math.trunc(flt(raw)) : flt(raw, getFieldPrecision(field, doc));
+    if (next !== num) onChange(next);
   };
 
   if (isDisabled) {

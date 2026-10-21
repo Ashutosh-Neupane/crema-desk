@@ -3,7 +3,7 @@
  *   navbar_settings (settings_dropdown / help_dropdown rows), setup_complete, app_data.
  * The boot (parsed from /desk HTML, cached 30 s per sid) already carries it verbatim.
  *
- * POST /api/desk/shell/clear-cache → the client half of Desk's "Reload"
+ * POST /api/desk/shell {action: "clear-cache"} → the client half of Desk's "Reload"
  * (frappe.ui.toolbar.clear_cache): clear the server's boot cache; the caller
  * drops its react-query caches and reloads.
  */
@@ -21,7 +21,7 @@ export async function GET() {
       // Navbar-row conditions are JS over frappe.boot (eval: frappe.boot.sysdefaults…)
       sysdefaults: boot.sysdefaults ?? null,
     },
-    { headers: { "Cache-Control": "private, max-age=30" } },
+    { headers: { "Cache-Control": "private, no-store" } },
   );
 }
 

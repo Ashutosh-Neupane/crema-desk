@@ -15,6 +15,7 @@ import { MultiSelectDialog } from "./multiSelect";
 import { makeLenientJQuery } from "./jquery";
 import { deskRouteToUrl } from "@/lib/navigation/deskRoute";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
+import * as fmt from "@/lib/frappe/format";
 
 export interface RuntimeContext {
   user: string;
@@ -36,19 +37,9 @@ type Handler = (...args: unknown[]) => unknown;
 export type FormHandlers = Map<string, Map<string, Handler[]>>;
 
 // ── numbers / strings (frappe/public/js/frappe/utils/number_format.js) ──────
-export function flt(v: unknown, precision?: number | null): number {
-  let n: number;
-  if (typeof v === "number") n = v;
-  else {
-    const s = String(v ?? "").replace(/,/g, "").trim();
-    n = s === "" ? 0 : parseFloat(s);
-  }
-  if (!Number.isFinite(n)) n = 0;
-  if (precision != null) {
-    const m = 10 ** precision;
-    n = Math.round((n + Number.EPSILON) * m) / m;
-  }
-  return n;
+/** Desk's flt: strips the site's number groups, rounds with System Settings' rounding method */
+export function flt(v: unknown, precision?: number | null, numberFormat?: string, roundingMethod?: string): number {
+  return fmt.flt(v, precision, numberFormat, roundingMethod);
 }
 export const cint = (v: unknown) => Math.trunc(flt(v)) || 0;
 export const cstr = (v: unknown) => (v == null ? "" : String(v));
@@ -65,8 +56,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const toDate = (v: unknown) => (v instanceof Date ? v : new Date(String(v ?? "").replace(" ", "T").slice(0, 19) || Date.now()));
 
-function makeDatetime(ctx: RuntimeContext) {
-  const fmt = String(ctx.sysdefaults?.date_format ?? "yyyy-mm-dd");
+function makeDatetime(_ctx: RuntimeContext) {
   const dt = {
     get_today: () => ymd(new Date()),
     nowdate: () => ymd(new Date()),
@@ -98,12 +88,12 @@ function makeDatetime(ctx: RuntimeContext) {
     month_end: () => ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)),
     year_start: () => `${new Date().getFullYear()}-01-01`,
     year_end: () => `${new Date().getFullYear()}-12-31`,
-    str_to_user: (s: unknown) => {
-      if (!s) return "";
-      const d = toDate(s);
-      return fmt.replace("yyyy", String(d.getFullYear())).replace("mm", pad(d.getMonth() + 1)).replace("dd", pad(d.getDate()));
-    },
-    user_to_str: (s: unknown) => cstr(s),
+    str_to_user: (s: unknown, onlyTime?: boolean, onlyDate?: boolean) => fmt.strToUser(s, onlyTime, onlyDate),
+    user_to_str: (s: unknown, onlyTime?: boolean) => fmt.userToStr(s, onlyTime),
+    convert_to_user_tz: (s: unknown) => fmt.convertToUserTz(s),
+    convert_to_system_tz: (s: unknown) => fmt.convertToSystemTz(s),
+    get_user_date_fmt: () => fmt.userDateFormat(),
+    get_user_time_fmt: () => fmt.userTimeFormat(),
     comment_when: (s: unknown) => cstr(s),
   };
   return dt;
@@ -329,7 +319,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     meta: {
       get_docfield: (dt: string, fn: string) => getField(dt, fn),
       has_field: (dt: string, fn: string) => !!getField(dt, fn),
-      get_field_precision: (df?: DocField) => (df?.precision ? cint(df.precision) : df?.fieldtype === "Currency" ? 2 : 3),
+      get_field_precision: (df?: DocField, doc?: Record<string, unknown>) => fmt.getFieldPrecision(df ?? {}, doc),
+      get_field_currency: (df?: DocField, doc?: Record<string, unknown>) => fmt.getFieldCurrency(df ?? {}, doc),
       get_label: (dt: string, fn: string) => getField(dt, fn)?.label ?? fn,
     },
     model: {
@@ -382,7 +373,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       toast.error(text.replace(/<[^>]+>/g, ""));
       throw new Error(text);
     },
-    format: (v: unknown) => cstr(v),
+    /** frappe.format(value, df, options, doc) — text, from the site's formats */
+    format: (v: unknown, df?: DocField, options?: Record<string, unknown>, doc?: Record<string, unknown>) =>
+      fmt.formatValue(v, df ?? { fieldtype: "Data" }, doc ?? {}, { always_show_decimals: !!options?.always_show_decimals }),
     get_meta: (dt: string) => metas[dt],
     get_doc: (dt: string, name: string) => ((globals.locals as Record<string, Record<string, unknown>>)?.[dt] ?? {})[name],
     get_list: (dt: string) => Object.values(((globals.locals as Record<string, Record<string, unknown>>)?.[dt] ?? {})),
@@ -432,7 +425,21 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     show_alert: (m: unknown) => (frappe.show_alert as (m: unknown) => void)(m),
     $: makeLenientJQuery(makeJQueryStub, NOOP),
     jQuery: undefined,
-    format_currency: (v: unknown, currency?: string) => `${currency ?? ""} ${flt(v, 2).toLocaleString()}`.trim(),
+    format_currency: (v: unknown, currency?: string, decimals?: number) => fmt.formatCurrency(v, currency, decimals),
+    fmt_money: (v: unknown, currency?: string) => fmt.formatCurrency(v, currency),
+    format_number: (v: unknown, format?: string, decimals?: number) => fmt.formatNumber(v, format, decimals),
+    get_currency_symbol: (currency?: string) => fmt.getCurrencySymbol(currency),
+    get_number_format: (currency?: string) => fmt.getNumberFormat(currency),
+    get_number_format_info: (format?: string) => fmt.getNumberFormatInfo(format),
+    _round: (n: number, p?: number, m?: string) => fmt.round(n, p, m),
+    roundNumber: (n: number, p?: number) => fmt.round(n, p),
+    strip_number_groups: (v: unknown) => fmt.flt(v),
+    // precision(fieldname, doc) — Desk looks the field up on cur_frm's doctype
+    precision: (fieldname: string, doc?: Record<string, unknown>) => {
+      const d = (doc ?? ((globals.cur_frm as { doc?: Record<string, unknown> } | undefined)?.doc ?? {})) as Record<string, unknown>;
+      const df = getField(cstr(d.doctype), fieldname);
+      return df ? fmt.getFieldPrecision(df, d) : cint(ctx.sysdefaults?.float_precision) || 3;
+    },
   });
   globals.jQuery = globals.$;
   // App scripts call ERPNext bundle helpers (erpnext.utils.get_tree_options, …) we don't ship:

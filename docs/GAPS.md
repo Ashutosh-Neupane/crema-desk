@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (31 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (32 today, all passing).
 
 ---
 
@@ -60,7 +60,6 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 
 **Order of work (impact on daily use):**
 1. Users track: User Permissions UX (2.12), impersonation banner (2.8).
-2. Formatting from settings (2.3 — number systems, precision, date/time formats, time zone).
 3. `frm.dashboard` / `set_intro` / headline (2.1) and the ERPNext form widgets (2.11: address & contact, stock
    levels, serial/batch selector, ledger preview).
 4. Lists: sidebar counts, saved layouts, list settings dialog, persisted user settings (2.4).
@@ -131,10 +130,15 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   description under the field, `ignore_user_permissions`.
 - ❌ Camera capture for Attach (`ui/capture.js`) and barcode/QR scanner dialog (`scanner/`, `frappe.ui.Scanner`).
 - ❌ Address autocomplete (`ui/address_autocomplete`, geocoder setting).
-- ❌ Formatting from settings everywhere (`utils/number_format.js`, `number_systems.js`, `datetime.js`):
-  System Settings / Currency `number_format` (`#,##,###.##` Indian/Nepali grouping, `#.###,##`), float/currency
-  precision, `date_format` + `time_format` in lists/reports/grids, user time zone conversion for Datetime,
-  `rounding_method`. Lists currently use `toLocaleString("en")`.
+- ✅ Formatting from settings (`lib/frappe/format.ts` — transcribes `number_format.js`, `form/formatters.js`,
+  `datetime.js`): System Settings / Currency `number_format` (`#,##,###.##` lakh/crore, `#.###,##`, …), currency
+  symbol + `symbol_on_right` from boot `:Currency`, `get_field_currency` (incl. `Company:company:default_currency`),
+  float/currency precision, the three rounding methods (`flt` in site scripts too), `date_format` / `time_format`,
+  Datetime shown in the user's time zone and saved in the system one, typed numbers parsed with the site's format.
+  Lists, reports, grid, kanban, number inputs, `frappe.format`, `format_currency`, `format_number`, `precision()`,
+  `frappe.datetime.*` — `e2e/formats.mjs`.
+- ❌ Number systems for words / `number_systems.js` short forms (lakh/crore abbreviations in charts), Time and
+  Date inputs typed in the user's format (DatePicker shows it; free-typing in other orders), Duration input.
 
 ### 2.4 Lists (`list/list_view.js`, `base_list.js`, `bulk_operations.js`, `list_settings.js`, `list_filter/`)
 - ✅ Filters, standard filters, group-by, sort, paging, count, bulk edit/delete/submit/cancel/print/assign/tags/export,

@@ -105,6 +105,15 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Singles redirect from list to form; the shared Dialog is named by its title (aria-labelledby/-describedby) —
   bulk.mjs locator scoped accordingly.
 - `e2e/usermenu.mjs`; full suite 31/31.
+- Formatting from the site's settings: `lib/frappe/format.ts` (number formats incl. `#,##,###.##`, rounding
+  methods, currency symbol / per-currency format / field currency, precision, date & time formats, system ↔ user
+  time zone without moment). Fed from the desk context (`docs` = boot `:Currency` / `:Company`, `time_zone`) via
+  `setFormatSettings` in useDeskContext. `formatCell` (lists, reports, grid, kanban, number inputs) and the
+  runtime (`flt`, `format_currency`, `format_number`, `frappe.format`, `precision`, `frappe.datetime.*`,
+  `frappe.meta.get_field_precision/currency`) use it; Datetime control converts zones; NumberField parses with
+  the site's format. Found + fixed: `/api/desk/context` and `/api/desk/shell` were browser-cached 30–60 s, so a
+  settings change (or Reload) showed stale formats → `no-store`. System Settings can't be saved with an empty
+  language (test sets "en"). `e2e/formats.mjs`; full suite 32/32.
 
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
@@ -149,7 +158,7 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
   FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
-1. Formatting from settings (number systems, precision, date/time, time zone) — highest impact
+1. `frm.dashboard` / set_intro / headline, then ERPNext form widgets (Address & Contact, stock levels, serial/batch, ledger preview)
 2. User Permissions UX, impersonation banner
 2. `frm.dashboard` / `frm.page.body` containers (indicators, progress, heatmap), Map view, list sidebar + saved filters
 
