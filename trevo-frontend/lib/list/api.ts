@@ -18,13 +18,15 @@ export interface ListQuery {
   orderBy: string;
   start: number;
   pageLength: number;
+  /** Desk skips comment counts when List View Settings has disable_comment_count */
+  withCommentCount?: boolean;
 }
 
 export type Row = Record<string, unknown> & { name: string };
 
 const q = (doctype: string, field: string) => (field.includes("`") || field.includes("(") ? field : `\`tab${doctype}\`.\`${field}\``);
 
-export async function fetchRows({ doctype, fields, filters, orderBy, start, pageLength }: ListQuery): Promise<Row[]> {
+export async function fetchRows({ doctype, fields, filters, orderBy, start, pageLength, withCommentCount = true }: ListQuery): Promise<Row[]> {
   const { env } = await deskCall("frappe.desk.reportview.get", {
     doctype,
     fields: JSON.stringify([...new Set(fields)].map((f) => q(doctype, f))),
@@ -33,7 +35,7 @@ export async function fetchRows({ doctype, fields, filters, orderBy, start, page
     start,
     page_length: pageLength,
     view: "List",
-    with_comment_count: 1,
+    with_comment_count: withCommentCount ? 1 : 0,
   });
   const msg = env.message as { keys?: string[]; values?: unknown[][] } | Row[] | undefined;
   if (Array.isArray(msg)) return msg;

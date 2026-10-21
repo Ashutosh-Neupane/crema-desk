@@ -167,14 +167,17 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   three, Desk shows them per settings.
 - ❌ Saved layouts / filters (v16 `list_filter/`: List Filter doctype — save, share globally, manage, duplicate,
   layout field selector).
-- ❌ List Settings dialog (`list_settings.js`): fields shown, disable count / comment count / sidebar stats / auto
-  refresh — saved to List View Settings.
+- ✅ List Settings dialog (`components/list/ListSettingsDialog.tsx`, Desk `list_settings.js`): columns add / remove /
+  reorder / width, Disable Count / Comment Count / Sidebar Stats / Auto Refresh via `save_listview_settings`, honoured
+  by the list — `e2e/listsettings.mjs` (agent-built, judged). ❌ allow_edit, disable_scrolling, show_tags, recency filters.
 - ❌ Row extras: comment counts, likes, assignee avatars, `_seen` bold for unread, "Edit" inline for Check fields,
   `has_indicator_for_draft`, `get_form_link` overrides from `listview_settings`.
 - ❌ `listview_settings` hooks verification: `onload`, `refresh`, `button`, `formatters`, `get_indicator`,
   `add_fields`, `filters`, `hide_name_column`, `primary_action`, `selectable`, `right_column`.
 - ❌ Restricted-by-user-permission banner (`list_view_permission_restrictions.html`).
-- ❌ Per-user persisted list state (`model/user_settings.js`): last filters, sort, page length, view, report columns.
+- ✅ Per-user list state (`lib/list/useUserListState.ts`, Desk `model/user_settings.js`): filters + sort saved under
+  `List` (+ `last_view`) and restored on a bare list URL; URL filters win — `e2e/listsettings.mjs`.
+- ❌ `filter_conditions`, `load_last_view` redirect, report-view column state.
 - ❌ Virtualized list for 2000+ rows (`list_view_virtualization.js`).
 - ❌ Bulk actions: "Apply Assignment Rule", "Delete" progress via realtime for >500 docs, bulk rename (`bulk_rename`).
 

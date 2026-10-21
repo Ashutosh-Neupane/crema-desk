@@ -30,6 +30,9 @@ import {
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useListSettings } from "@/lib/list/useListSettings";
+import { lvsKey, parseColumnSettings, useListViewSettings } from "@/lib/list/useListViewSettings";
+import { loadUserSettings, saveListState, userSettingsKey, type UserSettings } from "@/lib/list/useUserListState";
+import ListSettingsDialog from "@/components/list/ListSettingsDialog";
 import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
 import { getIndicator, INDICATOR_PILL, indicatorFilters } from "@/lib/list/indicator";
 import { formatCell, timeAgo } from "@/lib/list/format";
@@ -61,6 +64,13 @@ export default function ListView({ doctype }: { doctype: string }) {
   }, [meta?.issingle, doctype, router]);
   const { data: ctx } = useDeskContext();
   const settings = useListSettings(meta);
+  // Desk base_list.js get_list_view_settings: the List View Settings doc (columns, disable_count, …)
+  const lvsQuery = useListViewSettings(doctype);
+  const lvs = lvsQuery.data;
+  const lvsReady = lvsQuery.isSuccess || lvsQuery.isError;
+  const colSettings = useMemo(() => parseColumnSettings(lvs), [lvs]);
+  const disableCount = !!lvs?.disable_count;
+  const disableCommentCount = !!lvs?.disable_comment_count;
 
   const filters = useMemo(() => filtersFromParams(doctype, new URLSearchParams(params.toString())), [doctype, params]);
   const [search, setSearch] = useState(params.get("q") ?? "");
@@ -77,6 +87,14 @@ export default function ListView({ doctype }: { doctype: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [quickEntry, setQuickEntry] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [listSettingsOpen, setListSettingsOpen] = useState(false);
+
+  // Desk list_view.js setup_defaults: filters / sort_by / sort_order restored from user_settings["List"]
+  // (URL filters win); before_render saves them back (+ last_view). Query is not cached so a revisit re-reads it.
+  const usQuery = useQuery({ queryKey: userSettingsKey(doctype), queryFn: () => loadUserSettings(doctype), staleTime: 0, gcTime: 0, refetchOnMount: "always" });
+  const userSettings = useRef<UserSettings>({});
+  const [restoredFor, setRestoredFor] = useState<string | null>(null);
+  const [awaitFrom, setAwaitFrom] = useState<Filter[] | null>(null);
 
   const setFilters = useCallback(
     (next: Filter[]) => {
@@ -94,18 +112,54 @@ export default function ListView({ doctype }: { doctype: string }) {
     },
     [pathname, router, search],
   );
+  useEffect(() => {
+    if (restoredFor === doctype || !meta || !usQuery.isFetchedAfterMount) return;
+    const saved = usQuery.data ?? {};
+    userSettings.current = saved;
+    const cur = saved.List ?? {};
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot restore of the saved view state
+    if (cur.sort_by) setSort({ field: String(cur.sort_by), order: String(cur.sort_order).toLowerCase() === "asc" ? "asc" : "desc" });
+    if (filters.length === 0 && Array.isArray(cur.filters) && cur.filters.length) {
+      const std = new Set(["name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "_assign", "_user_tags", "_comments", "_liked_by"]);
+      const valid = (cur.filters as Filter[]).filter((f) => Array.isArray(f) && f.length === 4 && (f[0] !== doctype || std.has(f[1]) || meta.fields?.some((x) => x.fieldname === f[1])));
+      if (valid.length) {
+        setAwaitFrom(filters);
+        setFilters(valid);
+      }
+    }
+    setRestoredFor(doctype);
+  }, [restoredFor, doctype, meta, usQuery.isFetchedAfterMount, usQuery.data, filters, setFilters]);
+  const stateReady = restoredFor === doctype && !(awaitFrom !== null && awaitFrom === filters);
+
   const addFilter = (f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]);
   const removeFilter = (i: number) => setFilters(filters.filter((_, j) => j !== i));
 
   const titleField = typeof meta?.title_field === "string" && meta.title_field && meta.show_title_field_in_link !== undefined ? meta.title_field : typeof meta?.title_field === "string" ? meta.title_field : "";
   const listFields = useMemo(() => {
     if (!meta) return [] as DocField[];
+    // List View Settings `fields` (list_view.js build_columns): exactly those columns, in that order
+    if (colSettings.length) {
+      const subject = new Set(["name", titleField, colSettings[0]?.fieldname]);
+      const std: Record<string, Partial<DocField>> = { owner: { fieldtype: "Link", options: "User", label: "Created By" }, modified_by: { fieldtype: "Link", options: "User", label: "Last Updated By" }, creation: { fieldtype: "Datetime", label: "Created On" }, modified: { fieldtype: "Datetime", label: "Last Updated On" }, idx: { fieldtype: "Int", label: "Index" }, docstatus: { fieldtype: "Int", label: "Document Status" } };
+      const out: DocField[] = [];
+      for (const c of colSettings) {
+        // the Status indicator column already shows the `status` field
+        if (c.fieldname === "status_field" || subject.has(c.fieldname) || (c.fieldname === "status" && colSettings.some((x) => x.fieldname === "status_field"))) continue;
+        const df = meta.fields?.find((f) => f.fieldname === c.fieldname) ?? (std[c.fieldname] ? ({ fieldname: c.fieldname, ...std[c.fieldname] } as DocField) : undefined);
+        if (df && !NO_VALUE.has(df.fieldtype)) out.push(df);
+      }
+      return out;
+    }
     return (meta.fields ?? [])
       .filter((f) => f.in_list_view && !NO_VALUE.has(f.fieldtype) && f.fieldname !== titleField && f.fieldname !== "status")
       .slice(0, 6);
-  }, [meta, titleField]);
+  }, [meta, titleField, colSettings]);
+  const colWidth = (fieldname: string) => colSettings.find((c) => c.fieldname === fieldname)?.width;
   const hasStatusField = !!meta?.fields?.some((f) => f.fieldname === "status");
-  const hasIndicator = !!meta && (!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled"));
+  const hasIndicator =
+    !!meta &&
+    (!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled")) &&
+    (!colSettings.length || colSettings.some((c) => c.fieldname === "status_field"));
   const standardFilters = useMemo(
     () => (meta?.fields ?? []).filter((f) => f.in_standard_filter && ["Link", "Select", "Data", "Date", "Check"].includes(f.fieldtype)).slice(0, 4),
     [meta],
@@ -130,20 +184,21 @@ export default function ListView({ doctype }: { doctype: string }) {
   const allFilters = useMemo(() => [...filters, ...searchFilter], [filters, searchFilter]);
 
   const rowsQuery = useQuery<Row[]>({
-    queryKey: ["list", doctype, fetchFields, allFilters, sort, pageLength],
-    enabled: !!meta && !meta.issingle && settings !== undefined,
-    queryFn: () => fetchRows({ doctype, fields: fetchFields, filters: allFilters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength }),
+    queryKey: ["list", doctype, fetchFields, allFilters, sort, pageLength, disableCommentCount],
+    enabled: !!meta && !meta.issingle && settings !== undefined && lvsReady && stateReady,
+    queryFn: () => fetchRows({ doctype, fields: fetchFields, filters: allFilters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength, withCommentCount: !disableCommentCount }),
     placeholderData: keepPreviousData,
   });
   const countQuery = useQuery({
     queryKey: ["list-count", doctype, allFilters],
-    enabled: !!meta && !meta.issingle,
+    enabled: !!meta && !meta.issingle && lvsReady && stateReady && !disableCount,
     queryFn: () => fetchCount(doctype, allFilters),
   });
 
   // Search by title can miss an exact ID — retry on name when the title search is empty
   const rows = rowsQuery.data ?? [];
   const total = countQuery.data ?? rows.length;
+  const moreRows = disableCount ? rows.length >= pageLength : rows.length < total;
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
 
   const refresh = () => {
@@ -153,7 +208,7 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   // Desk refreshes the list when anyone creates/changes/deletes a document (list_update); bursts coalesce
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useListRealtime(doctype, () => {
+  useListRealtime(lvs?.disable_auto_refresh ? undefined : doctype, () => {
     if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
     realtimeTimer.current = setTimeout(() => {
       qc.invalidateQueries({ queryKey: ["list", doctype] });
@@ -163,6 +218,17 @@ export default function ListView({ doctype }: { doctype: string }) {
   useEffect(() => () => {
     if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
   }, []);
+
+  // before_render: save { filters, sort_by, sort_order } (and last_view) to the user's settings
+  useEffect(() => {
+    if (!stateReady || !meta) return;
+    const value = { filters, sort_by: sort.field, sort_order: sort.order };
+    const cur = userSettings.current;
+    const next = { ...cur, List: { ...(cur.List ?? {}), ...value }, last_view: "List" };
+    if (JSON.stringify(next) === JSON.stringify(cur)) return;
+    userSettings.current = next;
+    saveListState(doctype, cur, value).catch(() => {});
+  }, [stateReady, meta, doctype, filters, sort.field, sort.order]);
 
   const views = useMemo(() => {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
@@ -257,7 +323,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/List%20View%20Settings?name=${enc(doctype)}`)}>List settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setListSettingsOpen(true)}>List settings</DropdownMenuItem>
               {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setExporting(true)}>Export</DropdownMenuItem>
             </DropdownMenuContent>
@@ -338,7 +404,7 @@ export default function ListView({ doctype }: { doctype: string }) {
           </PopoverContent>
         </Popover>
 
-        <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />
+        {!lvs?.disable_sidebar_stats && <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />}
 
         <div className="ml-auto flex items-center gap-1">
           <select
@@ -395,13 +461,13 @@ export default function ListView({ doctype }: { doctype: string }) {
                     className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
                   />
                 </th>
-                <th className="px-3 py-2.5">{subjectLabel}</th>
+                <th className="px-3 py-2.5" style={colWidth(colSettings[0]?.fieldname ?? "name") ? { minWidth: colWidth(colSettings[0]?.fieldname ?? "name") } : undefined}>{subjectLabel}</th>
                 {hasIndicator && <th className="px-3 py-2.5">Status</th>}
                 {listFields.map((f) => (
-                  <th key={f.fieldname} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
+                  <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
                 ))}
                 <th className="w-24 px-3 py-2.5 text-right">
-                  {rows.length} of {total}
+                  {!disableCount && `${rows.length} of ${total}`}
                 </th>
               </tr>
             </thead>
@@ -469,7 +535,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                     })}
                     <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
                       <span className="inline-flex items-center gap-2">
-                        {Number(r._comment_count) > 0 && (
+                        {!disableCommentCount && Number(r._comment_count) > 0 && (
                           <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
                         )}
                         {timeAgo(r.modified)}
@@ -501,7 +567,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                 {n}
               </button>
             ))}
-            {rows.length < total && (
+            {moreRows && (
               <button type="button" onClick={() => setPageLength(pageLength + 20)} className="ml-auto rounded-md border border-zinc-200 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
                 Load more
               </button>
@@ -509,6 +575,20 @@ export default function ListView({ doctype }: { doctype: string }) {
           </div>
         )}
       </div>
+
+      {listSettingsOpen && (
+        <ListSettingsDialog
+          meta={meta}
+          settings={lvs ?? null}
+          hasIndicator={!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled")}
+          onClose={() => setListSettingsOpen(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: lvsKey(doctype) });
+            qc.invalidateQueries({ queryKey: ["doctype", doctype] });
+            refresh();
+          }}
+        />
+      )}
 
       {exporting && <ExportDialog doctype={doctype} filters={allFilters} onClose={() => setExporting(false)} />}
 
