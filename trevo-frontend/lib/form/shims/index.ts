@@ -5,6 +5,7 @@
 import type { Runtime } from "@/lib/desk-runtime";
 import { install as installItemDashboard } from "./itemDashboard";
 import { install as installLedgerPreview } from "./ledgerPreview";
+import { install as installSerialBatch } from "./serialBatch";
 
 export interface ShimOptions {
   frm: Record<string, unknown>;
@@ -14,4 +15,5 @@ export interface ShimOptions {
 export function installShims(rt: Runtime, opts: ShimOptions) {
   installItemDashboard(rt, opts);
   installLedgerPreview(rt, opts);
+  installSerialBatch(rt, opts);
 }
