@@ -109,7 +109,12 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 
 ### 2.2 Grid / child tables (`form/grid.js`, `grid_row.js`, `grid_row_form.js`, `grid_pagination.js`)
 - ✅ Add/remove/duplicate rows, drag reorder, 50-row pages, CSV download/upload (allow_bulk_edit), row form.
-- ❌ Insert Above / Below, move to row, multi-row select + delete, "Add Multiple" (Link selector).
+- ✅ Insert Above / Below / Duplicate in the row editor, multi-row select + delete, select-all, idx renumbered;
+  `before_<table>_remove` and `<table>_remove` fire per row with the child doctype like Desk's script_manager
+  (child-doctype handlers such as ERPNext's `accounts_remove` now run; cscript once per row) — `e2e/gridrows.mjs`
+  (agent-built, judged; judge removed a parent-level extra trigger).
+- ❌ "Move to row #" prompt, per-row hover menu, "Delete all N rows", "Add Multiple" (Link selector), Duplicate
+  honouring `no_copy`.
 - ❌ Per-user column settings (`Configure Columns` dialog, `in_list_view` override, column widths) — saved to user
   settings / `GridView`.
 - ❌ Grid keyboard navigation (arrows between cells, Enter opens row, Ctrl+Shift+Up/Down).

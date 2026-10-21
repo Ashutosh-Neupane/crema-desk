@@ -391,9 +391,21 @@ export class FormController {
 
   async remove_rows(table: string, names: string[]) {
     const drop = new Set(names);
+    const removed = ((this.doc[table] as Row[]) ?? []).filter((r) => drop.has(r.name));
+    // Desk grid_row.remove: before_<table>_remove (cdt, cdn) per row, then clear_doc, then <table>_remove (cdt, cdn)
+    for (const r of removed) {
+      // in order on purpose (Desk run_serially)
+      // react-doctor-disable-next-line async-await-in-loop
+      await this.trigger(`before_${table}_remove`, r.doctype, r.name);
+    }
     const rows = ((this.doc[table] as Row[]) ?? []).filter((r) => !drop.has(r.name));
     this.setRows(table, rows);
-    await this.trigger(`${table}_remove`);
+    // Desk triggers only with the child doctype (script_manager.get_handlers: that doctype's handlers + cscript),
+    // so handlers on the child doctype and frm.cscript.<table>_remove run once per removed row
+    for (const r of removed) {
+      // react-doctor-disable-next-line async-await-in-loop
+      await this.trigger(`${table}_remove`, r.doctype, r.name);
+    }
     // in order on purpose: each change may trigger events that depend on the previous one (Desk semantics)
     // react-doctor-disable-next-line async-await-in-loop
     for (const w of this.watchers) await w({ fieldname: table, value: rows, table });

@@ -276,6 +276,13 @@ export default function Grid({
     if (!cols.length) setEditing(row.name);
   };
 
+  // Desk grid_row.insert(show, below, duplicate): new row at idx (0-based `at`), editor opens on it
+  const insertAt = async (at: number, copyFrom?: Row) => {
+    const copy = copyFrom ? Object.fromEntries(Object.entries(copyFrom).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k))) : {};
+    const r = await ctl.add_child(table, copy, at);
+    setEditing(r.name);
+  };
+
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
       <div className="overflow-x-auto">
@@ -449,9 +456,17 @@ export default function Grid({
                     <button type="button" onClick={() => ctl.move_row(table, editRow.name, -1)} aria-label="Move up" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><ArrowUp className="h-4 w-4" /></button>
                     <button type="button" onClick={() => ctl.move_row(table, editRow.name, 1)} aria-label="Move down" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><ArrowDown className="h-4 w-4" /></button>
                     {!cannotAdd && (
-                      <button type="button" onClick={async () => { const r = await ctl.add_child(table, {}, editRow.idx); setEditing(r.name); }} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                        Insert below
+                      <>
+                      <button type="button" onClick={() => void insertAt(editRow.idx - 1)} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                        Insert Above
                       </button>
+                      <button type="button" onClick={() => void insertAt(editRow.idx)} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                        Insert Below
+                      </button>
+                        <button type="button" onClick={() => void insertAt(editRow.idx, editRow)} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                          Duplicate
+                        </button>
+                      </>
                     )}
                     {!cannotDelete && (
                       <button type="button" onClick={() => { void ctl.remove_rows(table, [editRow.name]); setEditing(null); }} aria-label="Delete row" className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"><Trash2 className="h-4 w-4" /></button>
