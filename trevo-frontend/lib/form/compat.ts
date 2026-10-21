@@ -12,6 +12,7 @@ import { lenient, type Runtime } from "@/lib/desk-runtime";
 import { deskCall } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { MultiSelectDialog, type MultiSelectOptions } from "@/lib/desk-runtime/multiSelect";
+import { installShims } from "./shims";
 
 export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unknown>; navigate?: (href: string) => void }) {
   const g = rt.globals;
@@ -153,4 +154,5 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   }
   frappe.model.can_set_user_permissions = () => false;
   (frappe.ui.form as Record<string, unknown>).make_quick_entry = (dt: string) => opts.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`);
+  installShims(rt, opts);
 }
