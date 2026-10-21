@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
 import type { FormController, Row } from "@/lib/form/FormController";
+import { AddressContact } from "./AddressContact";
 
 export interface WidgetProps {
   ctl: FormController;
@@ -24,8 +25,14 @@ const WIDGETS: Record<string, Record<string, (p: WidgetProps) => React.ReactNode
   "Module Profile": { module_html: (p) => <ModuleEditor {...p} /> },
 };
 
+/** Desk renders these for ANY doctype that has the field (frappe.contacts.render_address_and_contact) */
+const FIELD_WIDGETS: Record<string, (p: WidgetProps) => React.ReactNode> = {
+  address_html: (p) => <AddressContact {...p} fieldname="address_html" />,
+  contact_html: (p) => <AddressContact {...p} fieldname="contact_html" />,
+};
+
 export function getHtmlWidget(doctype: string, fieldname: string) {
-  return WIDGETS[doctype]?.[fieldname];
+  return WIDGETS[doctype]?.[fieldname] ?? FIELD_WIDGETS[fieldname];
 }
 
 /** Desk's MultiCheck look: filter box, select all / none, a column grid of checkboxes */

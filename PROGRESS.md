@@ -120,6 +120,18 @@ Newest entries on top. Each session: append what was done, what's verified, what
   `components/form/FormDashboard.tsx` renders it (headline HTML sanitized); DocForm adds Desk's submit message.
   `e2e/dashboard.mjs`; usermenu's menu-open helper retries once (hydration timing late in a full run); 33 suites.
 
+## 2026-10-21 — multi-agent round 1 (Opus judge; Sonnet ×3, Haiku ×1)
+Agents shared the one dev server and worked on disjoint files without committing; the judge reviewed each diff
+against Desk's source, re-ran its test, fixed problems, and committed separately.
+- Haiku — Data options validation (`validators.ts`): accepted as-is.
+- Sonnet — Grid Insert Above/Below/Duplicate + per-row `_remove`: judge removed an extra parent-level trigger Desk
+  doesn't fire (cscript ran N+1 times). Child-doctype `_remove` handlers (ERPNext) now run.
+- Sonnet — List sidebar counts: accepted (dropdowns in the filter row).
+- Sonnet — Address & Contact cards: judge replaced a `Storage.prototype.getItem` monkey-patch with
+  `takePrefill()` (lib/form/prefill.ts) — the new-form prefill was consumed by StrictMode's first initializer run,
+  which also made Duplicate / Quick Entry → full form / mapped docs flaky.
+- Full suite 35/37; the 2 failures (calendar setup insert under load, useractions compile timeout) pass alone.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)

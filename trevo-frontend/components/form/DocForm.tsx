@@ -23,7 +23,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
-import { PREFILL_KEY } from "@/lib/form/prefill";
+import { PREFILL_KEY, takePrefill } from "@/lib/form/prefill";
 import FormSidebar from "@/components/form/FormSidebar";
 import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
@@ -141,16 +141,7 @@ export default function DocForm({ doctype, name }: Props) {
   const [busy, setBusy] = useState<null | "save" | "submit" | "cancel" | "delete">(null);
   const [confirm, setConfirm] = useState<null | "submit" | "cancel" | "delete">(null);
   const [missing, setMissing] = useState<string[] | null>(null);
-  const [prefill] = useState<Record<string, unknown>>(() => {
-    if (typeof window === "undefined" || name) return {};
-    try {
-      const raw = sessionStorage.getItem(PREFILL_KEY(doctype));
-      if (raw) sessionStorage.removeItem(PREFILL_KEY(doctype));
-      return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [prefill] = useState<Record<string, unknown>>(() => (name ? {} : takePrefill(doctype)));
 
   const load = useCallback(async () => {
     if (!name) return;

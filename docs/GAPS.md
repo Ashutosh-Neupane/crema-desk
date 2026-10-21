@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (33 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (37 today, all passing).
 
 ---
 
@@ -258,8 +258,11 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 
 ### 2.11 ERPNext scripted UIs inside forms (L3 candidates — today NOOP or broken)
 Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-use ERPNext.
-- ❌ Address & Contact cards on Customer, Supplier, Lead, Company, Sales Partner, Shareholder…
-  (`address_html` / `contact_html`, `frappe.contacts.render_address_and_contact`, `utils/address_and_contact.js`).
+- ✅ Address & Contact cards for any doctype with `address_html` / `contact_html` (`components/form/widgets/
+  AddressContact.tsx`, Desk `address_and_contact.js` + templates): cards from `__onload`, Edit, Primary badge, Set /
+  Unset Primary, Unlink (`remove_link`), New Address / Contact pre-linked via the form prefill, hidden on new docs —
+  `e2e/addresscontact.mjs` (agent-built, judged; judge replaced a Storage monkey-patch with `takePrefill`).
+- ❌ Address autocompletion dialog, Contact quick-entry dialog (phone/email → child rows).
 - ❌ Item stock levels dashboard (`erpnext.stock.ItemDashboard`, `item-dashboard.bundle.js`) on Item / Warehouse.
 - ❌ Serial & Batch selector dialog (`utils/serial_no_batch_selector.js` — SerialBatchPackageSelector) on stock
   transactions; barcode scanning into items (`utils/barcode_scanner.js`, `scan_barcode` field).
