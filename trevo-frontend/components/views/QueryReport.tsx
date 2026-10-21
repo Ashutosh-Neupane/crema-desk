@@ -7,7 +7,7 @@
  * frappe.desk.query_report.run. Prepared reports are generated in the background
  * and polled until ready.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BarChart3, ChevronDown, ChevronRight, Download, FileText, Loader2, RefreshCw, Save, Search, Settings2, X } from "lucide-react";
@@ -78,6 +78,8 @@ const SUMMARY_TONE: Record<string, string> = {
   blue: "text-blue-700 dark:text-blue-400",
   orange: "text-amber-700 dark:text-amber-400",
 };
+
+const noopSubscribe = () => () => {};
 
 export default function QueryReport({ name }: { name: string }) {
   const router = useRouter();
@@ -366,7 +368,9 @@ export default function QueryReport({ name }: { name: string }) {
   };
 
   // ── Save As / PDF (Desk menu: Save, PDF) ───────────────────────────────────
-  const isReportManager = !!ctx && (ctx.user === "Administrator" || ctx.roles.includes("System Manager") || ctx.roles.includes("Report Manager"));
+  // role-dependent, from the client-side desk context: shown only after hydration so server and client markup match
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const isReportManager = hydrated && !!ctx && (ctx.user === "Administrator" || ctx.roles.includes("System Manager") || ctx.roles.includes("Report Manager"));
   const [saveOpen, setSaveOpen] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [busy, setBusy] = useState(false);

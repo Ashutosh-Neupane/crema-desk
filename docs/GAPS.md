@@ -222,8 +222,9 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   `set_session_default_values`, boot cache cleared), Reload (`clear_cache`), View Website, Apps, About (`about.js`),
   Navbar Settings rows (settings_dropdown / help_dropdown, conditions + actions run in the desk runtime via
   `frappe.utils.eval`), theme saved to `User.desk_theme` (`switch_theme`) — `e2e/usermenu.mjs`.
-- ❌ Toggle Full Width, Apps switcher page (`/apps`), initial theme from `boot.user.desk_theme` on a new device,
-  "Edit Sidebar" item.
+- ✅ Toggle Full Width (Desk `localStorage.container_fullwidth`; content capped at Desk's 1290px container otherwise)
+  and the saved `User.desk_theme` applied on a browser with no stored choice — `e2e/fullwidth.mjs` (agent-built, judged).
+- ❌ Apps switcher page (`/apps`), "Edit Sidebar" item.
 - ❌ v16 user settings dialog (`user_settings_dialog.bundle.js`, `ui/settings_dialog.js`): Profile, Email signature +
   options, Appearance, Language, Notifications, API access.
 - ❌ Site banners (`ui/site_banners.js`): read-only mode, impersonation ("Impersonating X — Stop").
@@ -304,6 +305,8 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ Virtualized lists and report grids for large data.
 - ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
 - ❌ Mobile layouts, keyboard-only pass, a11y labels everywhere (✅ dialogs are now named by their title).
+- ✅ No hydration mismatches on home / forms / reports: client-only values (stored theme icon, report-manager
+  buttons, greeting + user name) render after hydration.
 - ❌ Shared `Dialog` caps every dialog at max-w-lg (DialogContent's `max-w-*` is stripped) — wide dialogs
   (email composer, report pickers) need the panel width to follow the content.
 - ❌ Error reporting parity: server tracebacks in a collapsible dialog for System Managers (Desk shows them).

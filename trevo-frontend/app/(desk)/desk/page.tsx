@@ -18,6 +18,8 @@ import type { NavSection } from "@/lib/navigation";
 const APP_TITLES: Record<string, string> = { frappe: "Framework", erpnext: "ERPNext" };
 const enc = encodeURIComponent;
 
+const noopSubscribe = () => () => {};
+
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -47,6 +49,7 @@ function readRecent(): RecentDoc[] {
 export default function DeskHomePage() {
   const { data: nav } = useNavigation();
   const { data: ctx } = useDeskContext();
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const recent = useSyncExternalStore(
     (cb) => {
       window.addEventListener("storage", cb);
@@ -83,8 +86,9 @@ export default function DeskHomePage() {
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <header className="pt-2">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          {greeting()}
-          {ctx?.full_name ? `, ${ctx.full_name.split(" ")[0]}` : ""}
+          {/* time of day and the user's name are client-only: shown after hydration so server and client match */}
+          {hydrated ? greeting() : "Welcome"}
+          {hydrated && ctx?.full_name ? `, ${ctx.full_name.split(" ")[0]}` : ""}
         </h1>
         <p className="mt-1 text-sm text-zinc-500" suppressHydrationWarning>
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}

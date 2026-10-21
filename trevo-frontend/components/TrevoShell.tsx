@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/frappe/auth";
+import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import CommandPalette from "@/components/CommandPalette";
@@ -253,10 +254,37 @@ function NavSection({ section, depth = 0 }: { section: DeskNavigation["sections"
   );
 }
 
+const noopSubscribe = () => () => {};
+
 export default function TrevoShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const { sidebarOpen, toggleSidebar, theme, setTheme } = useUIStore();
+  const { sidebarOpen, toggleSidebar, theme, setTheme, themeSeeded, seedThemeFromUser, fullWidth, hydrateFullWidth } = useUIStore();
+  const { data: deskCtx } = useDeskContext();
+  const deskUser = deskCtx?.user;
+  // A browser with no stored theme choice (new device) takes the user's saved User.desk_theme, as Desk does at boot
+  useEffect(() => {
+    if (themeSeeded || !deskUser) return;
+    let cancelled = false;
+    deskCall("frappe.client.get_value", { doctype: "User", filters: deskUser, fieldname: "desk_theme" })
+      .then(({ env }) => {
+        if (cancelled) return;
+        const deskTheme = (env.message as { desk_theme?: string | null } | null)?.desk_theme;
+        seedThemeFromUser(deskTheme);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [themeSeeded, deskUser, seedThemeFromUser]);
+  // Desk's container_fullwidth (localStorage) is read after mount so server and client markup match
+  useEffect(() => {
+    hydrateFullWidth();
+  }, [hydrateFullWidth]);
   const { data: navigation } = useNavigation();
+  // the persisted theme is read from localStorage on the client only: the server and the first client render show
+  // the default icon, the stored one after hydration (otherwise React reports a hydration mismatch)
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const shownTheme = hydrated ? theme : "light";
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const realtimeStatus = useRealtimeStatus();
@@ -355,9 +383,9 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
             <DropdownMenu open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
               <DropdownMenuTrigger>
                 <span className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors inline-flex" aria-label="Theme" title="Theme">
-                  {theme === "dark" ? (
+                  {shownTheme === "dark" ? (
                     <Moon className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-                  ) : theme === "light" ? (
+                  ) : shownTheme === "light" ? (
                     <Sun className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
                   ) : (
                     <Monitor className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
@@ -424,10 +452,17 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
           ].join(" ")}
           id="main-content"
         >
-          <div className="mb-4">
-            <Breadcrumbs />
+          {/* Desk's container: capped at its xl width (variables.scss $container-max-widths) unless "Toggle Full Width" is on */}
+          <div
+            id="main-container"
+            data-fullwidth={fullWidth ? "true" : "false"}
+            className={fullWidth ? "w-full" : "mx-auto w-full max-w-[1290px]"}
+          >
+            <div className="mb-4">
+              <Breadcrumbs />
+            </div>
+            {children}
           </div>
-          {children}
         </main>
         <DialogHost />
         <MultiSelectHost />

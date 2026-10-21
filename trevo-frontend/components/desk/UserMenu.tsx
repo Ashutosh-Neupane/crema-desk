@@ -11,13 +11,14 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, Globe, LayoutGrid, LogOut, RotateCcw, Settings2, User } from "lucide-react";
+import { ChevronDown, Globe, LayoutGrid, LogOut, Maximize2, RotateCcw, Settings2, User } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import SessionDefaultsDialog from "@/components/desk/SessionDefaultsDialog";
 import AboutDialog from "@/components/desk/AboutDialog";
 import { createRuntime } from "@/lib/desk-runtime";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { useUIStore } from "@/lib/stores/ui.store";
 
 interface NavbarItem {
   item_label?: string;
@@ -53,6 +54,7 @@ export default function UserMenu({
   const router = useRouter();
   const qc = useQueryClient();
   const { data: ctx } = useDeskContext();
+  const toggleFullWidth = useUIStore((s) => s.toggleFullWidth);
   const [open, setOpen] = useState(false);
   const [sessionDefaults, setSessionDefaults] = useState(false);
   const [about, setAbout] = useState(false);
@@ -130,6 +132,9 @@ export default function UserMenu({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={close(() => router.push("/desk"))}>
               <LayoutGrid className="h-4 w-4" /> Apps
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={close(() => toggleFullWidth())}>
+              <Maximize2 className="h-4 w-4" /> Toggle Full Width
             </DropdownMenuItem>
             {siteRows.map((item, i) => (
               <DropdownMenuItem key={`s-${i}-${item.item_label}`} onClick={() => run(item)}>
