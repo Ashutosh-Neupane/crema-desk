@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (41 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (45 today, all passing).
 
 ---
 
@@ -90,7 +90,8 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ❌ Permlevel: sections and fields above the user's permlevel read-only/hidden, "Not permitted" banners,
   `frm.perm` checks in custom buttons, `read_only_depends_on` re-check after save.
 - ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
-- ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`).
+- ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`), in grid row
+  forms with the child doctype + row (`trigger(fieldname, cdt, cdn)`).
 - ✅ Field descriptions render as (sanitized) HTML.
 - ✅ ERPNext forms load without script errors (probed: Sales/Purchase Order + Invoice, Delivery Note, Stock Entry,
   Material Request, Payment Entry, Journal Entry, Quotation, Item, Customer): `frm.events.<helper>` (Desk: last
@@ -281,8 +282,13 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ✅ Item stock levels (`lib/form/shims/itemDashboard.ts`, Desk `item_dashboard.js` + templates): per-warehouse qty bars
   from `item_dashboard.get_data`, More, Move / Add dialogs → prefilled Stock Entry (`make_stock_entry`) —
   `e2e/itemdashboard.mjs` (agent-built, judged). ❌ Putaway Rule edit, warehouse-capacity variant.
-- ❌ Serial & Batch selector dialog (`utils/serial_no_batch_selector.js` — SerialBatchPackageSelector) on stock
-  transactions; barcode scanning into items (`utils/barcode_scanner.js`, `scan_barcode` field).
+- ✅ Serial & Batch selector (`lib/form/shims/serialBatch.ts` + `SerialBatchDialog.tsx`, Desk
+  `serial_no_batch_selector.js`): `erpnext.SerialBatchPackageSelector` / `show_serial_batch_selector` /
+  `select_batch_and_serial_no`, opened by ERPNext's own row button; batch rows → `add_serial_batch_ledgers`,
+  bundle on the row, submit + SLE verified — `e2e/serialbatch.mjs` (agent-built, judged; judge wired row-form
+  Button fields to child events).
+- ❌ Selector auto-open from the transaction controller on PR / PI / DN, serial-number + outward + CSV flows
+  untested, DeskDialog Table fields (selector uses its own dialog), barcode scanning (`utils/barcode_scanner.js`).
 - ✅ Accounting / Stock Ledger preview (`lib/form/shims/ledgerPreview.ts`, `utils/ledger_preview.js`): Preview ▸ buttons
   on drafts, same methods, rows in a dialog (static table, no datatable filters) — `e2e/ledgerpreview.mjs`
   (agent-built, judged; Sales Invoice + Purchase Receipt).

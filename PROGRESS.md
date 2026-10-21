@@ -143,6 +143,15 @@ against Desk's source, re-ran its test, fixed problems, and committed separately
   Probe of 13 ERPNext forms: no script errors. Dev server was OOM-killed once mid-round (restarted); a run while the
   Mac slept timed out and passed on re-run. Full suite 41/41.
 
+## 2026-10-21 — multi-agent round 3
+- Haiku — grid Move To + Delete all N rows: agent corrected the brief (Desk's grid Duplicate keeps no_copy fields);
+  judge replaced window.confirm with Desk's in-app confirm and fired `<table>_delete` once like Desk.
+- Sonnet — List Settings dialog + per-user list state: accepted; judge made fetchRows honour disable_comment_count.
+  Note: saved list filters persist across visits (Desk behaviour), so tests that open bare lists reset `List` first.
+- Sonnet — Serial & Batch selector: standalone dialog (DeskDialog can't host Table fields yet); judge wired row-form
+  Button fields → child events, so ERPNext's own "Add Serial / Batch No" button opens it.
+- Full suite 43/44 → listsettings fixed (polluted ToDo list state from bulk) → 45 suites.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)

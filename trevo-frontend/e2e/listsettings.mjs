@@ -16,7 +16,9 @@ const origPS = new Set(await psNames());
 async function restore() {
   if (await lvsDoc()) await post("frappe.client.delete", { doctype: "List View Settings", name: "ToDo" });
   for (const n of await psNames()) if (!origPS.has(n)) await post("frappe.client.delete", { doctype: "Property Setter", name: n });
-  await post("frappe.model.utils.user_settings.save", { doctype: "ToDo", user_settings: JSON.stringify({ List: origUS.List ?? null, last_view: origUS.last_view ?? null }) });
+  // start/end with no saved list state: earlier suites (bulk, crud.todo) leave their own ToDo filters behind,
+  // which the list now restores like Desk does
+  await post("frappe.model.utils.user_settings.save", { doctype: "ToDo", user_settings: JSON.stringify({ List: null, last_view: origUS.last_view ?? null }) });
   if (origLVS) console.log("  (note: ToDo had List View Settings before the test; deleted)");
 }
 await restore();

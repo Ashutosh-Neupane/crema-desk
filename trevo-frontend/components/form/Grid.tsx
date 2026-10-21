@@ -543,6 +543,8 @@ export default function Grid({
                 errors={Object.fromEntries(Object.entries(errors).filter(([k]) => k.startsWith(`${table}.${editRow.idx - 1}.`)).map(([k, v]) => [k.split(".").pop()!, v]))}
                 onChange={(f, v) => void ctl.set_child_value(editRow.doctype, editRow.name, f, v)}
                 getQuery={(f) => () => ctl.getQuery(f, table)?.(ctl.getDoc(), editRow.doctype, editRow.name)}
+                // Button fields in the row form fire the child doctype's event (Desk script_manager.trigger(fieldname, cdt, cdn))
+                onButton={(f) => void ctl.trigger(f, editRow.doctype, editRow.name)}
                 compact
               />
             </div>
