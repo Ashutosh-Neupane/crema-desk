@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import type { FormController, Row } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import LinkField from "@/lib/trevo-form/controls/LinkField";
@@ -222,6 +223,8 @@ export default function Grid({
   const cols = useMemo(() => gridColumns(meta, overrides, table), [meta, overrides, table]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
+  // Desk grid_row.move(): "Move To" prompt for the row number (value kept as typed)
+  const [moveOpen, setMoveOpen] = useState<{ name: string; value: string } | null>(null);
   const tableReadOnly = readOnly || !!(overrides[table]?.read_only ?? df.read_only);
   const cannotAdd = !!(df as { cannot_add_rows?: unknown }).cannot_add_rows || !!overrides[table]?.cannot_add_rows;
   const cannotDelete = !!(df as { cannot_delete_rows?: unknown }).cannot_delete_rows;
@@ -277,6 +280,19 @@ export default function Grid({
   };
 
   // Desk grid_row.insert(show, below, duplicate): new row at idx (0-based `at`), editor opens on it
+  // Desk grid_row.move(): row moves to the 1-based position, idx renumbered (reorder_row handles it)
+  const applyMove = () => {
+    if (!editRow || moveOpen?.name !== editRow.name) return;
+    const n = Math.round(Number(moveOpen.value));
+    if (!Number.isFinite(n) || n < 1) {
+      toast.error("Enter a row number");
+      return;
+    }
+    ctl.reorder_row(table, editRow.name, Math.min(n, rows.length) - 1);
+    setMoveOpen(null);
+    setEditing(null);
+  };
+
   const insertAt = async (at: number, copyFrom?: Row) => {
     const copy = copyFrom ? Object.fromEntries(Object.entries(copyFrom).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k))) : {};
     const r = await ctl.add_child(table, copy, at);
@@ -409,6 +425,21 @@ export default function Grid({
         <div className="flex items-center gap-2 border-t border-zinc-100 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900">
           {selected.size > 0 ? (
             <>
+              {!cannotDelete && allSelected && rows.length > pageRows.length && (
+                // Desk grid.js delete_all_rows: header checkbox across pages → "Delete all N rows" (confirmed)
+                <button
+                  type="button"
+                  onClick={() => {
+                    deskConfirm(`Are you sure you want to delete all ${rows.length} rows?`, () => {
+                      void ctl.delete_all_rows(table);
+                      setSelected(new Set());
+                    });
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete all {rows.length} rows
+                </button>
+              )}
               {!cannotDelete && (
                 <button type="button" onClick={() => { void ctl.remove_rows(table, [...selected]); setSelected(new Set()); }} className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700">
                   <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -455,6 +486,9 @@ export default function Grid({
                   <>
                     <button type="button" onClick={() => ctl.move_row(table, editRow.name, -1)} aria-label="Move up" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><ArrowUp className="h-4 w-4" /></button>
                     <button type="button" onClick={() => ctl.move_row(table, editRow.name, 1)} aria-label="Move down" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><ArrowDown className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => setMoveOpen({ name: editRow.name, value: String(editRow.idx) })} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                      Move To
+                    </button>
                     {!cannotAdd && (
                       <>
                       <button type="button" onClick={() => void insertAt(editRow.idx - 1)} className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
@@ -476,6 +510,28 @@ export default function Grid({
                 <button type="button" onClick={() => setEditing(null)} aria-label="Close" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="h-4 w-4" /></button>
               </div>
             </div>
+            {moveOpen?.name === editRow.name && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-5 py-2 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+                <label className="flex items-center gap-2">
+                  Move to Row Number
+                  <input
+                    type="number"
+                    min={1}
+                    max={rows.length}
+                    value={moveOpen.value}
+                    onChange={(e) => setMoveOpen({ name: editRow.name, value: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && applyMove()}
+                    className="w-20 rounded-md border border-zinc-200 bg-white px-2 py-1 tabular-nums dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                </label>
+                <button type="button" onClick={applyMove} className="rounded-md bg-zinc-900 px-2.5 py-1 font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+                  Update
+                </button>
+                <button type="button" onClick={() => setMoveOpen(null)} className="rounded-md px-2 py-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                  Cancel
+                </button>
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto p-4">
               <FormBody
                 meta={meta}

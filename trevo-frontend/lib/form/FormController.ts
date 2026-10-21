@@ -381,6 +381,13 @@ export class FormController {
     } as Row;
   }
 
+  /** Desk grid.delete_all_rows: empty the table, then `<table>_delete` once with the child doctype */
+  async delete_all_rows(table: string) {
+    const childType = String(this.meta.fields?.find((f) => f.fieldname === table)?.options ?? "");
+    this.setRows(table, []);
+    await this.trigger(`${table}_delete`, childType || undefined);
+  }
+
   private setRows(table: string, rows: Row[]) {
     this.doc = { ...this.doc, [table]: rows.map((r, i) => ({ ...r, idx: i + 1 })) };
     this.dirty = true;

@@ -120,8 +120,9 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   `before_<table>_remove` and `<table>_remove` fire per row with the child doctype like Desk's script_manager
   (child-doctype handlers such as ERPNext's `accounts_remove` now run; cscript once per row) — `e2e/gridrows.mjs`
   (agent-built, judged; judge removed a parent-level extra trigger).
-- ❌ "Move to row #" prompt, per-row hover menu, "Delete all N rows", "Add Multiple" (Link selector), Duplicate
-  honouring `no_copy`.
+- ✅ Move To (row number, clamped) and "Delete all N rows" (Desk `frappe.confirm`, then `<table>_delete` once) —
+  `e2e/gridmove.mjs` (agent-built, judged). Duplicate copies `no_copy` fields exactly as Desk's grid duplicate does.
+- ❌ Per-row hover menu, "Add Multiple" (Link selector).
 - ❌ Per-user column settings (`Configure Columns` dialog, `in_list_view` override, column widths) — saved to user
   settings / `GridView`.
 - ❌ Grid keyboard navigation (arrows between cells, Enter opens row, Ctrl+Shift+Up/Down).
