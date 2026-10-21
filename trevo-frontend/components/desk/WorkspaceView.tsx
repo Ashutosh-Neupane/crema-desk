@@ -12,6 +12,8 @@ import { ArrowUpRight, FileText, BarChart3, LayoutGrid, Link2 } from "lucide-rea
 import { ChartCard, NumberCard, WidgetShell } from "@/components/desk/Widgets";
 import { SidebarIcon } from "@/components/DeskSidebar";
 import { sidebarItemHref } from "@/lib/navigation";
+import OnboardingWidget, { type OnboardingData } from "@/components/desk/OnboardingWidget";
+import CustomBlock from "@/components/desk/CustomBlock";
 
 interface Block {
   id?: string;
@@ -33,6 +35,7 @@ interface LinkRow {
 
 interface WorkspaceDoc {
   name: string;
+  public?: 0 | 1;
   title?: string;
   label?: string;
   icon?: string;
@@ -163,6 +166,12 @@ function QuickList({ q }: { q: NonNullable<WorkspaceDoc["quick_lists"]>[number] 
   );
 }
 
+/** frappe.desk.desktop.get_desktop_page: what Desk's blocks read for onboardings (enabled, role-checked, not complete) and permitted custom blocks. */
+interface DesktopPage {
+  onboardings?: { items: OnboardingData[] };
+  custom_blocks?: { items: Array<{ custom_block_name: string }> };
+}
+
 export default function WorkspaceView({ name }: { name: string }) {
   const { data: ws, isLoading, error } = useQuery<WorkspaceDoc>({
     queryKey: ["workspace", name],
@@ -172,6 +181,22 @@ export default function WorkspaceView({ name }: { name: string }) {
       return ((await res.json()) as { data: WorkspaceDoc }).data;
     },
     staleTime: 60_000,
+  });
+
+  const hasDynamic = !!ws?.content && /"type":\s*"(onboarding|custom_block)"/.test(ws.content);
+  const { data: page } = useQuery<DesktopPage>({
+    queryKey: ["desktop-page", name],
+    enabled: hasDynamic,
+    queryFn: async () => {
+      const res = await fetch("/api/frappe/api/method/frappe.desk.desktop.get_desktop_page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ page: JSON.stringify({ name, title: ws?.title ?? name, public: ws?.public ?? 1 }) }),
+      });
+      return res.ok ? ((await res.json()) as { message?: DesktopPage }).message ?? {} : {};
+    },
+    staleTime: 0,
   });
 
   if (isLoading) {
@@ -233,8 +258,16 @@ export default function WorkspaceView({ name }: { name: string }) {
         const q = ws.quick_lists?.find((x) => (x.label || x.document_type) === d.quick_list_name);
         return q ? <div key={key} className={span(d.col)}><QuickList q={q} /></div> : null;
       }
+      case "onboarding": {
+        const ob = page?.onboardings?.items.find((x) => x.label === d.onboarding_name);
+        return ob ? <div key={key} className="col-span-12"><OnboardingWidget key={ob.items.map((x) => `${x.name}:${x.is_complete}${x.is_skipped}`).join()} data={ob} /></div> : null;
+      }
+      case "custom_block":
+        return page?.custom_blocks?.items.some((x) => x.custom_block_name === d.custom_block_name) ? (
+          <div key={key} className={span(d.col)}><CustomBlock name={String(d.custom_block_name)} /></div>
+        ) : null;
       default:
-        return null; // onboarding / custom_block: not rendered yet
+        return null;
     }
   };
 
