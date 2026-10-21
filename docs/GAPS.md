@@ -152,8 +152,11 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 ### 2.4 Lists (`list/list_view.js`, `base_list.js`, `bulk_operations.js`, `list_settings.js`, `list_filter/`)
 - ✅ Filters, standard filters, group-by, sort, paging, count, bulk edit/delete/submit/cancel/print/assign/tags/export,
   indicators, realtime refresh, list settings record, Import/Export.
-- ❌ List sidebar (`list_sidebar_group_by.js`, `list_sidebar_stat.html`): Assigned To / Created By / Tags / group-by
-  field counts (`frappe.desk.listview.get_group_by_count`), "Assigned to me", "Created by me".
+- ✅ List sidebar counts (`components/list/ListSidebar.tsx`, Desk `base_list.js` + `list_sidebar_group_by.js`): Assigned
+  To / Created By / Tags / configured fields with counts (`get_group_by_count`, `get_sidebar_stats`), click-to-filter
+  toggle, counts follow filters, "Customize" saved to user settings `group_by_fields` — `e2e/listsidebar.mjs`
+  (agent-built, judged). Shown as dropdowns in the filter row (layout is a phase-2 call); always shows the standard
+  three, Desk shows them per settings.
 - ❌ Saved layouts / filters (v16 `list_filter/`: List Filter doctype — save, share globally, manage, duplicate,
   layout field selector).
 - ❌ List Settings dialog (`list_settings.js`): fields shown, disable count / comment count / sidebar stats / auto

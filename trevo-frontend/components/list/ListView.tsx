@@ -40,6 +40,7 @@ import { FilterEditor, GroupBy, NO_VALUE, OPERATORS, describeValue, fieldLabel, 
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
 import BulkActions from "@/components/list/BulkActions";
 import ExportDialog from "@/components/list/ExportDialog";
+import ListSidebar from "@/components/list/ListSidebar";
 import { useShortcuts } from "@/lib/shortcuts";
 import { useListRealtime } from "@/lib/services/realtime";
 import type { DocField } from "@/lib/frappe/types";
@@ -336,6 +337,8 @@ export default function ListView({ doctype }: { doctype: string }) {
             <GroupBy meta={meta} filters={allFilters} onPick={addFilter} />
           </PopoverContent>
         </Popover>
+
+        <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />
 
         <div className="ml-auto flex items-center gap-1">
           <select
