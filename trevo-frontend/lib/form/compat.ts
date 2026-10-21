@@ -28,6 +28,16 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
     onload() {}
     refresh() {}
   }
+  // Controllers extending frappe.ui.form.Controller (ERPNext's StockController, TransactionController, app classes)
+  // call base helpers from bundles Trevo doesn't load (setup_posting_date_time_check, show_stock_ledger,
+  // super.onload_post_render, …); Trevo implements their effects natively, so missing ones resolve to no-ops.
+  const lenientBase = new Proxy(Object.prototype, {
+    get(target, prop, receiver) {
+      if (typeof prop === "symbol" || prop in target || prop === "then") return Reflect.get(target, prop, receiver);
+      return () => undefined;
+    },
+  });
+  Object.setPrototypeOf(Controller.prototype, lenientBase);
   (frappe.ui.form as Record<string, unknown>).Controller = Controller;
 
   const provide = rt.frappe.provide as (ns: string) => Record<string, unknown>;
@@ -39,17 +49,6 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   provide("erpnext.accounts");
   provide("erpnext.taxes");
   class TransactionController extends Controller {}
-  // ERPNext controller subclasses call many base helpers (setup_accounting_dimension_triggers,
-  // set_dynamic_labels, …); Trevo implements their effects natively, so missing ones are no-ops.
-  Object.setPrototypeOf(
-    TransactionController.prototype,
-    new Proxy(Controller.prototype, {
-      get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
-        return () => undefined;
-      },
-    }),
-  );
   erpnext.TransactionController = TransactionController;
   erpnext.taxes_and_totals = TransactionController;
   erpnext.payments = TransactionController;
@@ -66,7 +65,8 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   g.extend_cscript = (cscript: Record<string, unknown>, obj: Record<string, unknown>) => {
     let proto: object | null = obj;
     const seen = new Set<string>();
-    while (proto && proto !== Object.prototype) {
+    // stop at the lenient base: its own names are Object.prototype's (constructor, __proto__, …)
+    while (proto && proto !== Object.prototype && proto !== lenientBase) {
       for (const key of Object.getOwnPropertyNames(proto)) {
         if (key === "constructor" || seen.has(key)) continue;
         seen.add(key);

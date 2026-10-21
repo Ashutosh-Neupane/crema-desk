@@ -167,7 +167,9 @@ export function lenient(obj: Record<string, unknown>, deep = true): Record<strin
       if (typeof prop === "symbol") return (target as Record<symbol, unknown>)[prop];
       if (!(prop in target)) return NOOP;
       const v = target[prop];
-      return deep && v && typeof v === "object" && !Array.isArray(v) ? lenient(v as Record<string, unknown>) : v;
+      // only plain namespaces are wrapped: class instances, DOM nodes, Maps keep their own `this`
+      const plain = !!v && typeof v === "object" && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
+      return deep && plain ? lenient(v as Record<string, unknown>) : v;
     },
   });
 }
@@ -397,7 +399,12 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     new_doc: (dt: string) => ctx.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`),
     get_route: () => [],
     realtime: { on() {}, off() {} },
-    require: () => Promise.resolve(),
+    /** frappe.require(files, callback): bundles are Trevo's own, so it resolves at once — and calls the callback (item.js builds its dashboard there) */
+    require: (_files?: unknown, callback?: () => unknown) => {
+      const p = Promise.resolve();
+      if (typeof callback === "function") void p.then(() => callback());
+      return p;
+    },
     _: __,
   };
 

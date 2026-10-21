@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (37 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (41 today, all passing).
 
 ---
 
@@ -92,6 +92,13 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
 - ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`).
 - ✅ Field descriptions render as (sanitized) HTML.
+- ✅ ERPNext forms load without script errors (probed: Sales/Purchase Order + Invoice, Delivery Note, Stock Entry,
+  Material Request, Payment Entry, Journal Entry, Quotation, Item, Customer): `frm.events.<helper>` (Desk: last
+  registered handler), lenient `frappe.ui.form.Controller` base (StockController helpers, `super.*`),
+  `script_manager.make`, `grid.set_column_disp` + lenient grid, Desk `frm.call` semantics (doc method vs module
+  method, reply applied to doc / child), `locals` keeps cached docs + boot `:Company` / `:Currency`, section
+  `.wrapper` is a jQuery set, `frappe.require` runs its callback, deep-lenient namespaces no longer wrap class
+  instances / DOM nodes.
 - ✅ Runtime robustness: `frappe.ui/utils/db/defaults/model/meta/user/tools/datetime` and field objects return no-ops
   for helpers Trevo hasn't shimmed; `new frappe.Unknown()` is a no-op object; `has_common`, `frappe.user.has_role`,
   `frappe.ui.show_change_password_dialog`, `frappe.db.get_single_value`, `frappe.defaults.is_enabled`,
@@ -267,7 +274,9 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
   Unset Primary, Unlink (`remove_link`), New Address / Contact pre-linked via the form prefill, hidden on new docs —
   `e2e/addresscontact.mjs` (agent-built, judged; judge replaced a Storage monkey-patch with `takePrefill`).
 - ❌ Address autocompletion dialog, Contact quick-entry dialog (phone/email → child rows).
-- ❌ Item stock levels dashboard (`erpnext.stock.ItemDashboard`, `item-dashboard.bundle.js`) on Item / Warehouse.
+- ✅ Item stock levels (`lib/form/shims/itemDashboard.ts`, Desk `item_dashboard.js` + templates): per-warehouse qty bars
+  from `item_dashboard.get_data`, More, Move / Add dialogs → prefilled Stock Entry (`make_stock_entry`) —
+  `e2e/itemdashboard.mjs` (agent-built, judged). ❌ Putaway Rule edit, warehouse-capacity variant.
 - ❌ Serial & Batch selector dialog (`utils/serial_no_batch_selector.js` — SerialBatchPackageSelector) on stock
   transactions; barcode scanning into items (`utils/barcode_scanner.js`, `scan_barcode` field).
 - ✅ Accounting / Stock Ledger preview (`lib/form/shims/ledgerPreview.ts`, `utils/ledger_preview.js`): Preview ▸ buttons

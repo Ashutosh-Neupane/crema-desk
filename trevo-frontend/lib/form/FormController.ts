@@ -16,6 +16,7 @@
  */
 import { toast } from "sonner";
 import { FormDashboard, type DashboardState } from "@/lib/form/dashboard";
+import { getFormatSettings } from "@/lib/frappe/format";
 import { createRuntime, flt, lenient, type Runtime, type RuntimeContext, NOOP } from "@/lib/desk-runtime";
 import { deskCall, isNewDoc, type Doc } from "@/lib/frappe/form";
 import { getNewDoc } from "@/lib/trevo-form/newDoc";
@@ -156,9 +157,15 @@ export class FormController {
   }
 
   /** locals[doctype][name] like Desk, so scripts can do locals[cdt][cdn] */
+  /** Desk's `locals`: this doc + its child rows, kept beside docs scripts cached (frappe.model.with_doc) and the
+   *  boot docs Desk puts there (":Company", ":Currency" — read by frappe.get_doc(":Company", name)) */
   private syncLocals() {
-    const locals: Record<string, Record<string, unknown>> = {};
-    locals[this.meta.name] = { [this.doc.name]: this.doc };
+    const prev = (this.runtime.globals.locals ?? {}) as Record<string, Record<string, unknown>>;
+    const locals: Record<string, Record<string, unknown>> = { ...prev };
+    for (const [dt, docs] of Object.entries(getFormatSettings().docs ?? {})) locals[`:${dt}`] ??= docs;
+    locals[this.meta.name] = { ...(prev[this.meta.name] ?? {}), [this.doc.name]: this.doc };
+    const childTypes = new Set(this.tableFields().map((f) => String(f.options)));
+    for (const dt of childTypes) locals[dt] = {};
     for (const f of this.tableFields()) {
       for (const r of (this.doc[f.fieldname] as Row[]) ?? []) {
         (locals[r.doctype] ??= {})[r.name] = r;
@@ -556,8 +563,9 @@ export class FormController {
         set_query: (fn: QueryFn) => (self.queries[f.fieldname] = fn),
         // HTML fields get a real DOM node (rendered by HtmlHost) so scripts' markup shows up; other fields
         // get an empty jQuery set — calls on it are harmless no-ops
+        // other fields (section breaks, controls) get an empty jQuery set: `.find()`, `.data()`, `.on()` are harmless
         get wrapper() {
-          return f.fieldtype === "HTML" ? (self.htmlWrapper(f.fieldname) ?? {}) : {};
+          return f.fieldtype === "HTML" ? (self.htmlWrapper(f.fieldname) ?? {}) : (self.runtime.globals.$ as () => unknown)();
         },
         get $wrapper() {
           const $ = self.runtime.globals.$ as (el?: unknown) => unknown;
@@ -569,9 +577,9 @@ export class FormController {
         // Autocomplete / Select options from scripts (Desk: control.set_data)
         set_data: (data: unknown) => self.setDf(f.fieldname, "options", Array.isArray(data) ? data.map((x) => (x && typeof x === "object" ? (x as { value?: unknown }).value : x)).join("\n") : data),
         get_query: undefined as unknown,
-        // grid API for tables
+        // grid API for tables; Desk grid methods Trevo doesn't model (toggle_checkboxes, set_multiple_add, …) are no-ops
         grid: TABLE_TYPES.has(f.fieldtype)
-          ? {
+          ? lenient({
               get_field: (child: string) => ({
                 set get_query(fn: QueryFn) {
                   self.queries[`${f.fieldname}.${child}`] = fn;
@@ -581,10 +589,14 @@ export class FormController {
               toggle_reqd: (child: string, reqd: boolean) => self.setDf(`${f.fieldname}.${child}`, "reqd", reqd ? 1 : 0),
               toggle_display: (child: string, show: boolean) => self.setDf(`${f.fieldname}.${child}`, "hidden", show ? 0 : 1),
               update_docfield_property: (child: string, prop: string, value: unknown) => self.setDf(`${f.fieldname}.${child}`, prop, value),
+              /** Desk grid.set_column_disp(fieldname | fieldnames, show) */
+              set_column_disp: (child: string | string[], show: boolean) => {
+                for (const c of Array.isArray(child) ? child : [child]) self.setDf(`${f.fieldname}.${c}`, "hidden", show ? 0 : 1);
+              },
               add_custom_button: () => {},
               refresh: () => {},
               cannot_add_rows: false,
-            }
+            }, false)
           : undefined,
       };
       Object.defineProperty(fieldsDict[f.fieldname], "get_query", {
@@ -672,21 +684,59 @@ export class FormController {
         return row;
       },
       clear_table: (table: string) => self.setRows(table, []),
-      call: async (method: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void }, args?: Record<string, unknown>) => {
-        const o = typeof method === "string" ? { method, args } : method;
-        const { env } = await deskCall("frappe.handler.run_doc_method", {
-          docs: JSON.stringify(self.doc),
-          method: o.method,
-          args: JSON.stringify(o.args ?? {}),
-        });
-        const updated = (env.docs as Doc[] | undefined)?.[0];
-        if (updated) self.load(updated);
+      /**
+       * Desk frm.call: frm.call("method", args) and {doc} run a controller method on the document (run_doc_method);
+       * {method} without doc is a plain frappe.call (module path prefixed when there's no dot), and a plain-object
+       * reply is applied to opts.child or to the doc.
+       */
+      call: async (
+        method: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void; doc?: Doc; child?: Row },
+        args?: Record<string, unknown>,
+        callback?: (r: unknown) => void,
+      ) => {
+        const o = typeof method === "string" ? { method, args, callback, doc: self.doc as Doc } : method;
+        if (o.doc) {
+          const { env } = await deskCall("frappe.handler.run_doc_method", {
+            docs: JSON.stringify(o.doc),
+            method: o.method,
+            args: JSON.stringify(o.args ?? {}),
+          });
+          const updated = (env.docs as Doc[] | undefined)?.[0];
+          if (updated && updated.doctype === self.meta.name) self.load(updated);
+          o.callback?.(env);
+          return env;
+        }
+        let m = o.method;
+        if (!m.includes(".")) {
+          const scrub = (x: unknown) => String(x ?? "").toLowerCase().replace(/[ -]/g, "_");
+          const mod = scrub(self.meta.module);
+          const app = (self.ctx.boot?.module_app as Record<string, string> | undefined)?.[mod] ?? "frappe";
+          m = `${app}.${mod}.doctype.${scrub(self.meta.name)}.${scrub(self.meta.name)}.${m}`;
+        }
+        const { env } = await deskCall(m, o.args ?? {});
+        const msg = env.message;
+        if (msg && typeof msg === "object" && !Array.isArray(msg)) {
+          if (o.child) {
+            // Desk skips the standard + child-table fields when updating the row
+            const skip = new Set(["doctype", "name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "parent", "parentfield", "parenttype"]);
+            const patch = Object.fromEntries(Object.entries(msg as Record<string, unknown>).filter(([k]) => !skip.has(k)));
+            await self.set_child_value(String(o.child.doctype), o.child.name, patch);
+          }
+          else await self.set_value(msg as Record<string, unknown>);
+        }
         o.callback?.(env);
         return env;
       },
       trigger: (event: string, cdt?: string, cdn?: string) => self.trigger(event, cdt, cdn),
       script_manager: {
         trigger: (event: string, cdt?: string, cdn?: string) => self.trigger(event, cdt, cdn),
+        /** Desk script_manager.make(ControllerClass): frm.cscript = extend_cscript(frm.cscript, new Class({ frm })) */
+        make: (ControllerClass: new (o: Record<string, unknown>) => Record<string, unknown>) => {
+          const extend = self.runtime.globals.extend_cscript as ((c: unknown, o: unknown) => Record<string, unknown>) | undefined;
+          const ctl = new ControllerClass({ frm: self.frm });
+          self.frm.cscript = extend ? extend(self.frm.cscript, ctl) : Object.assign((self.frm.cscript ?? {}) as object, ctl);
+        },
+        has_handlers: (event: string, doctype?: string) => (self.runtime.frappe.ui.form.handlers.get(doctype ?? self.meta.name)?.get(event)?.length ?? 0) > 0,
         /** copy fields from the table's first row into `row` when empty (Desk grid helper) */
         copy_from_first_row: (table: string, row: Row, fields: string[]) => {
           const first = ((self.doc[table] as Row[]) ?? [])[0];
@@ -709,7 +759,12 @@ export class FormController {
       layout: { refresh_sections() {}, show_message: (html?: string, color?: string, permanent?: boolean) => self.dash.showMessage(html, color, permanent) },
       perm: [{ read: 1, write: 1, create: 1, submit: 1, cancel: 1, delete: 1 }],
       toolbar: { refresh() {} },
-      events: {},
+      // Desk: frm.events[name] is the last handler registered for this doctype (frappe.ui.form.on), so scripts
+      // call their own helpers as frm.events.show_bom_custom_button(frm)
+      events: new Proxy({} as Record<string, unknown>, {
+        get: (own, k) => (typeof k !== "string" ? undefined : k in own ? own[k] : self.runtime.frappe.ui.form.handlers.get(self.meta.name)?.get(k)?.at(-1)),
+        has: (own, k) => typeof k === "string" && (k in own || !!self.runtime.frappe.ui.form.handlers.get(self.meta.name)?.get(k)?.length),
+      }),
     };
     // frappe.model.set_value(cdt, cdn, field, value) is the child-row setter scripts use most
     const model = this.runtime.frappe.model as Record<string, unknown>;

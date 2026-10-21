@@ -132,6 +132,17 @@ against Desk's source, re-ran its test, fixed problems, and committed separately
   which also made Duplicate / Quick Entry → full form / mapped docs flaky.
 - Full suite 35/37; the 2 failures (calendar setup insert under load, useractions compile timeout) pass alone.
 
+## 2026-10-21 — multi-agent round 2 + runtime fixes from agent findings
+- Sonnet — query report Save As + PDF (accepted). Haiku — Toggle Full Width + desk_theme seeding (accepted); judge
+  fixed hydration mismatches (theme icon, report Save As button, home greeting) — none left on home/forms/reports.
+- Sonnet — ledger preview (accepted). Sonnet — Item stock levels (accepted; its frappe.require override removed in
+  favour of the runtime fix).
+- Agents' reports exposed runtime gaps that broke whole ERPNext forms; fixed by the judge in the runtime:
+  frm.events, lenient Controller base, script_manager.make, grid.set_column_disp + lenient grid, Desk frm.call,
+  locals (kept + boot docs), section wrapper as jQuery, frappe.require callback, deep-lenient only for plain objects.
+  Probe of 13 ERPNext forms: no script errors. Dev server was OOM-killed once mid-round (restarted); a run while the
+  Mac slept timed out and passed on re-run. Full suite 41/41.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)
