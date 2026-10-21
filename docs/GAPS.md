@@ -270,7 +270,9 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ Item stock levels dashboard (`erpnext.stock.ItemDashboard`, `item-dashboard.bundle.js`) on Item / Warehouse.
 - ❌ Serial & Batch selector dialog (`utils/serial_no_batch_selector.js` — SerialBatchPackageSelector) on stock
   transactions; barcode scanning into items (`utils/barcode_scanner.js`, `scan_barcode` field).
-- ❌ Accounting / stock ledger preview (`utils/ledger_preview.js`) on draft invoices / stock entries.
+- ✅ Accounting / Stock Ledger preview (`lib/form/shims/ledgerPreview.ts`, `utils/ledger_preview.js`): Preview ▸ buttons
+  on drafts, same methods, rows in a dialog (static table, no datatable filters) — `e2e/ledgerpreview.mjs`
+  (agent-built, judged; Sales Invoice + Purchase Receipt).
 - ❌ Unreconcile dialog (`utils/unreconcile.js`), Payment Reconciliation allocation, Bank Reconciliation Tool
   (`bank-reconciliation-tool.bundle.js` — datatable + dialogs inside a Single doctype).
 - ❌ Item selector / quick add (`utils/item_selector.js`), party quick entries (`customer_quick_entry.js`,
