@@ -2,7 +2,7 @@
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
-Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (45 today, all passing).
+Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (48 today, all passing).
 
 ---
 
@@ -107,10 +107,11 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   script dialogs; `set_route(..., {options})`.
 - ✅ Singles open their form from the list route (Desk router); `/desk/system-health-report` → the single.
 - 🟡 Virtual / Single DocTypes rendered read-only like Desk (System Health Report).
-- 🟡 `frappe.ui.Dialog` from scripts (`ui/dialog.js`, `ui/field_group.js`): fields render through FormBody — verify
-  Table fields with `data` / `get_data`, HTML fields with `$wrapper`, `fields_dict.x.grid`, `set_query` / `get_query`,
-  `onchange`, `depends_on`, size, `disable_primary_action`, `frappe.ui.form.MultiSelect`, `frappe.prompt` with field list,
-  `frappe.msgprint({ primary_action })`, `frappe.show_progress`, `frappe.ui.form.LinkSelector` (`link_selector.js`).
+- ✅ `frappe.ui.Dialog` from scripts (`lib/desk-runtime/dialogs.ts`, `components/desk/DialogTable.tsx`): Table fields
+  (`data` / `fields` / `get_data`, `grid.refresh / add_new_row / delete_rows / get_selected_children`, child `onchange`
+  / `get_query`), `depends_on` / `mandatory_depends_on`, HTML `$wrapper` as a real node, `set_indicator`,
+  `disable_primary_action`, `add_custom_action`, `set_secondary_action_label` — `e2e/dialogs.mjs` (agent-built, judged).
+- ❌ Dialog grids: child-field `depends_on`, row form, pagination, drag-reorder; Table MultiSelect in dialogs.
 - ❌ Translation of field values (`views/translation_manager.js`, `translatable` fields).
 - ❌ Interaction composer: New Event / ToDo from a document (`views/interaction.js`).
 - ❌ Print: raw / QZ Tray printing (`form/print_utils.js`), network printer selection, letter head preview in the composer.
@@ -212,8 +213,10 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 ### 2.7 Workspaces, desktop, sidebar (`views/workspace`, `widgets/*`, `ui/sidebar/*`, `desktop_icons.bundle.js`)
 - ✅ Workspace render: header, paragraph, spacer, shortcut (with stats filter count), card links, chart, number card,
   quick list; sidebar from boot; desktop page.
-- ❌ Workspace blocks: onboarding widget (`onboarding_widget.js`, Module Onboarding steps), custom HTML block
-  (`custom_block_widget.js`, Custom HTML Block doctype with its own JS/CSS).
+- ✅ Workspace onboarding block (`components/desk/OnboardingWidget.tsx`: `get_desktop_page` onboardings honouring
+  `enable_onboarding`, steps, progress, skip, step actions via `update_onboarding_step`, 24 h dismiss) and Custom HTML
+  Block (`CustomBlock.tsx`: shadow root, scoped style, script with `root_element`) — `e2e/workspaceblocks.mjs`
+  (agent-built, judged). ❌ Form-tour / route_hooks auto-tick, quick entry and Import from a step.
 - ❌ Workspace editing (`views/workspace/blocks`, Editor.js): add/move/resize blocks, new widget dialogs
   (`widget_dialog.js`, `new_widget.js`), create/duplicate/delete/hide workspace, public vs private, workspace restore.
 - ❌ v16 sidebar: dock (`ui/sidebar/dock.js`, pinned/floating), sidebar arrangement editor
@@ -224,9 +227,10 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 ### 2.8 Shell, navigation, search (`ui/toolbar/*`, `ui/keyboard.js`, `router.js`)
 - ✅ ⌘K awesomebar (doctypes, records, reports, pages), keyboard shortcuts dialog, notifications panel, breadcrumbs,
   `frappe.set_route` for Desk pages + route_options.
-- ❌ Awesomebar extras (`awesome_bar.js`, `search_utils.js`): calculator, "New X", "Search for X in DocType", tag
-  search (`#tag`), help articles, recent items ranking (`fuzzy_match.js`), global search results page
-  (`frappe.utils.global_search.search`).
+- ✅ Awesomebar extras (`lib/search/*`, Desk `awesome_bar.js` / `search_utils.js`): "new <DocType>" (can_create),
+  calculator (safe parser, no eval; copies the result), "<text> in <DocType>" → list `?q=` (the list follows `?q=`
+  while mounted) — `e2e/awesomebar.mjs` (agent-built, judged).
+- ❌ Global search results page ("Search for '<text>'"), `#tag` search, help articles, recents ranking (`fuzzy_match.js`).
 - ✅ Desk URLs resolved like Desk's router (`app/(desk)/desk/[slug]`, `resolveDeskPath`): shell prefix, workspace
   slug, DocType slug (list / `view/x` / `new` / record), standard routes (`List/User`), else Desk Page; query kept.
   Used by pasted Desk links, Navbar Settings routes and `frappe.set_route("/app/…")` (`e2e/usermenu.mjs`).

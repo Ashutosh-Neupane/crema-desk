@@ -2,7 +2,9 @@
 
 /**
  * ⌘K awesomebar — mirrors Frappe Desk's search bar:
- *  - DocTypes the user can read → "<DocType> List" / open Single, and "New <DocType>"
+ *  - DocTypes the user can read → "<DocType> List" / open Single, and "New <DocType>" (after "new")
+ *  - "<text> in <DocType>" → that list filtered by the text
+ *  - Calculator: "3*7+2" → "3*7+2 = 23" (copies the result)
  *  - Reports (allowed_reports) and module workspaces
  *  - Full-text document search (frappe.utils.global_search) for 2+ chars
  * Opens on ⌘K / Ctrl+K (TrevoShell dispatches `trevo:command-palette`) or the trigger button.
@@ -11,10 +13,13 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Command } from "cmdk";
-import { Search, FileText, Plus, List, BarChart3, LayoutGrid, Settings2, Moon, Sun, Monitor } from "lucide-react";
+import { Search, FileText, Plus, List, BarChart3, LayoutGrid, Settings2, Moon, Sun, Monitor, Calculator } from "lucide-react";
 import { useGlobalSearch } from "@/lib/hooks/useSearch";
+import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
 import type { AwesomebarIndex } from "@/app/api/awesomebar/route";
+import { calculate } from "@/lib/search/calculator";
+import { newDoctypeQuery, score, searchInQuery } from "@/lib/search/awesomebar";
 
 const MAX_PER_GROUP = 8;
 
@@ -26,16 +31,6 @@ interface Entry {
   icon: typeof FileText;
   /** text matched against the query */
   key: string;
-}
-
-/** Desk-like ranking: exact > prefix > word-start > substring; null = no match. */
-function score(key: string, q: string): number | null {
-  const k = key.toLowerCase();
-  if (k === q) return 0;
-  if (k.startsWith(q)) return 1;
-  if (k.split(/[\s_-]+/).some((w) => w.startsWith(q))) return 2;
-  if (k.includes(q)) return 3;
-  return null;
 }
 
 function rank(entries: Entry[], q: string): Entry[] {
@@ -55,6 +50,9 @@ export default function CommandPalette() {
   const router = useRouter();
   const uiStore = useUIStore();
   const q = search.trim().toLowerCase();
+  const { data: ctx } = useDeskContext();
+  const canCreate = useMemo(() => new Set(ctx?.perms?.can_create ?? []), [ctx]);
+  const calc = useMemo(() => calculate(search), [search]);
 
   const { data: index } = useQuery<AwesomebarIndex>({
     queryKey: ["awesomebar-index"],
@@ -99,7 +97,7 @@ export default function CommandPalette() {
     [close, router],
   );
 
-  const { lists, creates, reports, workspaces } = useMemo(() => {
+  const { lists, creates, finds, reports, workspaces } = useMemo(() => {
     const listEntries: Entry[] = [];
     const createEntries: Entry[] = [];
     for (const d of index?.doctypes ?? []) {
@@ -110,7 +108,8 @@ export default function CommandPalette() {
         icon: d.single ? Settings2 : List,
         key: d.name,
       });
-      if (d.create) {
+      // Desk get_creatables: "new" + text → New <DocType> for each doctype in boot.user.can_create
+      if (!d.single && canCreate.has(d.name)) {
         createEntries.push({
           id: `new:${d.name}`,
           label: `New ${d.name}`,
@@ -136,14 +135,29 @@ export default function CommandPalette() {
       icon: LayoutGrid,
       key: w.name,
     }));
-    if (!q) return { lists: [], creates: [], reports: [], workspaces: wsEntries.slice(0, MAX_PER_GROUP) };
+    if (!q) return { lists: [], creates: [], finds: [], reports: [], workspaces: wsEntries.slice(0, MAX_PER_GROUP) };
+
+    // Desk get_creatables: a bare "new" lists every creatable doctype, "new <text>" fuzzy-matches them
+    const newQuery = newDoctypeQuery(search);
+    const creatable = newQuery === null ? [] : newQuery === "" ? createEntries.slice(0, MAX_PER_GROUP) : rank(createEntries, newQuery);
+
+    // Desk get_search_in_list: "<text> in <DocType>" → the doctype's list with ?q=<text>
+    const inQuery = searchInQuery(search);
+    const findEntries: Entry[] = inQuery
+      ? rank(
+          (index?.doctypes ?? []).filter((d) => !d.single).map((d) => ({ id: `find:${d.name}`, label: `Find ${inQuery.text} in ${d.name}`, href: `/desk/doctype/${enc(d.name)}?q=${enc(inQuery.text)}`, icon: Search, key: d.name })),
+          inQuery.target.toLowerCase(),
+        )
+      : [];
+
     return {
       lists: rank(listEntries, q),
-      creates: rank(createEntries, q).slice(0, 3),
+      creates: creatable,
+      finds: findEntries,
       reports: rank(reportEntries, q),
       workspaces: rank(wsEntries, q),
     };
-  }, [index, q]);
+  }, [index, q, search, canCreate]);
 
   const docs = (Array.isArray(searchResults) ? searchResults : []) as Array<{
     doctype?: string;
@@ -175,7 +189,7 @@ export default function CommandPalette() {
       </Command.Group>
     );
 
-  const nothing = q && !lists.length && !creates.length && !reports.length && !workspaces.length && !docs.length;
+  const nothing = q && !calc && !lists.length && !creates.length && !finds.length && !reports.length && !workspaces.length && !docs.length;
 
   return (
     <>
@@ -212,8 +226,27 @@ export default function CommandPalette() {
               </div>
 
               <Command.List className="max-h-[60vh] overflow-y-auto p-2">
+                {calc && (
+                  <Command.Group>
+                    <Command.Item
+                      value={`calc:${calc.expr}`}
+                      onSelect={() => {
+                        void navigator.clipboard?.writeText(calc.text).catch(() => {});
+                        close();
+                      }}
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-800 data-[selected=true]:bg-zinc-100 dark:text-zinc-200 dark:data-[selected=true]:bg-zinc-800"
+                    >
+                      <Calculator className="h-4 w-4 shrink-0 text-zinc-500" />
+                      <span className="truncate">
+                        {calc.expr} = <span className="font-semibold">{calc.text}</span>
+                      </span>
+                      <span className="ml-auto truncate text-xs text-zinc-400">Copy result</span>
+                    </Command.Item>
+                  </Command.Group>
+                )}
                 {group("Lists", lists)}
                 {group("Create", creates)}
+                {group("Find in list", finds)}
                 {group("Reports", reports)}
                 {group(q ? "Workspaces" : "Go to workspace", workspaces)}
 

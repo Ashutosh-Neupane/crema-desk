@@ -152,6 +152,14 @@ against Desk's source, re-ran its test, fixed problems, and committed separately
   Button fields → child events, so ERPNext's own "Add Serial / Batch No" button opens it.
 - Full suite 43/44 → listsettings fixed (polluted ToDo list state from bulk) → 45 suites.
 
+## 2026-10-21 — multi-agent round 4
+- Sonnet — frappe.ui.Dialog parity (Table fields, depends_on, $wrapper, set_indicator, primary disable, custom
+  actions): accepted. Sonnet — workspace onboarding + Custom HTML Block: accepted; judge made its test wait for the
+  block's separate load. Haiku — awesomebar "new X", calculator (no eval), "<text> in <DocType>": accepted; judge
+  fixed ListView ignoring `?q=` changes while mounted.
+- Three agents testing on one dev server made /desk compile for ~20 min; idle server answers in ~3 s. Full suite
+  46/47 (awesomebar compile timing, passes twice alone) → 48 suites.
+
 ## 2026-10-17 — session 2: Tree view, Query reports
 Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/scripts regressions.
 - Tree view `/desk/doctype/X/view/tree` driven by the DocType's `__tree_js` (Account, Item Group)

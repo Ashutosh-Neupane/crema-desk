@@ -74,6 +74,13 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   const filters = useMemo(() => filtersFromParams(doctype, new URLSearchParams(params.toString())), [doctype, params]);
   const [search, setSearch] = useState(params.get("q") ?? "");
+  // ?q= can change while this list stays mounted (awesomebar "<text> in <DocType>"): follow the URL
+  const urlQ = params.get("q") ?? "";
+  const [prevUrlQ, setPrevUrlQ] = useState(urlQ);
+  if (prevUrlQ !== urlQ) {
+    setPrevUrlQ(urlQ);
+    setSearch(urlQ);
+  }
   const [debounced, setDebounced] = useState(search);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 250);
