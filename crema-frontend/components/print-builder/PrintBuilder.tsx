@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Eye, ExternalLink, Loader2, PencilRuler, Redo2, Search, Trash2, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Copy, Download, Eye, ExternalLink, Loader2, PencilRuler, Redo2, Search, Trash2, Undo2, X } from "lucide-react";
 import Canvas from "@/components/print-builder/Canvas";
 import CodeField from "@/lib/crema-form/controls/CodeField";
 import { fetchDoctypeMetaClient } from "@/lib/frappe/doctype";
@@ -19,7 +19,9 @@ import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { useBuilder } from "@/lib/print-builder/useBuilder";
 import {
   BLOCKS,
+  PAPERS,
   addField,
+  duplicateField,
   fieldFromDocField,
   getSection,
   insertSection,
@@ -30,11 +32,13 @@ import {
   removeField,
   removeSection,
   setColumnCount,
+  tableColumnChoices,
   updateField,
   updateSection,
   type PFField,
   type PFSection,
   type Selection,
+  type TableColumn,
 } from "@/lib/print-builder/layout";
 
 const PAGE_NUMBERS = ["Hide", "Top Left", "Top Center", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right"];
@@ -62,8 +66,57 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+/** Table block columns: which child-table fields print, in what order, how wide (Desk's table column picker) */
+function TableColumns({ field, onChange }: { field: PFField; onChange: (cols: TableColumn[]) => void }) {
+  const [child, setChild] = useState<DocTypeMeta | null>(null);
+  const childType = String(field.options ?? "");
+  useEffect(() => {
+    let alive = true;
+    if (childType) void fetchDoctypeMetaClient(childType).then((m) => alive && setChild(m)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [childType]);
+  const cols = (field.table_columns as TableColumn[] | undefined) ?? [];
+  const choices = child ? tableColumnChoices(child).filter((tf) => !cols.some((c) => c.fieldname === tf.fieldname)) : [];
+  const total = cols.reduce((n, c) => n + (Number(c.width) || 0), 0);
+  const move = (i: number, d: number) => {
+    const next = [...cols];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    onChange(next);
+  };
+  return (
+    <Group title="Table columns">
+      <ul className="space-y-1" aria-label="Table columns">
+        {cols.map((c, i) => (
+          <li key={c.fieldname} className="flex items-center gap-1">
+            <span className="min-w-0 flex-1 truncate text-sm text-zinc-800 dark:text-zinc-200" title={c.fieldname}>{c.label || c.fieldname}</span>
+            <input type="number" min={1} max={100} aria-label={`Width of ${c.label || c.fieldname}`} title="Width (% of the table)" className={`${input} w-12 px-1 text-center`} value={String(c.width ?? "")} onChange={(e) => onChange(cols.map((x, j) => (j === i ? { ...x, width: Number(e.target.value) || undefined } : x)))} />
+            <button type="button" aria-label={`Move ${c.label || c.fieldname} up`} disabled={i === 0} onClick={() => move(i, -1)} className="rounded p-0.5 text-zinc-400 hover:text-zinc-800 disabled:opacity-30 dark:hover:text-zinc-100"><ArrowUp className="h-3.5 w-3.5" /></button>
+            <button type="button" aria-label={`Move ${c.label || c.fieldname} down`} disabled={i === cols.length - 1} onClick={() => move(i, 1)} className="rounded p-0.5 text-zinc-400 hover:text-zinc-800 disabled:opacity-30 dark:hover:text-zinc-100"><ArrowDown className="h-3.5 w-3.5" /></button>
+            <button type="button" aria-label={`Remove column ${c.label || c.fieldname}`} onClick={() => onChange(cols.filter((_, j) => j !== i))} className="rounded p-0.5 text-zinc-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+          </li>
+        ))}
+      </ul>
+      <p className={`text-xs ${total > 100 ? "text-amber-600" : "text-zinc-500"}`}>Widths add up to {total}%{total > 100 ? " — columns will squeeze" : ""}.</p>
+      {choices.length > 0 && (
+        <select aria-label="Add column" className={input} value="" onChange={(e) => {
+          const tf = choices.find((x) => x.fieldname === e.target.value);
+          if (tf) onChange([...cols, { label: tf.label, fieldname: tf.fieldname, fieldtype: tf.fieldtype, options: tf.options, width: 10 }]);
+        }}>
+          <option value="">Add column…</option>
+          {choices.map((tf) => <option key={tf.fieldname} value={tf.fieldname}>{tf.label || tf.fieldname}</option>)}
+        </select>
+      )}
+    </Group>
+  );
+}
+
+type Prefs = { record?: string; letterhead?: string; paper?: string };
+
 export default function PrintBuilder({ name, deskHref }: { name: string; deskHref: string }) {
   const b = useBuilder(name);
+  const { edit, undo, redo, previewDoc } = b;
   const [selection, setSelection] = useState<Selection>(null);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [tab, setTab] = useState<"fields" | "blocks">("fields");
@@ -72,10 +125,35 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
   const [sample, setSample] = useState<Record<string, unknown> | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [records, setRecords] = useState<string[]>([]);
+  const [letterHeads, setLetterHeads] = useState<Array<{ name: string; is_default?: number }>>([]);
+  // preview record, letter head and paper aren't part of a Print Format; remembered per format in this browser
+  const prefsKey = `crema.pfb.${name}`;
+  const [prefs, setPrefs] = useState<Prefs>({});
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot restore from localStorage after hydration
+      setPrefs(JSON.parse(localStorage.getItem(prefsKey) ?? "{}") as Prefs);
+    } catch {
+      /* private window: defaults */
+    }
+  }, [prefsKey]);
+  const setPref = (patch: Prefs) =>
+    setPrefs((p) => {
+      const next = { ...p, ...patch };
+      try {
+        localStorage.setItem(prefsKey, JSON.stringify(next));
+      } catch {
+        /* not persisted */
+      }
+      return next;
+    });
+  const paper = PAPERS.find((x) => x.key === prefs.paper) ?? PAPERS[0];
   const doctype = b.doc ? String(b.doc.doc_type ?? "") : "";
   const readOnly = b.doc?.standard === "Yes";
 
-  // the DocType's meta and the latest printable record for sample values (Desk printable_sample)
+  // the DocType's meta, recent printable records to sample from (Desk printable_sample) and the letter heads
   useEffect(() => {
     if (!doctype) return;
     let alive = true;
@@ -84,11 +162,16 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
       if (!alive) return;
       setMeta(m);
       try {
-        const { env } = await deskCall("frappe.client.get_list", { doctype, filters: m?.is_submittable ? { docstatus: 1 } : {}, fields: ["name"], order_by: "modified desc", limit_page_length: 1 });
-        const first = (env.message as Array<{ name: string }> | undefined)?.[0]?.name;
-        if (first && alive) setSample((await getDoc(doctype, first)).doc);
+        const { env } = await deskCall("frappe.client.get_list", { doctype, filters: m?.is_submittable ? { docstatus: 1 } : {}, fields: ["name"], order_by: "modified desc", limit_page_length: 20 });
+        if (alive) setRecords(((env.message as Array<{ name: string }> | undefined) ?? []).map((r) => r.name));
       } catch {
-        /* no sample: cards show labels only */
+        /* no records: cards show labels only */
+      }
+      try {
+        const { env } = await deskCall("frappe.client.get_list", { doctype: "Letter Head", filters: { disabled: 0 }, fields: ["name", "is_default"], order_by: "is_default desc, name asc", limit_page_length: 50 });
+        if (alive) setLetterHeads((env.message as Array<{ name: string; is_default?: number }>) ?? []);
+      } catch {
+        /* no access to Letter Head: only the default */
       }
     })();
     return () => {
@@ -96,9 +179,26 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
     };
   }, [doctype]);
 
+  const sampleName = prefs.record && records.includes(prefs.record) ? prefs.record : records[0];
+  useEffect(() => {
+    if (!doctype || !sampleName) return;
+    let alive = true;
+    getDoc(doctype, sampleName)
+      .then(({ doc }) => alive && setSample(doc))
+      .catch(() => alive && setSample(null));
+    return () => {
+      alive = false;
+    };
+  }, [doctype, sampleName]);
+  /** render_builder_preview / download_builder_preview_pdf arguments for the current draft */
+  const previewArgs = useCallback(() => {
+    const pf = previewDoc();
+    if (!pf || !sample) return null;
+    return { print_format: JSON.stringify(pf), doctype, name: sample.name, letterhead: prefs.letterhead || undefined, settings: JSON.stringify(paper.settings) };
+  }, [previewDoc, sample, doctype, prefs.letterhead, paper]);
+
   const layout = b.layout;
   const settings = b.settings;
-  const { edit, undo, redo, previewDoc } = b;
   const setLayout = useCallback((fn: (l: NonNullable<typeof layout>) => NonNullable<typeof layout>) => edit((s) => ({ ...s, layout: fn(s.layout) })), [edit]);
   const setSetting = (k: string, v: unknown) => edit((s) => ({ ...s, settings: { ...s.settings, [k]: v } }));
 
@@ -117,7 +217,14 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
     }
   }, [layout, selection, setLayout, undo]);
 
-  // keyboard: Delete / Backspace, ⌘Z, ⇧⌘Z / ⌘Y, Escape — not while typing
+  const duplicateSelected = useCallback(() => {
+    if (!layout || selection?.kind !== "field") return;
+    const { layout: next, selection: sel } = duplicateField(layout, selection.s, selection.c, selection.f);
+    setLayout(() => next);
+    setSelection(sel);
+  }, [layout, selection, setLayout]);
+
+  // keyboard: Delete / Backspace, ⌘D, ⌘Z, ⇧⌘Z / ⌘Y, Escape — not while typing
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -127,6 +234,9 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      } else if (mod && e.key === "d" && selection?.kind === "field" && mode === "edit" && !readOnly) {
+        e.preventDefault();
+        duplicateSelected();
       } else if (mod && e.key === "y") {
         e.preventDefault();
         redo();
@@ -137,7 +247,7 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [undo, redo, selection, removeSelected, mode, readOnly]);
+  }, [undo, redo, selection, removeSelected, duplicateSelected, mode, readOnly]);
 
   // warn before leaving with an edit that hasn't reached the draft yet
   useEffect(() => {
@@ -148,14 +258,14 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
   }, [b.status]);
 
   const renderPreview = useCallback(async () => {
-    const pf = previewDoc();
-    if (!pf || !sample) {
+    const args = previewArgs();
+    if (!args) {
       setPreviewHtml(null);
       return;
     }
     setPreviewBusy(true);
     try {
-      const { env } = await deskCall("frappe.utils.print_format_generator.render_builder_preview", { print_format: JSON.stringify(pf), doctype, name: sample.name });
+      const { env } = await deskCall("frappe.utils.print_format_generator.render_builder_preview", args);
       setPreviewHtml(typeof env.message === "string" ? env.message : "");
     } catch (e) {
       setPreviewHtml(null);
@@ -163,7 +273,39 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
     } finally {
       setPreviewBusy(false);
     }
-  }, [previewDoc, sample, doctype]);
+  }, [previewArgs]);
+
+  /** the draft as a PDF, through the format's own PDF renderer (Desk's builder "Download PDF") */
+  const downloadPdf = async () => {
+    const args = previewArgs();
+    if (!args) return;
+    setPdfBusy(true);
+    try {
+      const res = await fetch("/api/frappe/api/method/frappe.utils.print_format_generator.download_builder_preview_pdf", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      });
+      if (!res.ok || !(res.headers.get("content-type") ?? "").includes("pdf")) {
+        const env = (await res.json().catch(() => ({}))) as { exception?: string; exc_type?: string };
+        const msg = env.exception?.split("\n")[0] || `PDF failed (${res.status})`;
+        // builder formats print through the server's Chromium (also when "wkhtmltopdf" is picked, print_format_generator
+        // render_pdf); in containers it often can't start for missing system libraries such as libnss3
+        throw new Error(/Chromium/i.test(msg) ? `${msg} The server's PDF renderer (Chromium) isn't working — ask your administrator.` : msg);
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name} - ${String(args.name)}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not make the PDF");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async render; the HTML is set after the await
     if (mode === "preview") void renderPreview();
@@ -300,31 +442,58 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
 
         {/* centre */}
         <main aria-label="Canvas" className="min-h-0 overflow-auto bg-zinc-100 p-4 sm:p-6 dark:bg-zinc-950">
+          <div role="toolbar" aria-label="Preview options" className="mx-auto mb-3 flex w-full flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" style={{ maxWidth: `max(${paper.width}mm, 36rem)` }}>
+            <label className="flex items-center gap-1">
+              Sample
+              <select aria-label="Sample record" className={`${input} h-7 w-auto max-w-[13rem] text-xs`} value={sampleName ?? ""} onChange={(e) => setPref({ record: e.target.value })} disabled={!records.length}>
+                {!records.length && <option value="">No {doctype} yet</option>}
+                {records.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1">
+              Letter head
+              <select aria-label="Letter head" className={`${input} h-7 w-auto max-w-[11rem] text-xs`} value={prefs.letterhead ?? ""} onChange={(e) => setPref({ letterhead: e.target.value })}>
+                <option value="">Default</option>
+                <option value="No Letterhead">None</option>
+                {letterHeads.map((l) => <option key={l.name} value={l.name}>{l.name}{l.is_default ? " (default)" : ""}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1">
+              Paper
+              <select aria-label="Paper" className={`${input} h-7 w-auto text-xs`} value={paper.key} onChange={(e) => setPref({ paper: e.target.value })}>
+                {PAPERS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => void downloadPdf()} disabled={!sample || pdfBusy} className={`${btn} ml-auto h-7 text-xs`}>
+              {pdfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} PDF
+            </button>
+          </div>
           {mode === "edit" ? (
             <Canvas
               layout={layout}
               settings={settings}
               meta={meta}
               sample={sample}
+              paper={paper}
               selection={selection}
               onSelect={setSelection}
-              onRemoveField={(s, c, f) => { const { sectionRemoved } = removeField(layout, s, c, f); setLayout((l) => removeField(l, s, c, f).layout); setSelection(null); toast(sectionRemoved ? "Field and its empty section removed" : "Field removed", { action: { label: "Undo", onClick: () => b.undo() } }); }}
-              onRemoveSection={(s) => { setLayout((l) => removeSection(l, s)); setSelection(null); toast("Section removed", { action: { label: "Undo", onClick: () => b.undo() } }); }}
+              onRemoveField={(s, c, f) => { const { sectionRemoved } = removeField(layout, s, c, f); setLayout((l) => removeField(l, s, c, f).layout); setSelection(null); toast(sectionRemoved ? "Field and its empty section removed" : "Field removed", { action: { label: "Undo", onClick: () => undo() } }); }}
+              onRemoveSection={(s) => { setLayout((l) => removeSection(l, s)); setSelection(null); toast("Section removed", { action: { label: "Undo", onClick: () => undo() } }); }}
               onColumns={(s, n) => setLayout((l) => updateSection(l, s, (sec) => setColumnCount(sec, n)))}
               onInsertSection={(at) => { setLayout((l) => insertSection(l, at)); setSelection({ kind: "section", s: at }); }}
               onMoveSection={(from, to) => { setLayout((l) => moveSection(l, from, to)); setSelection(null); }}
               onMoveField={(from, to) => { setLayout((l) => moveField(l, from, to)); setSelection(null); }}
             />
           ) : (
-            <div className="mx-auto w-full max-w-[210mm]">
+            <div className="mx-auto w-full" style={{ maxWidth: `calc(${paper.width}mm + 4rem)` }}>
               {!sample ? (
                 <p className="rounded-lg bg-white p-6 text-sm text-zinc-500 shadow">No {doctype} to preview with yet{meta?.is_submittable ? " (only submitted documents print)" : ""}.</p>
               ) : previewBusy && !previewHtml ? (
                 <div className="flex h-64 items-center justify-center rounded-lg bg-white shadow"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" aria-label="Rendering preview" /></div>
               ) : (
                 <>
-                  <p className="mb-2 text-xs text-zinc-500">Rendered by the server with this draft, using {doctype} {String(sample.name)}.</p>
-                  <iframe title="Print preview" srcDoc={previewHtml ?? ""} sandbox="allow-scripts" className="h-[297mm] w-full rounded-sm bg-white shadow-lg" />
+                  <p className="mb-2 text-xs text-zinc-500">Rendered by the server with this draft, using {doctype} {String(sample.name)}.{previewBusy ? " Updating…" : ""}</p>
+                  <iframe title="Print preview" srcDoc={previewHtml ?? ""} sandbox="allow-scripts" className="w-full rounded-sm" style={{ height: `calc(${paper.height}mm + 4rem)` }} />
                 </>
               )}
             </div>
@@ -397,7 +566,11 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
                   <Row label="Show text" htmlFor="pfb-bt"><input id="pfb-bt" type="checkbox" className="h-4 w-4 justify-self-start" checked={!!selField.show_text} onChange={(e) => patchField({ show_text: e.target.checked })} /></Row>
                 </Group>
               )}
-              <div className="px-4 py-3">
+              {(selField.fieldtype === "Table" || selField.fieldtype === "Table MultiSelect") && (
+                <TableColumns field={selField} onChange={(cols) => patchField({ table_columns: cols })} />
+              )}
+              <div className="flex items-center gap-4 px-4 py-3">
+                <button type="button" onClick={duplicateSelected} disabled={readOnly} title="Duplicate (⌘D)" className="inline-flex items-center gap-1.5 text-sm text-zinc-700 hover:underline disabled:opacity-50 dark:text-zinc-200"><Copy className="h-3.5 w-3.5" /> Duplicate</button>
                 <button type="button" onClick={removeSelected} disabled={readOnly} className="inline-flex items-center gap-1.5 text-sm text-red-600 hover:underline disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> Remove field</button>
               </div>
             </>
@@ -458,7 +631,7 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
               <Group title="Custom CSS">
                 <CodeField field={{ fieldname: "css", label: "CSS", fieldtype: "Code", options: "CSS" } as DocField} value={String(settings.css ?? "")} onChange={(v) => setSetting("css", String(v ?? ""))} />
               </Group>
-              <p className="px-4 py-3 text-xs text-zinc-500">Click a section or field on the page to change it. Delete removes the selection; ⌘Z undoes.</p>
+              <p className="px-4 py-3 text-xs text-zinc-500">Click a section or field on the page to change it. Delete removes the selection, ⌘D duplicates a field, ⌘Z undoes.</p>
             </>
           )}
         </aside>

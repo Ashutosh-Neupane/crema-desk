@@ -34,6 +34,8 @@ export interface CanvasProps {
   settings: Record<string, unknown>;
   meta: DocTypeMeta | null;
   sample: Record<string, unknown> | null;
+  /** sheet size in mm (default A4) */
+  paper?: { width: number; height: number };
   selection: Selection;
   onSelect: (s: Selection) => void;
   onRemoveField: (s: SectionKey, c: number, f: number) => void;
@@ -337,8 +339,8 @@ export default function Canvas(props: CanvasProps) {
         aria-label="Print layout"
         onClick={() => props.onSelect(null)}
         // paper stays white in dark mode, like printed output
-        className="mx-auto w-full max-w-[210mm] bg-white text-zinc-900 shadow-lg ring-1 ring-black/5"
-        style={{ padding: `${m("margin_top", 15)} ${m("margin_right", 15)} ${m("margin_bottom", 15)} ${m("margin_left", 15)}`, fontSize: `${Number(settings.font_size || 14)}px`, minHeight: "297mm", colorScheme: "light" }}
+        className="mx-auto w-full bg-white text-zinc-900 shadow-lg ring-1 ring-black/5"
+        style={{ padding: `${m("margin_top", 15)} ${m("margin_right", 15)} ${m("margin_bottom", 15)} ${m("margin_left", 15)}`, fontSize: `${Number(settings.font_size || 14)}px`, maxWidth: `${props.paper?.width ?? 210}mm`, minHeight: `${props.paper?.height ?? 297}mm`, colorScheme: "light" }}
       >
         <div className="mb-3">{layout.header && <SectionBox s="header" sec={layout.header} props={props} zone="Header" />}</div>
         <SortableContext items={layout.sections.map((_, i) => `s|${i}`)} strategy={verticalListSortingStrategy}>

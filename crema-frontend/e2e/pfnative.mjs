@@ -7,6 +7,7 @@ import { start, BASE } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
+page.setDefaultTimeout(60000);
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
 const PF = "Crema Test Native";
 const getPF = async () => (await api(`api/resource/Print Format/${encodeURIComponent(PF)}`)).data;
@@ -68,6 +69,31 @@ await body.first().click({ position: { x: 6, y: 6 } });
 await page.getByRole("button", { name: "2 columns" }).click();
 check((await page.getByRole("button", { name: "2 columns" }).getAttribute("aria-pressed")) === "true", "section has 2 columns");
 
+step("duplicate (⌘D) and remove the copy");
+await page.getByRole("option", { name: "Field Delivery Date" }).click();
+await page.keyboard.press("Control+d");
+check((await page.getByRole("option", { name: "Field Delivery Date" }).count()) === 2, "Ctrl+D duplicates the field");
+await page.keyboard.press("Delete");
+check((await page.getByRole("option", { name: "Field Delivery Date" }).count()) === 1, "copy removed");
+
+step("table block: choose its columns");
+await page.getByRole("tab", { name: "fields" }).click();
+await page.getByRole("textbox", { name: "Search fields" }).fill("items");
+await page.getByRole("button", { name: /^Items\s*Table$/ }).first().click();
+const itemsCard = page.getByRole("option", { name: "Field Items" });
+await itemsCard.waitFor({ timeout: 15000 });
+const colList = page.getByRole("list", { name: "Table columns" });
+await colList.waitFor({ timeout: 15000 });
+const firstCol = (await colList.locator("li span").first().innerText()).trim();
+const nCols = await colList.locator("li").count();
+check(nCols > 0 && (await itemsCard.getByRole("columnheader", { name: firstCol }).count()) === 1, `Items shows ${nCols} columns, first "${firstCol}"`);
+await page.getByRole("button", { name: `Remove column ${firstCol}` }).click();
+check((await itemsCard.getByRole("columnheader", { name: firstCol, exact: true }).count()) === 0, `"${firstCol}" column removed from the table`);
+const addCol = page.getByRole("combobox", { name: "Add column" });
+const addLabel = (await addCol.locator("option").nth(1).innerText()).trim();
+await addCol.selectOption({ index: 1 });
+check((await itemsCard.getByRole("columnheader", { name: addLabel, exact: true }).count()) === 1, `"${addLabel}" column added`);
+
 step("page settings");
 await page.keyboard.press("Escape");
 await page.getByRole("spinbutton", { name: "Margin top" }).fill("20");
@@ -97,7 +123,34 @@ if (hasSO) {
   check(true, "preview shows the unsaved text block");
   await shot("pfnative_preview", false);
 } else check(true, "no Sales Order on this site to preview with");
+
+step("paper, letter head, PDF");
+await page.getByRole("combobox", { name: "Paper" }).selectOption("A5");
+check(await page.getByRole("combobox", { name: "Sample record" }).evaluate((el) => el.options.length > 0), "sample record picker has records");
+await page.getByRole("combobox", { name: "Letter head" }).selectOption("No Letterhead");
+await page.waitForTimeout(1500);
+if (hasSO) {
+  await preview.getByText("Thank you for your order").waitFor({ timeout: 60000 });
+  check(true, "preview re-renders with A5 and no letter head");
+}
+// PDF=1 on a bench whose Chromium works: a builder PDF always goes through the server's Chromium, and where it can't
+// start (e.g. no libnss3 in the container) the request holds a worker for minutes and stalls the rest of the suite
+if (hasSO && process.env.PDF === "1") {
+  const dl = page.waitForEvent("download", { timeout: 120000 }).catch(() => null);
+  await page.getByRole("button", { name: "PDF" }).click();
+  const chromiumDown = page.getByText(/PDF renderer \(Chromium\) isn't working/);
+  const file = await Promise.race([dl, chromiumDown.waitFor({ timeout: 120000 }).then(() => "down").catch(() => null)]);
+  if (file === "down") {
+    // builder formats always print through the server's Chromium; on a bench without its libraries that fails
+    check(true, "SKIP PDF: the server's Chromium can't start; the error says so");
+    t.errors.splice(0, t.errors.length, ...t.errors.filter((e) => !/download_builder_preview_pdf/.test(e)));
+  } else check(!!file && /\.pdf$/.test(file.suggestedFilename()), `PDF downloaded (${file?.suggestedFilename() ?? "none"})`);
+} else check(await page.getByRole("button", { name: "PDF" }).isEnabled(), "PDF button ready (PDF=1 downloads it)");
 await page.getByRole("tab", { name: "Edit" }).click();
+const a5 = await paper.evaluate((el) => el.getBoundingClientRect().width);
+check(Math.abs(a5 - 148 * 3.7795) < 3, `sheet is A5 wide (${Math.round(a5)}px)`);
+await page.getByRole("combobox", { name: "Paper" }).selectOption("A4");
+await page.getByRole("combobox", { name: "Letter head" }).selectOption("");
 
 step("Save & Apply");
 await page.getByRole("button", { name: "Save & Apply" }).click();
@@ -107,6 +160,8 @@ const fd = JSON.parse(pf.format_data || "{}");
 const flat = JSON.stringify(fd);
 check(flat.includes("Thank you for your order") && flat.includes("delivery_date") && !flat.includes("Hello block"), "format_data has the new layout");
 check(fd.sections?.[0]?.columns?.length === 2, "two columns saved");
+const items = fd.sections.flatMap((x) => x.columns).flatMap((c) => c.fields).find((f) => f.fieldname === "items");
+check(!!items && !items.table_columns.some((c) => c.label === firstCol) && items.table_columns.some((c) => c.label === addLabel), "table columns saved");
 check(Number(pf.margin_top) === 20, `margin_top saved (${pf.margin_top})`);
 check(!pf.draft_data, "draft cleared");
 
@@ -115,7 +170,8 @@ await page.reload({ waitUntil: "domcontentloaded" });
 await paper.getByText("Thank you for your order").waitFor({ timeout: 90000 });
 check(/^Saved/.test(await status.innerText()), "reopened as Saved");
 await page.getByRole("link", { name: /Desk builder/ }).click();
-await page.waitForURL(/ui=desk/, { timeout: 30000 });
+// the bench may still be busy with the failed PDF (its Chromium start-up wait)
+await page.waitForURL(/ui=desk/, { timeout: 180000 });
 await page.locator("iframe").first().waitFor({ timeout: 60000 });
 check(true, "?ui=desk frames Desk's builder");
 

@@ -470,8 +470,13 @@ layout asks to convert it in Desk once.
   an emptied section removed too and Undo in the toast, ⌘Z / ⇧⌘Z, autosave to the server draft (status in the bar,
   stale `modified` → Reload), Discard draft, Save & Apply, Preview = `render_builder_preview` of the unsaved draft,
   paper white in dark mode.
-- Still to do (B2): resizable columns, table column picker in the inspector, letter head select, PDF button,
-  versions drawer, copy / duplicate, multi-select, tablet sheets, signature / totals blocks, snippet library.
+- B2 done (2026-10-28): table column picker (add / remove / order / width, total shown), Duplicate (⌘D), a
+  preview bar — sample record (20 most recent printable), letter head (default / none / any), paper (A4, A5, Letter,
+  Legal, 80 mm receipt; the sheet resizes too) — and Download PDF of the draft (`download_builder_preview_pdf`,
+  the format's own renderer). Record, letter head and paper aren't part of a Print Format: kept per format in the
+  browser.
+- Still to do (B3): resizable columns, versions drawer, multi-select, tablet sheets, signature / totals blocks,
+  snippet library.
 - Canvas with dnd-kit (already used by the grid): sections → columns (1–4, resizable) → fields; header / footer zones.
 - Left: Fields (searchable, grouped by section of the DocType, child tables as table blocks with column picker),
   Blocks (text, HTML, image, divider, spacer, page break, barcode / QR, signature, totals), Library (snippets).
@@ -485,7 +490,8 @@ layout asks to convert it in Desk once.
 - Side-by-side preview with 2–3 sample records (short / long / many items) to catch overflow before printing.
 - Conditional blocks in plain words ("show when Status is Overdue"), not Jinja.
 - Number / date / currency formatting per field with a live sample; amount in words (Nepali / Indian lakh-crore).
-- Paper presets (A4, A5, Letter, 80 mm thermal for POS) with margins that match the printer.
+- Paper presets (A4, A5, Letter, 80 mm thermal for POS) with margins that match the printer. (Preview / sheet ✅ B2;
+  still to do: remember the paper on the format, e.g. as a Print Settings default per format.)
 - Check before Apply: empty blocks, fields the role can't read, images too large, page overflow.
 - Export / import a format as JSON to share between sites (pairs with multi-site, PLAN.md § 2.1).
 - Optional AI: "describe the invoice you want" → a draft layout (PLAN.md § 2.2), always as a draft.

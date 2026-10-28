@@ -28,6 +28,7 @@ export const DRAFT_FIELDS = [
 export type SectionKey = number | "header" | "footer";
 export type Selection = null | { kind: "section"; s: SectionKey } | { kind: "field"; s: SectionKey; c: number; f: number };
 
+const rand = () => Math.random().toString(36).slice(2, 10);
 const emptyZone = (): PFSection => ({ columns: [{ label: "", fields: [] }] });
 export const newSection = (pageBreak = false): PFSection => ({ label: "", columns: [{ label: "", fields: [] }], ...(pageBreak ? { page_break: true } : {}) });
 
@@ -98,6 +99,14 @@ export function removeField(l: PFLayout, s: SectionKey, c: number, f: number): {
   return { layout: next, sectionRemoved: false };
 }
 
+/** Copy a field right after itself; a custom block gets a fresh fieldname (Desk: "Duplicate"). */
+export function duplicateField(l: PFLayout, s: SectionKey, c: number, f: number): { layout: PFLayout; selection: Selection } {
+  const field = getSection(l, s)?.columns[c]?.fields[f];
+  if (!field) return { layout: l, selection: null };
+  const copy: PFField = { ...field, ...(field.custom ? { fieldname: `${field.fieldname.replace(/_[a-z0-9]{8}$/, "")}_${rand()}` } : {}) };
+  return addField(l, copy, { kind: "field", s, c, f });
+}
+
 export function removeSection(l: PFLayout, s: number): PFLayout {
   return { ...l, sections: l.sections.filter((_, i) => i !== s) };
 }
@@ -154,6 +163,21 @@ export function addField(l: PFLayout, field: PFField, sel: Selection): { layout:
   return { layout: next, selection: { kind: "field", s, c, f: sec.columns[c].fields.length } };
 }
 
+export type TableColumn = { label?: string | null; fieldname: string; fieldtype?: string; options?: string | null; width?: number };
+
+/** child-table fields a Table block can show as columns */
+export const tableColumnChoices = (childMeta: DocTypeMeta) =>
+  (childMeta.fields ?? []).filter((tf) => tf.fieldname && !["Section Break", "Column Break", "Tab Break", "HTML", "Button"].includes(tf.fieldtype));
+
+/** Paper sizes for the sheet and the preview; a preview-time Print Settings override, not stored in the format */
+export const PAPERS: Array<{ key: string; label: string; width: number; height: number; settings: Record<string, unknown> }> = [
+  { key: "A4", label: "A4", width: 210, height: 297, settings: { pdf_page_size: "A4" } },
+  { key: "A5", label: "A5", width: 148, height: 210, settings: { pdf_page_size: "A5" } },
+  { key: "Letter", label: "Letter", width: 215.9, height: 279.4, settings: { pdf_page_size: "Letter" } },
+  { key: "Legal", label: "Legal", width: 215.9, height: 355.6, settings: { pdf_page_size: "Legal" } },
+  { key: "thermal80", label: "Receipt 80 mm", width: 80, height: 297, settings: { pdf_page_size: "Custom", pdf_page_width: 80, pdf_page_height: 297 } },
+];
+
 /** Is this DocField worth offering in the Fields list (Desk is_printable_docfield) */
 const NO_VALUE = new Set(["Section Break", "Column Break", "Tab Break", "HTML", "Button", "Image", "Fold", "Heading"]);
 export const isPrintable = (df: DocField) => !!df.fieldname && (!NO_VALUE.has(df.fieldtype) || df.fieldtype === "Table");
@@ -176,8 +200,6 @@ export function fieldFromDocField(df: DocField, childMeta?: DocTypeMeta): PFFiel
   }
   return f;
 }
-
-const rand = () => Math.random().toString(36).slice(2, 10);
 
 /** Blocks tab (Desk PrintFormatControls draggable_blocks): fieldtypes the server templates render */
 export const BLOCKS: Array<{ key: string; label: string; desc: string; make: () => PFField }> = [

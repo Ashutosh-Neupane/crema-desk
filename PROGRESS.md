@@ -2,6 +2,14 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — Print Format Builder, step B2
+- Table blocks: pick, order and size their columns. Duplicate a field (⌘D). Preview bar: sample record, letter head,
+  paper (A4 / A5 / Letter / Legal / 80 mm receipt; the edit sheet follows), Download PDF of the unsaved draft.
+- Bench note: the vendor container lacks `libnss3`, so Frappe's Chromium PDF renderer can't start ("Chromium took
+  too long to start", Desk too); wkhtmltopdf works. The builder's error now suggests switching renderer.
+- e2e/pfnative extended to 35 checks (duplicate, table columns, paper, letter head; the PDF download runs with `PDF=1`
+  on a bench whose Chromium works — here the request holds a worker for minutes).
+
 ## 2026-10-28 — Print Format Builder, step B1 (Crema's own builder)
 - "Edit Format" now opens Crema's builder (`components/print-builder/`, `lib/print-builder/`) on Desk's layout JSON
   and server draft: Fields / Blocks panel, canvas with sample values, inspector, Delete removes a block and its
