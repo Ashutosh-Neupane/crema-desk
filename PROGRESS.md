@@ -2,6 +2,16 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — Print Format Builder, step B1 (Crema's own builder)
+- "Edit Format" now opens Crema's builder (`components/print-builder/`, `lib/print-builder/`) on Desk's layout JSON
+  and server draft: Fields / Blocks panel, canvas with sample values, inspector, Delete removes a block and its
+  emptied section (Undo in the toast), ⌘Z / ⇧⌘Z, autosave → draft, Save & Apply, server-rendered preview of the draft,
+  white sheet in dark mode. Desk's builder stays at `?ui=desk`.
+- e2e/pfnative (new, 25 checks); pfbuilder now opens `?ui=desk`; print, printformat, formats green.
+- Gotcha: the preview iframe needs `sandbox="allow-scripts"` (opaque origin) — the print HTML runs its barcode script.
+
+Next: B2 / C items in GAPS § 2.19, then M2 workflow.
+
 ## 2026-10-28 — Print Format Builder, step A (framed, usable)
 - "Edit Format" → `/desk/print-format-builder/<name>`: Desk's v16 builder full screen (no breadcrumb row, no width
   cap, sidebar folded), one header with Back and Open in Desk; framed Desk pages follow Crema's light / dark theme.
