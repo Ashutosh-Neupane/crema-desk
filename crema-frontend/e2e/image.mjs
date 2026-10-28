@@ -23,7 +23,7 @@ check(await page.evaluate(() => [...document.querySelectorAll("ul img")].some((i
 await shot("image_view", false);
 
 step("search + open");
-await page.getByLabel("Search").fill("Sugar");
+await page.getByLabel("Search", { exact: true }).fill("Sugar");
 await page.waitForTimeout(1200);
 check((await grid.getByRole("listitem").count()) === 1, "search narrows to one card");
 await grid.getByRole("link").first().click();

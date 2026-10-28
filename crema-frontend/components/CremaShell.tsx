@@ -260,6 +260,11 @@ const noopSubscribe = () => () => {};
 export default function CremaShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { sidebarOpen, toggleSidebar, theme, setTheme, themeSeeded, seedThemeFromUser, fullWidth, hydrateFullWidth } = useUIStore();
+  // phones: the sidebar is an overlay, so it starts closed and closes after each navigation (Desk: sidebar.js on mobile)
+  const shellPath = usePathname();
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) useUIStore.getState().setSidebarOpen(false);
+  }, [shellPath]);
   const { data: deskCtx } = useDeskContext();
   const deskUser = deskCtx?.user;
   // A browser with no stored theme choice (new device) takes the user's saved User.desk_theme, as Desk does at boot
@@ -334,8 +339,8 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
             Reconnecting to server…
           </div>
         )}
-        <div className="flex h-full items-center justify-between px-3">
-          <div className="flex items-center gap-2">
+        <div className="flex h-full items-center justify-between gap-2 px-gutter">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
             <button
               onClick={toggleSidebar}
               className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -352,14 +357,14 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
               <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
                 <Layout className="h-4 w-4" />
               </div>
-              <span className="text-base font-semibold text-foreground">Crema</span>
+              <span className="hidden text-base font-semibold text-foreground sm:inline">Crema</span>
             </Link>
 
             <DropdownMenu open={appMenuOpen} onOpenChange={setAppMenuOpen}>
               <DropdownMenuTrigger>
-                <span className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors">
+                <span className="flex max-w-[40vw] items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors">
                   <Layout className="h-4 w-4 text-zinc-400" />
-                  {apps.length > 0 ? apps[0].app_title ?? apps[0].app_name : "crema"}
+                  <span className="hidden truncate sm:inline">{apps.length > 0 ? apps[0].app_title ?? apps[0].app_name : "crema"}</span>
                   <ChevronsUpDown className="h-3 w-3 text-zinc-400" />
                 </span>
               </DropdownMenuTrigger>
@@ -377,7 +382,7 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
             </DropdownMenu>
           </div>
 
-          <div className="flex items-center gap-0.5">
+          <div className="flex min-w-0 items-center justify-end gap-0.5">
             <CommandPalette />
 
             {/* Theme switcher */}
@@ -448,7 +453,7 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
         {/* Main content */}
         <main
           className={[
-            "flex-1 p-4 transition-all duration-300 ease-in-out min-w-0",
+            "flex-1 px-gutter py-stack transition-all duration-300 ease-in-out min-w-0",
             sidebarOpen ? "md:ml-[var(--sidebar-width)]" : "ml-0",
           ].join(" ")}
           id="main-content"
@@ -460,7 +465,7 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
             className={fullWidth ? "w-full" : "mx-auto w-full max-w-[1290px]"}
           >
             <SiteBanners />
-            <div className="mb-4">
+            <div className="mb-stack">
               <Breadcrumbs />
             </div>
             {children}

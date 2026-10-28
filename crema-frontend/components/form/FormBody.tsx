@@ -161,7 +161,8 @@ export default function FormBody({
     const collapsedByDefault = !!section.collapsible && !forced && !sectionHasError(all);
     const isCollapsed = section.collapsible ? (toggled.has(section.fieldname) ? !collapsedByDefault : collapsedByDefault) : false;
     const nonEmptyCols = cols.filter((c) => c.length);
-    const grid = nonEmptyCols.length >= 3 ? "lg:grid-cols-3" : nonEmptyCols.length === 2 ? "md:grid-cols-2" : "";
+    // columns follow the form's own width (container queries), so an open sidebar or a dialog doesn't squeeze them
+    const grid = nonEmptyCols.length >= 3 ? "@xl:grid-cols-2 @4xl:grid-cols-3" : nonEmptyCols.length === 2 ? "@xl:grid-cols-2" : "";
     const toggle = () => {
       const next = new Set(toggled);
       if (next.has(section.fieldname)) next.delete(section.fieldname);
@@ -170,21 +171,21 @@ export default function FormBody({
     };
 
     return (
-      <section key={section.fieldname} className={`${compact ? "py-3" : "px-5 py-5"} border-b border-zinc-200 last:border-b-0 dark:border-zinc-800`}>
+      <section key={section.fieldname} className={`${compact ? "py-field" : "p-section"} border-b border-zinc-200 last:border-b-0 dark:border-zinc-800`}>
         {section.showLabel !== false && section.label && (
           section.collapsible ? (
-            <button type="button" onClick={toggle} aria-expanded={!isCollapsed} className={`flex w-full items-center gap-2 text-left ${isCollapsed ? "" : "mb-4"}`}>
+            <button type="button" onClick={toggle} aria-expanded={!isCollapsed} className={`flex w-full items-center gap-2 text-left ${isCollapsed ? "" : "mb-field"}`}>
               <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{section.label}</h3>
               <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
             </button>
           ) : (
-            <h3 className="mb-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{section.label}</h3>
+            <h3 className="mb-field text-sm font-semibold text-zinc-900 dark:text-zinc-100">{section.label}</h3>
           )
         )}
         {!isCollapsed && (
-          <div className={`grid grid-cols-1 gap-x-6 gap-y-4 ${grid}`}>
+          <div className={`grid grid-cols-1 gap-x-column gap-y-field ${grid}`}>
             {nonEmptyCols.map((col, i) => (
-              <div key={i} className="flex min-w-0 flex-col gap-4">
+              <div key={i} className="flex min-w-0 flex-col gap-field">
                 {col.map((f) => renderField(f as DocField))}
               </div>
             ))}
@@ -201,7 +202,7 @@ export default function FormBody({
   const tabHasError = (tab: string) => layout.sections.some((s) => s.tab === tab && sectionHasError([...s.fields, ...s.childTables] as DocField[]));
 
   return (
-    <div className={compact ? "" : "overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}>
+    <div className={compact ? "@container" : "@container overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}>
       {tabs.length > 1 && (
         <div className={`flex gap-1 overflow-x-auto border-b border-zinc-200 dark:border-zinc-800 ${compact ? "" : "px-3"}`} role="tablist">
           {tabs.map((t) => (

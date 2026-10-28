@@ -114,7 +114,7 @@ export default function FormSidebar({
 
   return (
     <aside
-      className="space-y-4 text-sm xl:sticky xl:top-28 xl:self-start"
+      className="space-y-stack text-sm xl:sticky xl:top-28 xl:self-start"
       aria-label="Document sidebar"
     >
       {/* Assigned to */}
