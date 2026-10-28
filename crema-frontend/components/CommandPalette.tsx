@@ -195,11 +195,12 @@ export default function CommandPalette() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex w-full max-w-md items-center gap-2 rounded-md bg-zinc-100 px-3 py-1.5 text-sm text-zinc-500 transition-colors hover:bg-zinc-200/70 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+        aria-label="Search or type a command"
+        className="flex items-center gap-2 rounded-md bg-zinc-100 p-1.5 sm:w-[clamp(14rem,30vw,28rem)] sm:px-3 text-sm text-zinc-500 transition-colors hover:bg-zinc-200/70 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
       >
         <Search className="h-4 w-4" />
-        <span>Search or type a command</span>
-        <kbd className="ml-auto rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium dark:border-zinc-700 dark:bg-zinc-900">
+        <span className="hidden truncate sm:inline">Search or type a command</span>
+        <kbd className="ml-auto hidden rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium dark:border-zinc-700 dark:bg-zinc-900 sm:inline">
           ⌘K
         </kbd>
       </button>

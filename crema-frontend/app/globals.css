@@ -124,7 +124,24 @@
   --ring: #424242;
 }
 
+/* Fluid spacing: steps that grow with the viewport between a phone (≈360px) and a desktop (≈1440px),
+   so pages are tight on small screens and keep Desk's density on large ones. Tailwind utilities: p-gutter,
+   gap-stack, p-section, gap-field (registered as --spacing-* below). */
+:root {
+  --space-gutter: clamp(0.75rem, 0.5rem + 1.1vw, 1.25rem);  /* page side padding: 10.5 → 17.5px */
+  --space-stack: clamp(0.75rem, 0.6rem + 0.6vw, 1rem);      /* between blocks on a page */
+  --space-section: clamp(0.75rem, 0.45rem + 1.2vw, 1.25rem); /* inside a form section or card */
+  --space-field: clamp(0.625rem, 0.5rem + 0.45vw, 0.875rem); /* between fields */
+  --space-column: clamp(1rem, 0.6rem + 1.5vw, 1.75rem);      /* between form columns */
+}
+
 @theme inline {
+  --spacing-gutter: var(--space-gutter);
+  --spacing-stack: var(--space-stack);
+  --spacing-section: var(--space-section);
+  --spacing-field: var(--space-field);
+  --spacing-column: var(--space-column);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -207,6 +224,25 @@ h5 {
   color: var(--heading-color);
 }
 
+/* Tailwind 4 resets buttons to the default cursor; Desk (Bootstrap) shows a pointer on anything clickable */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* Frappe focus style for interactive elements */
 button:focus-visible,
 a:focus-visible,
@@ -224,16 +260,16 @@ a:focus-visible,
 .page-body {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem; /* space-y-6 equivalent */
+  gap: var(--space-stack);
 }
 
 /* Consistent card padding utilities */
 .card-content {
-  padding: 1.5rem; /* p-6 */
+  padding: var(--space-section);
 }
 
 .card-compact {
-  padding: 1rem; /* p-4 */
+  padding: var(--space-field);
 }
 
 /* Frappe-style list row */
@@ -298,3 +334,4 @@ a:focus-visible,
   --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
   --chart-grid: #2c2c2a; --chart-axis: #8f8e88; --chart-text: #c3c2b7; --chart-surface: #1f1f1f;
 }
+

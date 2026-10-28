@@ -101,7 +101,7 @@ function Connections({ meta, doc }: { meta: DocTypeMeta; doc: Doc }) {
   if (!dash?.transactions?.length || isNewDoc(doc)) return null;
   const fieldFor = (dt: string) => dash.non_standard_fieldnames?.[dt] ?? dash.fieldname ?? "";
   return (
-    <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-x-column gap-y-field p-section sm:grid-cols-2 lg:grid-cols-3">
       {dash.transactions.map((t) => (
         <div key={t.label ?? t.items.join(",")}>
           <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">{t.label}</h4>
@@ -476,9 +476,9 @@ export default function DocForm({ doctype, name }: Props) {
   const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
-    <div className="space-y-4 pb-16">
+    <div className="space-y-stack pb-16">
       {/* Header (sticks under the navbar so actions stay reachable on long forms) */}
-      <div className="sticky top-12 z-20 -mx-4 flex flex-wrap items-center gap-3 bg-[var(--bg-color)]/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-12 z-20 -mx-gutter flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg-color)]/95 px-gutter py-2 backdrop-blur">
         {canRename ? (
           <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">
             <button type="button" onClick={() => setFormDialog("rename")} title="Rename" className="max-w-full truncate rounded px-1 -mx-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
@@ -609,7 +609,7 @@ export default function DocForm({ doctype, name }: Props) {
       <FormDashboard state={snap.dashboard} />
       {docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
+      <div className="grid grid-cols-1 gap-stack xl:grid-cols-[minmax(0,1fr)_clamp(13rem,18vw,16rem)]">
         <div className="min-w-0 space-y-4">
           <FormBody
             meta={meta}

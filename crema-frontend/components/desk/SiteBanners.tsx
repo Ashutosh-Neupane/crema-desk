@@ -27,7 +27,7 @@ export default function SiteBanners() {
   }
   if (!banners.length) return null;
   return (
-    <div className="site-banners -mx-4 -mt-4 mb-4" data-testid="site-banners">
+    <div className="site-banners -mx-gutter -mt-stack mb-stack" data-testid="site-banners">
       {banners.map((b) => (
         <div key={b.key} role="status" data-banner={b.key} className={`${b.cls} px-4 py-2.5 text-sm`}>
           {b.message}

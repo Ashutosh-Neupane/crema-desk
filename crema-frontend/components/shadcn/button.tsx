@@ -11,7 +11,7 @@ export function Button({
 }) {
   // Frappe desk metrics: 28px height, 8px radius, 13px text, weight 500
   const base =
-    "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
   const variants = {
     default: "bg-primary text-primary-foreground hover:bg-zinc-800 dark:hover:bg-zinc-200",
     destructive: "bg-red-600 text-white hover:bg-red-700",
@@ -28,6 +28,6 @@ export function Button({
   };
 
   return (
-    <button className={` cursor-pointer ${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props} />
+    <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props} />
   );
 }
