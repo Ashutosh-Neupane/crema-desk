@@ -1,4 +1,4 @@
-# Trevo — progress log
+# Crema — progress log
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
@@ -7,7 +7,7 @@ Newest entries on top. Each session: append what was done, what's verified, what
   polish), then phase 2 UI/UX. Work through it top-down.
 - Tier 1 #1 done: Attach / Attach Image save their value (upload_file attached to the doc; loose upload on new
   docs, Frappe attaches on save), image preview, link mode, clear. `/files/*` and `/private/files/*` are served
-  from Trevo's origin (`lib/frappe/fileProxy.ts`; public files need Host = site). Verified by `e2e/attach.mjs`.
+  from Crema's origin (`lib/frappe/fileProxy.ts`; public files need Host = site). Verified by `e2e/attach.mjs`.
 - Tier 1 #2 done: form sidebar is editable (`components/form/FormSidebar.tsx`): assign/unassign, attach/remove
   files, add/remove tags, share/unshare, like; Follow shown only where Frappe allows it (track_changes, not
   Administrator, not ToDo/Communication/…). Verified by `e2e/sidebar.mjs`.
@@ -19,7 +19,7 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Tier 1 #4 (print view) done: `/desk/print/<dt>/<dn>` (`components/views/PrintView.tsx`): format + letterhead
   pickers, server HTML (`printview.get_html_and_style`) in a sandboxed same-origin iframe, Print, PDF
   (`download_pdf`, server errors shown). Form toolbar printer button, menu item, ⌘P. `/assets/*` proxied like /files.
-  Bench: vendor needs `GUNICORN_CMD_ARGS="--workers 3 --timeout 120"` (docker-compose, uncommitted in School_saas) —
+  Bench: vendor needs `GUNICORN_CMD_ARGS="--workers 3 --timeout 120"` (in the bench's docker-compose) —
   wkhtmltopdf fetches /assets from the same single gunicorn worker and deadlocked; `host_name` set to
   http://localhost:8000 for the site. ERPNext "Classic/Modern" formats need Chromium (not in the image) → PDF error,
   same as Desk. Verified by `e2e/print.mjs`. Print Format Builder still to do.
@@ -62,12 +62,12 @@ Newest entries on top. Each session: append what was done, what's verified, what
   Role Profile, Module Profile — writes Has Role / Block Module rows like Desk. `e2e/users.mjs`.
 - `docs/GAPS.md` rewritten: compatibility architecture for Frappe JS (L1 metadata UI, L2 real jQuery + DOM
   containers, L3 native widgets, L4 legacy page host for POS/Vue/jQuery pages), full remaining checklist, phase 3
-  (Trevo as a Frappe custom app) plan. `e2e/run-all.mjs` runs every suite (26/26 passing).
+  (Crema as a Frappe custom app) plan. `e2e/run-all.mjs` runs every suite (26/26 passing).
 - Breadcrumbs show DocType/document names verbatim; form.salesorder deletes its cancelled order.
-- L4 legacy page host done: `/desk/page/<name>` frames Frappe's own Desk page served at Trevo's `/app/<path>`
+- L4 legacy page host done: `/desk/page/<name>` frames Frappe's own Desk page served at Crema's `/app/<path>`
   (`app/app/[[...path]]/route.ts`: fetches bench `/desk/<path>` HTML, rewrites the frame URL to /desk before the
   router runs, hides navbar/sidebar/dock, points socket.io at the published port, bridges title + Form/List/Report
-  navigation back to Trevo). `/api/method/*` and `/api/resource/*` proxied on Trevo's origin
+  navigation back to Crema). `/api/method/*` and `/api/resource/*` proxied on Crema's origin
   (`lib/frappe/proxy.ts`, shared with /api/frappe — now forwards the caller's CSRF token and original content
   type). ERPNext POS runs unmodified. Sidebar/workspace Page links go there. Verified by `e2e/legacy.mjs`.
 - Dev machine: `.next` had grown to 19 GB and Turbopack's cache flush stalled everything (15 GB swap) →
@@ -196,11 +196,11 @@ Verified (all suites ALL PASSED): `e2e/tree.mjs`, `e2e/report.mjs`, plus form/sc
 - Desk context now carries the rest of `frappe.boot` (party_account_types, current_fiscal_year, …) into every
   runtime; shims: `erpnext.utils.get_fiscal_year`, `frappe.model.with_doc`, `frappe.db.get_link_options`
 
-- Hub hub run (frappe + hub, no ERPNext): crud.todo, workflow, kanban, bulk, doctype.create
-  (`TREVO_MODULE=Hub`) all pass; smoke of /desk, hub workspace, Vendor Listing list/form, report
+- Second-site run (Frappe + a custom app, no ERPNext): crud.todo, workflow, kanban, bulk, doctype.create
+  (`CREMA_MODULE=<app module>`) all pass; smoke of /desk, the app's workspace and its list/form views, report
   view, Script Reports, data-import → 0 errors. Run it with env overrides (no .env edit):
   `docker start sm-hub` then `FRAPPE_BACKEND_URL=http://localhost:8000 NEXT_PUBLIC_FRAPPE_BASE_URL=http://localhost:8000
-  FRAPPE_SITE_NAME=hub.localhost NEXT_PUBLIC_FRAPPE_SITE_NAME=hub.localhost PORT=3001 npm run dev`
+  FRAPPE_SITE_NAME=<site> NEXT_PUBLIC_FRAPPE_SITE_NAME=<site> PORT=3001 npm run dev`
 
 Next (see docs/GAPS.md)
 1. ERPNext form widgets: Address & Contact cards, Item stock levels, serial/batch selector, ledger preview
@@ -218,7 +218,7 @@ Verified (Playwright vs vendor1.localhost, all suites ALL PASSED):
 Built: desk runtime (runs app __js/__list_js/Client Scripts), FormController, Grid, FormBody, ERPNext transaction
 adapter, frappe.ui.Dialog host, Form Builder, calendar picker, Desk shortcuts, dashboards/workspaces/home.
 React Doctor: 0 errors (from 10), score 33 → 65; 70 dead files removed.
-Bench config: developer_mode, server_script_enabled, socketio (:9001) — see bench-vendor/docker/init.sh.
+Bench config: developer_mode, server_script_enabled, socketio (:9001), set by the bench's init script.
 
 Next
 1. Tree view route (/desk/doctype/X/view/tree) — list already offers it for tree DocTypes
@@ -227,7 +227,7 @@ Next
 4. Rebuild removed prototypes properly when needed: Kanban, Gantt, workflow actions on forms, bulk edit,
    data import/export, Inbox compose (currently not wired)
 5. Remaining React Doctor warnings (112): component complexity, positional keys
-6. Repeat the suites against the hub hub (`docker start sm-hub`, FRAPPE_SITE_NAME=hub.localhost)
+6. Repeat the suites against the second site (no ERPNext)
 
 ## 2026-10-16 — session 1 (cont.): v16 compatibility + Desk-style forms
 Verified in browser (Playwright) against vendor1.localhost
@@ -245,23 +245,23 @@ Next
 5. Client-script runtime (async events, frappe.throw abort, child events, add_custom_button)
 6. /desk/query-report/<name> page (sidebar/⌘K already link there)
 7. ColorField shows #000000 for empty; date display in System Settings format
-8. Point Trevo at the hub (localhost:8000, hub.localhost) and repeat checks
+8. Point Crema at the hub (localhost:8000) and repeat checks
 
 ## 2026-10-16 — session 1: setup
 Done
-- Cloned github.com/Ashutosh-Neupane/trevo → `~/Desktop/School_saas/trevo-frontend`
+- Cloned github.com/Ashutosh-Neupane/crema-desk
 - Fixed root `.gitignore` (`frappe/` → `/frappe/`); restored `lib/frappe/*` (19 files),
-  `app/api/frappe/[...path]` BFF proxy, `MultiselectField` from the local copy at `~/Desktop/trevo`
+  `app/api/frappe/[...path]` BFF proxy, `MultiselectField` from the local copy at `~/Desktop/crema`
   (they were never pushed). `tsc --noEmit`: 225 errors → 0. **Not yet committed/pushed.**
 - `npm run build` passes; lint 28 errors → 0 (5 hook-deps warnings left). Real bug fixed:
   `DateRangeField` ignored its saved value (always rendered empty on reopen)
-- graphify installed (`uv tool install graphifyy`), graph at `trevo-frontend/graphify-out/`, git hooks installed
+- graphify installed (`uv tool install graphifyy`), graph at `crema-frontend/graphify-out/`, git hooks installed
 - Vendor backend stack started (see CLAUDE.md → Backend)
 
 Next (parity test loop)
 1. Login + boot + sidebar/workspaces against vendor1.localhost
-2. DocType list/form/new/edit for ERPNext + custom_vendor doctypes (Vendor Config single, Vendor Order, Product Mapping)
-3. Custom DocType created in Desk → shows in Trevo; DocType created in Trevo builder → works in Desk
+2. DocType list/form/new/edit for ERPNext + custom-app doctypes (a single, transactions, mappings)
+3. Custom DocType created in Desk → shows in Crema; DocType created in Crema builder → works in Desk
 4. Reports: Report Builder, Query Report, Script Report
-5. Workflow: create in Desk → states/actions on Trevo form; Vendor Order whitelisted methods as buttons
+5. Workflow: create in Desk → states/actions on Crema form; Vendor Order whitelisted methods as buttons
 6. New page(s) as needed

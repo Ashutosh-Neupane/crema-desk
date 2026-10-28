@@ -1,5 +1,5 @@
 """
-Seed an ERPNext v16 site with enough setup + demo data to exercise Trevo the way
+Seed an ERPNext v16 site with enough setup + demo data to exercise Crema the way
 Desk would be used: finished setup (no Setup Wizard), defaults, master data,
 stock, and Sales Orders in Draft / Submitted / Cancelled states.
 
@@ -67,7 +67,7 @@ def setup_defaults(company):
 		"Stock Settings",
 		{"item_group": "Products", "stock_uom": "Nos", "default_warehouse": f"Stores - {frappe.db.get_value('Company', company, 'abbr')}"},
 	)
-	# Finish setup so Desk (and Trevo) don't route to the Setup Wizard
+	# Finish setup so Desk (and Crema) don't route to the Setup Wizard
 	frappe.db.set_single_value("System Settings", "setup_complete", 1)
 	if frappe.db.has_column("Installed Application", "is_setup_complete"):
 		frappe.db.sql("update `tabInstalled Application` set is_setup_complete=1")
@@ -100,7 +100,7 @@ def seed_masters(company):
 
 
 def seed_stock(company):
-	if frappe.db.exists("Stock Entry", {"remarks": "trevo-demo-opening", "docstatus": 1}):
+	if frappe.db.exists("Stock Entry", {"remarks": "crema-demo-opening", "docstatus": 1}):
 		return
 	abbr = frappe.db.get_value("Company", company, "abbr")
 	se = frappe.get_doc(
@@ -108,7 +108,7 @@ def seed_stock(company):
 			"doctype": "Stock Entry",
 			"stock_entry_type": "Material Receipt",
 			"company": company,
-			"remarks": "trevo-demo-opening",
+			"remarks": "crema-demo-opening",
 			"items": [
 				{"item_code": code, "qty": 100, "t_warehouse": f"Stores - {abbr}", "basic_rate": rate * 0.8}
 				for code, _, rate in ITEMS
@@ -122,7 +122,7 @@ def seed_stock(company):
 
 
 def reset_sales_orders():
-	for so in frappe.get_all("Sales Order", {"po_no": ["like", "TREVO-DEMO-%"]}, ["name", "docstatus"]):
+	for so in frappe.get_all("Sales Order", {"po_no": ["like", "CREMA-DEMO-%"]}, ["name", "docstatus"]):
 		doc = frappe.get_doc("Sales Order", so.name)
 		if doc.docstatus == 1:
 			doc.cancel()
@@ -132,7 +132,7 @@ def reset_sales_orders():
 
 
 def seed_sales_orders(company):
-	if frappe.db.count("Sales Order", {"po_no": ["like", "TREVO-DEMO-%"]}) >= 6:
+	if frappe.db.count("Sales Order", {"po_no": ["like", "CREMA-DEMO-%"]}) >= 6:
 		print("  sales orders already seeded")
 		return
 	abbr = frappe.db.get_value("Company", company, "abbr")
@@ -143,7 +143,7 @@ def seed_sales_orders(company):
 				"doctype": "Sales Order",
 				"company": company,
 				"customer": CUSTOMERS[cust],
-				"po_no": f"TREVO-DEMO-{i + 1}",
+				"po_no": f"CREMA-DEMO-{i + 1}",
 				"transaction_date": add_days(nowdate(), -i * 9),
 				"delivery_date": add_days(nowdate(), 7),
 				"selling_price_list": "Standard Selling",
