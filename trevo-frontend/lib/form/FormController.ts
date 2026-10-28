@@ -23,6 +23,7 @@ import { getNewDoc } from "@/lib/trevo-form/newDoc";
 import { evalDependsOn } from "@/lib/trevo-form/dependsOn";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { installFormCompat } from "./compat";
+import { fieldPermStatus, getPerm, hasPerm, readOnlyPerm, type FieldStatus, type Perm, type PermContext, type PermDocInfo } from "./perm";
 
 export type Row = Record<string, unknown> & { name: string; doctype: string; idx: number; parentfield?: string };
 export interface CustomButton {
@@ -84,6 +85,10 @@ export class FormController {
   private watchers: Watcher[] = [];
   private depth = 0;
   frm: Record<string, unknown>;
+  /** getdoc's docinfo (permissions, shared) feeding frm.perm */
+  private docinfo: PermDocInfo | undefined;
+  /** form.js set_read_only: frm.perm reduced to the viewing rights */
+  private permReadOnly = false;
 
   constructor(meta: DocTypeMeta, childMetas: DocTypeMeta[], doc: Doc, ctx: RuntimeContext) {
     this.meta = meta;
@@ -135,10 +140,32 @@ export class FormController {
   /** Replace the document (after load/save) — clears dirty and errors */
   load(doc: Doc) {
     this.doc = this.normalize(doc);
+    this.permReadOnly = false; // Desk refresh() re-fetches the permissions
     this.dirty = false;
     this.errors = {};
     this.emit();
   }
+
+  /** frappe.model.docinfo for this doc (the server's per-document permissions and shares) */
+  setDocinfo(docinfo: PermDocInfo | undefined) {
+    this.docinfo = docinfo;
+    this.emit();
+  }
+
+  private permCtx(): PermContext {
+    const boot = this.ctx.boot as { doctype_ptype_map?: Record<string, string[]> } | undefined;
+    return { user: this.ctx.user, roles: this.ctx.roles ?? [], lists: this.ctx.perms, ptypeMap: boot?.doctype_ptype_map };
+  }
+
+  /** frappe.perm.get_perm(doctype, doc) */
+  getPerm(doctype = this.meta.name): Perm {
+    if (doctype !== this.meta.name) return getPerm(this.metas[doctype], this.permCtx());
+    const perm = getPerm(this.meta, this.permCtx(), isNewDoc(this.doc) ? undefined : this.doc, this.docinfo);
+    return this.permReadOnly ? readOnlyPerm(perm) : perm;
+  }
+
+  /** the permlevel layer of frappe.perm.get_field_display_status */
+  fieldStatus = (df: DocField): FieldStatus => fieldPermStatus(df, this.getPerm());
 
   private normalize(doc: Doc): Doc {
     const d: Doc = { ...doc };
@@ -756,15 +783,21 @@ export class FormController {
       add_fetch: (link: string, source: string, target: string, table?: string) => self.extraFetch.push({ link, source, target, table }),
       enable_save: () => {},
       disable_save: () => self.setDf("__form", "disable_save", 1),
-      disable_form: () => self.setDf("__form", "read_only", 1),
+      disable_form: () => {
+        self.permReadOnly = true;
+        self.setDf("__form", "read_only", 1);
+      },
       set_currency_labels: () => {},
       get_field: (f: string) => fieldsDict[f],
       get_docfield: (table: string, f?: string) => (f ? self.field(f, String(self.field(table)?.options)) : self.field(table)),
-      has_perm: () => true,
+      has_perm: (ptype: string) => hasPerm(self.getPerm(), 0, ptype),
+      get_perm: (permlevel: number, accessType: string) => self.getPerm()[permlevel]?.[accessType] ?? null,
       email_doc: () => {},
       print_doc: () => {},
       layout: { refresh_sections() {}, show_message: (html?: string, color?: string, permanent?: boolean) => self.dash.showMessage(html, color, permanent) },
-      perm: [{ read: 1, write: 1, create: 1, submit: 1, cancel: 1, delete: 1 }],
+      get perm() {
+        return self.getPerm();
+      },
       toolbar: { refresh() {} },
       // Desk: frm.events[name] is the last handler registered for this doctype (frappe.ui.form.on), so scripts
       // call their own helpers as frm.events.show_bom_custom_button(frm)
@@ -774,6 +807,13 @@ export class FormController {
       }),
     };
     // frappe.model.set_value(cdt, cdn, field, value) is the child-row setter scripts use most
+    const fr = this.runtime.frappe as Record<string, unknown>;
+    fr.perm = {
+      ...((fr.perm as object | undefined) ?? {}),
+      get_perm: (doctype: string) => self.getPerm(doctype),
+      has_perm: (doctype: string, permlevel = 0, ptype = "read") => hasPerm(self.getPerm(doctype), permlevel, ptype),
+      get_field_display_status: (df: DocField) => fieldPermStatus(df, self.getPerm()),
+    };
     const model = this.runtime.frappe.model as Record<string, unknown>;
     model.set_value = (cdt: string, cdn: string, f: string | Record<string, unknown>, v?: unknown) =>
       cdt === self.meta.name ? self.set_value(f, v) : self.set_child_value(cdt, cdn, f, v);

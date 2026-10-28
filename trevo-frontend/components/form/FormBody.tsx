@@ -25,6 +25,8 @@ interface Props {
   /** parent doc (child row forms) — available as `parent` in depends_on */
   parent?: Values;
   readOnly?: boolean;
+  /** frappe.perm field display status for a field's permlevel (frm.perm); omitted = "Write" */
+  fieldPerm?: (df: DocField) => "Write" | "Read" | "None";
   overrides?: Record<string, Record<string, unknown>>;
   /** key prefix for overrides (e.g. "items." for a child row form) */
   overridePrefix?: string;
@@ -59,6 +61,7 @@ export default function FormBody({
   values,
   parent,
   readOnly = false,
+  fieldPerm,
   overrides = {},
   overridePrefix = "",
   errors = {},
@@ -97,9 +100,11 @@ export default function FormBody({
   const effective = (df: DocField): DocField & { _hidden: boolean } => {
     const o = (overrides[`${overridePrefix}${df.fieldname}`] ?? {}) as Partial<DocField>;
     const merged = { ...df, ...o } as DocField;
-    const ro = !!merged.read_only || (!!merged.read_only_depends_on && evalWith(String(merged.read_only_depends_on), ctx, parent));
+    // frappe.perm.get_field_display_status: a permlevel the user cannot read is hidden, one they cannot write is read-only
+    const permStatus = fieldPerm ? fieldPerm(merged) : "Write";
+    const ro = permStatus !== "Write" || !!merged.read_only || (!!merged.read_only_depends_on && evalWith(String(merged.read_only_depends_on), ctx, parent));
     const reqd = !!merged.reqd || (!!merged.mandatory_depends_on && evalWith(String(merged.mandatory_depends_on), ctx, parent));
-    let hidden = !!merged.hidden || (!!merged.depends_on && !evalWith(String(merged.depends_on), ctx, parent));
+    let hidden = permStatus === "None" || !!merged.hidden || (!!merged.depends_on && !evalWith(String(merged.depends_on), ctx, parent));
     // Desk hides read-only fields that have nothing to show
     if (!hidden && (ro || readOnly) && merged.fieldtype !== "Table" && merged.fieldtype !== "Check" && merged.fieldtype !== "Heading" && merged.fieldtype !== "HTML" && merged.fieldtype !== "Button" && isEmpty(values[df.fieldname])) {
       hidden = true;
