@@ -19,15 +19,15 @@ Crema takes a third route:
 
 | Area | Done |
 |---|---|
-| **Forms** | Save, submit, cancel, amend, delete; tabs, sections, `depends_on` / `mandatory_depends_on` / `read_only_depends_on`; quick entry; rename, links, reminders, copy; **field-level permissions** (permlevels hide or lock fields like Desk) |
+| **Forms** | Save, submit, cancel, amend, delete (an unchanged save sends nothing, like Desk); tabs, sections, `depends_on` / `mandatory_depends_on` / `read_only_depends_on`; quick entry; rename, links, reminders, copy; **field-level permissions** (permlevels hide or lock fields like Desk) |
 | **Client scripts** | The real Frappe client-script runtime: `frappe`, `frm`, `cur_frm`, `frappe.ui.Dialog`, `MultiSelectDialog`, real jQuery for scripts that write into the page. ERPNext's own Sales/Purchase Order, Invoice, Delivery Note and Stock Entry scripts run without errors |
 | **Child tables** | Add, insert, duplicate, move, drag to reorder, multi-select delete, 50-row pages, CSV download/upload, row forms |
-| **Field controls** | Data (with Email/Phone/URL validation), Int, Float, Currency, Percent, Check, Select, Link, Dynamic Link, Date, Datetime, Table, Attach, Attach Image, HTML and Code, formatted from System Settings. Text Editor, Markdown, JSON, Time, Duration, Rating, Color, Phone, Password, Signature, Barcode, Geolocation and the multi-selects are built and still being verified against Desk |
+| **Field controls** | Data (with Email/Phone/URL validation), Int, Float, Currency, Percent, Check, Select, Link, Dynamic Link, Date, Datetime, Table, Attach, Attach Image, HTML, Code and Text Editor (rendered rich text), formatted from System Settings. Markdown, JSON, Time, Duration, Rating, Color, Phone, Password, Signature, Barcode, Geolocation and the multi-selects are built and still being verified against Desk |
 | **Lists** | Filters, standard filters, group-by sidebar, sort, paging, bulk edit / delete / submit / cancel / print / assign / tag / export, list settings, per-user saved state, realtime refresh |
 | **Views** | Report view, Kanban, Calendar, Gantt, Tree, Image, Inbox, File manager, Dashboard |
 | **Reports** | Query and Script reports with the report's own JS filters and formatters, tree reports, totals, charts, prepared reports, Report Builder, Save As |
 | **Collaboration** | Timeline with comments, @mentions, version diffs and emails; email composer; assign, share, follow, tags, likes; notifications; viewers on the same document |
-| **Print** | Print view with format and letterhead pickers, PDF download |
+| **Print** | Print view with format and letterhead pickers, PDF download; create custom Jinja print formats from Crema's own form |
 | **Workflows** | Workflow states and actions on the form, read-only states, transitions through Frappe |
 | **Workspaces** | Shortcuts, cards, charts, number cards, onboarding blocks, Custom HTML blocks, sidebar |
 | **Admin** | Users with Frappe's own user actions, role and module editors, Role Permissions Manager, impersonation with a site banner, Data Import, Customize Form, DocType builder |
@@ -36,7 +36,7 @@ Crema takes a third route:
 | **Desk pages** | Any page that isn't rebuilt yet (Point of Sale, Setup Wizard, BOM Comparison, …) opens Frappe's own page inside Crema, with navigation bridged back |
 | **ERPNext extras** | Address and contact cards, item stock levels, Serial and Batch selector, accounting and stock ledger previews |
 
-52 end-to-end suites (`crema-frontend/e2e/`) drive a real browser against a live Frappe v16 + ERPNext v16 site and confirm results through the API.
+54 end-to-end suites (`crema-frontend/e2e/`) drive a real browser against a live Frappe v16 + ERPNext v16 site and confirm results through the API.
 
 | | |
 |---|---|
@@ -70,7 +70,11 @@ Details and the full feature audit: [`docs/GAPS.md`](docs/GAPS.md).
 
 **Ship as a Frappe app.** Package Crema as an installable Frappe app: a static Next.js export served by Frappe at `/desk`, with classic Desk kept at `/app` behind a "Use classic Desk" switch. This removes the separate Node server and the proxy routes. The plan is in [`docs/GAPS.md` § 3](docs/GAPS.md). The System Console and web-form submission screens already call `crema.*` server methods that will live in that app.
 
-**Then, UX.** Once behaviour matches Desk, improve on it: faster navigation, better mobile forms, theming.
+**Then, UX.** Once behaviour matches Desk, improve on it: faster navigation, better mobile forms, theming
+([`docs/GAPS.md` § 3](docs/GAPS.md)).
+
+**Beyond Desk.** One desk for several Frappe sites, AI that works inside the user's permissions, and the form engine
+as a React package: [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Getting started
 
