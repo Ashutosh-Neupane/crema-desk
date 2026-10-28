@@ -39,6 +39,8 @@ function matches(keys: string, e: KeyboardEvent): boolean {
   // "?" and "/" are the same physical key; Shift is implied by "?"
   if (key === "?") return e.key === "?" || (e.shiftKey && e.key === "/");
   if (wantShift !== e.shiftKey) return false;
+  // "<" / ">" are Shift+, / Shift+. ; with Ctrl/Cmd held some browsers report the unshifted key
+  if (key === "<" || key === ">") return e.key === key || e.key === (key === "<" ? "," : ".");
   return e.key.toLowerCase() === key;
 }
 

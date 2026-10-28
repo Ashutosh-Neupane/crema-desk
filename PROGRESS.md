@@ -2,6 +2,16 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — M1: form toolbar like Desk
+- Previous / next document buttons + Shift+Ctrl+< / > (`get_next` with the list's saved filters and sort,
+  "No further records"); "Not permitted" / "Not found" pages for doc and DocType errors; empty read-only fields follow
+  System Settings `hide_empty_read_only_fields`; a renamable title no longer cuts to "Mid…" (negative margin).
+- e2e/formnav (new). Form suites 9/9.
+- Dev server note: after switching branches, Turbopack can serve a stale globals.css (gutter tokens missing);
+  restart `next dev` if spacing looks wrong.
+
+Next: M6 (phone: grid / list as cards, bottom action bar), then M2 workflow.
+
 ## 2026-10-28 — save like Desk, responsive layout, print formats, plans
 - Save: an unchanged Save sends no request ("No changes in document"); a real save refreshes in place from the
   savedocs response (docinfo included), no second getdoc. Timeline versions read like Desk

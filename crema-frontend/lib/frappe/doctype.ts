@@ -80,7 +80,8 @@ export async function fetchDoctypeMetaClient(doctype: string): Promise<DocTypeMe
   });
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { exception?: string } | null;
-    throw new Error(err?.exception?.split("\n").filter(Boolean).pop() ?? `Failed to load DocType "${doctype}"`);
+    // status lets the form show Desk's "Not permitted" / "Not found" pages
+    throw Object.assign(new Error(err?.exception?.split("\n").filter(Boolean).pop() ?? `Failed to load DocType "${doctype}"`), { status: res.status });
   }
   const json = (await res.json().catch(() => null)) as GetDoctypeResponse | null;
   primeDoctypeMetaCache(json?.docs ?? []);
