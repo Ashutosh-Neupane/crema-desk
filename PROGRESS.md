@@ -2,6 +2,23 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — save like Desk, responsive layout, print formats, plans
+- Save: an unchanged Save sends no request ("No changes in document"); a real save refreshes in place from the
+  savedocs response (docinfo included), no second getdoc. Timeline versions read like Desk
+  (version_timeline_content_builder.js): "submitted this document", HTML as text, hidden fields left out. e2e/formsave.
+- Responsive: fluid `--space-*` tokens with clamp() (Tailwind `p-gutter`, `gap-field`, …), form columns by container
+  width, sidebar closed on phones, compact header; no horizontal scroll at 390/768/1280. Pointer cursor on clickables.
+- Print formats from Crema: new-form Name field for prompt-named DocTypes (`lib/form/newName.ts`), depends_on/eval with
+  a trailing `;` (Desk's `let out = …; return out`), Text Editor rendered as rich text. e2e/printformat.
+- Test hygiene: attach uses a unique image (Frappe dedupes uploads by content), reportsave writes under OUT,
+  run-all skips readme-shots. Full run 49/52 before those fixes; the three pass after.
+- Docs: GAPS.md phase-1 finish plan (M1–M7), visibility rules, workflow plan, data path, phase 2 UI/UX plan;
+  PLAN.md (multi-site, AI, SDK, what we want from Frappe); MARKETING.md (forum research, positioning, launch).
+- PRs #3 (responsive), #4 (save + timeline), #5 (print formats) merged.
+
+Next: GAPS M1 (forms like Desk: prev/next, title editing, "Not permitted") and M6 (phone: grid/list as cards), then the
+demo site (MARKETING § 2).
+
 ## 2026-10-28 — Crema, public
 - Renamed Trevo → Crema: `crema-frontend/`, `lib/crema-form`, `CremaShell`, `CREMA_*` env vars, storage keys.
 - Field permlevels (`lib/form/perm.ts`), site banners + impersonation, server traceback behind a toast's Details action,
