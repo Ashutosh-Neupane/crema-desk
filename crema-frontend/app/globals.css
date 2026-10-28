@@ -335,3 +335,19 @@ a:focus-visible,
   --chart-grid: #2c2c2a; --chart-axis: #8f8e88; --chart-text: #c3c2b7; --chart-surface: #1f1f1f;
 }
 
+/* Rendered rich text (Text Editor values: addresses, terms, ERPNext's tax breakup table) — Desk's .ql-editor read-mode */
+.crema-rich { overflow-wrap: anywhere; line-height: 1.5; }
+.crema-rich > :first-child { margin-top: 0; }
+.crema-rich > :last-child { margin-bottom: 0; }
+.crema-rich p, .crema-rich ul, .crema-rich ol, .crema-rich table { margin: 0 0 0.5em; }
+.crema-rich ul { list-style: disc; padding-left: 1.25em; }
+.crema-rich ol { list-style: decimal; padding-left: 1.25em; }
+.crema-rich h1, .crema-rich h2, .crema-rich h3 { margin: 0.75em 0 0.35em; font-size: 1.05em; }
+.crema-rich a { color: var(--blue-600); text-decoration: underline; }
+.crema-rich table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+.crema-rich th, .crema-rich td { border: 1px solid var(--border-color); padding: 0.3em 0.5em; vertical-align: top; }
+.crema-rich th { background: var(--gray-100); font-weight: 600; }
+[data-theme="dark"] .crema-rich th { background: var(--gray-800); }
+.crema-rich .text-right { text-align: right; }
+.crema-rich .text-left { text-align: left; }
+.crema-rich .tax-break-up { overflow-x: auto; }

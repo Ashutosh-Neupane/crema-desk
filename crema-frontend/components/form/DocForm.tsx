@@ -25,6 +25,7 @@ import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
 import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY, takePrefill } from "@/lib/form/prefill";
+import { asksForName, withNewNameField } from "@/lib/form/newName";
 import FormSidebar from "@/components/form/FormSidebar";
 import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
@@ -619,7 +620,7 @@ export default function DocForm({ doctype, name }: Props) {
       <div className="grid grid-cols-1 gap-stack xl:grid-cols-[minmax(0,1fr)_clamp(13rem,18vw,16rem)]">
         <div className="min-w-0 space-y-4">
           <FormBody
-            meta={meta}
+            meta={isNewDoc(doc) && asksForName(meta) ? withNewNameField(meta) : meta}
             values={doc}
             readOnly={readOnly}
             fieldPerm={ctl.fieldStatus}

@@ -23,6 +23,7 @@ import { getNewDoc } from "@/lib/crema-form/newDoc";
 import { evalDependsOn } from "@/lib/crema-form/dependsOn";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { installFormCompat } from "./compat";
+import { asksForName } from "./newName";
 import { fieldPermStatus, getPerm, hasPerm, readOnlyPerm, type FieldStatus, type Perm, type PermContext, type PermDocInfo } from "./perm";
 
 export type Row = Record<string, unknown> & { name: string; doctype: string; idx: number; parentfield?: string };
@@ -533,6 +534,10 @@ export class FormController {
         errors[df.fieldname] = "Required";
         missing.push(df.label ?? df.fieldname);
       }
+    }
+    if (isNewDoc(this.doc) && asksForName(this.meta) && isEmpty(this.doc.__newname)) {
+      errors.__newname = "Required";
+      missing.unshift("Name");
     }
     for (const t of this.tableFields()) {
       const cmeta = this.metas[String(t.options)];
