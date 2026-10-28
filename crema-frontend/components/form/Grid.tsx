@@ -21,6 +21,7 @@ import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import LinkField from "@/lib/crema-form/controls/LinkField";
 import FormBody from "@/components/form/FormBody";
 import DatePicker from "@/components/form/DatePicker";
+import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
 import { currencyFor } from "@/lib/crema-form/controls/NumberField";
 
@@ -160,6 +161,7 @@ function Cell({
   }
   if (NUMERIC.has(df.fieldtype)) return <NumberCell df={df} value={value} display={display} onCommit={set} className={base} />;
   if (df.fieldtype === "Date") return <DatePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
+  if (df.fieldtype === "Time") return <TimePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
   return <TextCell value={String(value ?? "")} onCommit={set} className={base} />;
 }
 

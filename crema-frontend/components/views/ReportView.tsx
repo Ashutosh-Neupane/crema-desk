@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import LinkInput from "@/components/list/LinkInput";
 import DatePicker from "@/components/form/DatePicker";
+import TimePicker from "@/components/form/TimePicker";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 /** [fieldname, doctype] — Desk's report view field tuple */
@@ -574,6 +575,8 @@ function CellEditor({ df, value, onCommit, onCancel }: { df: DocField; value: un
       return <LinkInput doctype={String(df.options)} value={v} autoFocus onChange={(nv) => onCommit(nv)} className="[&_input]:h-8 [&_input]:w-full [&_input]:rounded-none [&_input]:border-0" />;
     case "Date":
       return <DatePicker compact value={v} ariaLabel={String(df.label)} onChange={(nv) => onCommit(nv ?? "")} />;
+    case "Time":
+      return <TimePicker compact value={v} ariaLabel={String(df.label)} onChange={(nv) => onCommit(nv ?? "")} />;
     default:
       return (
         <input

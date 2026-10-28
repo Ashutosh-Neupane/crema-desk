@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import TimePicker from "@/components/form/TimePicker";
 import DatePicker from "@/components/form/DatePicker";
 
 const enc = encodeURIComponent;
@@ -175,7 +176,7 @@ export function ReminderDialog({ doctype, name, onClose }: { doctype: string; na
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
           <DatePicker value={date} onChange={(v) => setDate(v ?? date)} ariaLabel="Reminder date" />
-          <input type="time" aria-label="Reminder time" value={time} onChange={(e) => setTime(e.target.value)} className={input} />
+          <TimePicker ariaLabel="Reminder time" value={time ? `${time}:00` : null} onChange={(t) => setTime(t ? t.slice(0, 5) : "")} />
         </div>
         <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Note
