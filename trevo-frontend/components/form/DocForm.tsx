@@ -181,6 +181,7 @@ export default function DocForm({ doctype, name }: Props) {
       boot: ctx.boot,
       navigate: (href) => router.push(href),
     });
+    c.setDocinfo(loaded?.docinfo);
     attachDoctypeAdapters(c);
     c.loadScripts();
     ctlRef.current = c;
@@ -202,6 +203,11 @@ export default function DocForm({ doctype, name }: Props) {
       void c.runLoadEvents(false);
     }
   }, [loaded]);
+
+  // the server's per-document permissions/shares feed frm.perm
+  useEffect(() => {
+    ctlRef.current?.setDocinfo(loaded?.docinfo);
+  }, [loaded, ctl]);
 
   const noopSubscribe = useCallback(() => () => {}, []);
   const snap = useSyncExternalStore(ctl?.subscribe ?? noopSubscribe, () => ctl?.snapshot() ?? null, () => null);
@@ -608,6 +614,7 @@ export default function DocForm({ doctype, name }: Props) {
             meta={meta}
             values={doc}
             readOnly={readOnly}
+            fieldPerm={ctl.fieldStatus}
             overrides={snap.overrides}
             errors={snap.errors}
             onChange={(f, v) => void ctl.set_value(f, v)}
