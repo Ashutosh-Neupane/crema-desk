@@ -98,7 +98,8 @@ export function isNewDoc(doc: Partial<Doc> | null | undefined): boolean {
 export type SaveAction = "Save" | "Submit" | "Update";
 
 /** Save via savedocs; returns the doc as the server stored it (hooks may change values). */
-export async function saveDoc(doc: Doc, action: SaveAction = "Save"): Promise<{ doc: Doc; messages: string[] }> {
+/** savedocs answers with the saved doc and its docinfo (save.py send_updated_docs), so no getdoc is needed after */
+export async function saveDoc(doc: Doc, action: SaveAction = "Save"): Promise<{ doc: Doc; docinfo?: DocInfo; messages: string[] }> {
   const payload: Record<string, unknown> = { ...doc };
   if (isNewDoc(doc)) {
     payload.__islocal = 1;
@@ -107,7 +108,7 @@ export async function saveDoc(doc: Doc, action: SaveAction = "Save"): Promise<{ 
   const { env, messages } = await deskCall("frappe.desk.form.save.savedocs", { doc: JSON.stringify(payload), action });
   const saved = env.docs?.[0];
   if (!saved) throw new DeskError("Save returned no document", { status: 500 });
-  return { doc: saved, messages };
+  return { doc: saved, docinfo: env.docinfo, messages };
 }
 
 export async function cancelDoc(doctype: string, name: string): Promise<{ doc: Doc; messages: string[] }> {

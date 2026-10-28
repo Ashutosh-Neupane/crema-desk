@@ -30,7 +30,7 @@ await title.fill("Second");
 await title.press("Tab");
 await page.getByRole("button", { name: /^Save$/ }).click();
 const activity = page.getByRole("region", { name: "Activity" });
-await activity.getByText("changed Title from First to Second").waitFor({ timeout: 30000 });
+await activity.getByText("changed the value of Title from First to Second").waitFor({ timeout: 30000 });
 check(true, "version line shows field label and values");
 
 step("comment with @mention");

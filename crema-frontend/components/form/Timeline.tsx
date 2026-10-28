@@ -13,7 +13,8 @@ import { deskCall, type Doc, type DocInfo } from "@/lib/frappe/form";
 import { searchLink } from "@/lib/frappe/search";
 import { sanitizeHtml } from "@/lib/report/columns";
 import { timeAgo } from "@/lib/list/format";
-import type { DocTypeMeta } from "@/lib/frappe/types";
+import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+import type { FieldStatus } from "@/lib/form/perm";
 import EmailComposer from "@/components/form/EmailComposer";
 
 type Entry =
@@ -23,24 +24,69 @@ type Entry =
   | { kind: "log"; at: string; by: string; html: string; name: string };
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const show = (v: unknown) => (v === null || v === undefined || v === "" ? "empty" : String(v));
+/** Desk format_content_for_timeline: HTML → text, cut to 40 characters, empty as "" */
+const show = (v: unknown) => {
+  if (v === null || v === undefined || v === "") return '""';
+  let t = String(v);
+  if (/<[a-z/!]/i.test(t)) t = new DOMParser().parseFromString(t, "text/html").body.textContent ?? "";
+  t = t.replace(/\s+/g, " ").trim();
+  return !t ? '""' : t.length > 40 ? `${t.slice(0, 40)}...` : t;
+};
 
-/** Version.data → readable lines (Desk: version_timeline_content_builder.js) */
-function versionLines(raw: string, meta: DocTypeMeta, childMetas: DocTypeMeta[]): string[] {
-  let d: { changed?: unknown[][]; added?: unknown[][]; removed?: unknown[][]; row_changed?: unknown[][] } = {};
+type VersionField = DocField & { show_on_timeline?: unknown };
+
+/**
+ * Version.data → readable lines (Desk: form/footer/version_timeline_content_builder.js):
+ * docstatus becomes "submitted / cancelled this document", hidden fields and fields the user can't read
+ * are left out (unless show_on_timeline), at most 3 changes per kind, added / removed rows counted per table.
+ */
+function versionLines(raw: string, meta: DocTypeMeta, childMetas: DocTypeMeta[], fieldPerm?: (df: DocField) => FieldStatus): string[] {
+  let d: { changed?: unknown[][]; added?: unknown[][]; removed?: unknown[][]; row_changed?: unknown[][]; comment?: string } = {};
   try {
     d = JSON.parse(raw);
   } catch {
     return [];
   }
-  const label = (m: DocTypeMeta | undefined, f: string) => m?.fields?.find((x) => x.fieldname === f)?.label ?? f;
-  const tableMeta = (table: string) => childMetas.find((c) => c.name === meta.fields?.find((f) => f.fieldname === table)?.options);
+  if (d.comment) return [show(d.comment)];
+  const field = (m: DocTypeMeta | undefined, f: string) => m?.fields?.find((x) => x.fieldname === f) as VersionField | undefined;
+  const visible = (df: VersionField | undefined): df is VersionField => {
+    if (!df || (df.hidden && !df.show_on_timeline)) return false;
+    return !!(df.hidden && df.show_on_timeline) || (fieldPerm?.(df) ?? "Read") !== "None";
+  };
+  const tableMeta = (table: string) => childMetas.find((c) => c.name === field(meta, table)?.options);
   const out: string[] = [];
-  for (const [f, a, b] of (d.changed ?? []) as Array<[string, unknown, unknown]>) out.push(`changed ${label(meta, f)} from ${show(a)} to ${show(b)}`);
-  for (const [table, row] of (d.added ?? []) as Array<[string, Record<string, unknown>]>) out.push(`added a row to ${label(meta, table)}${row?.idx ? ` (#${row.idx})` : ""}`);
-  for (const [table, row] of (d.removed ?? []) as Array<[string, Record<string, unknown>]>) out.push(`removed row #${row?.idx ?? "?"} from ${label(meta, table)}`);
-  for (const [table, idx, , changes] of (d.row_changed ?? []) as Array<[string, number, string, Array<[string, unknown, unknown]>]>) {
-    for (const [f, a, b] of changes ?? []) out.push(`changed ${label(tableMeta(table), f)} in ${label(meta, table)} row #${idx} from ${show(a)} to ${show(b)}`);
+
+  const parts: string[] = [];
+  for (const [f, a, b] of (d.changed ?? []) as Array<[string, unknown, unknown]>) {
+    if (f === "docstatus") {
+      if (b === 1) out.push("submitted this document");
+      else if (b === 2) out.push("cancelled this document");
+    } else {
+      const df = field(meta, f);
+      if (visible(df)) parts.push(`${df.label ?? f} from ${show(a)} to ${show(b)}`);
+    }
+    if (parts.length >= 3) break;
+  }
+  if (parts.length) out.push(`changed the value of ${parts.join(", ")}`);
+
+  const rowParts: string[] = [];
+  outer: for (const [table, idx, , changes] of (d.row_changed ?? []) as Array<[string, number, string, Array<[string, unknown, unknown]>]>) {
+    for (const [f, a, b] of changes ?? []) {
+      const df = field(tableMeta(table), f);
+      if (visible(df)) rowParts.push(`${df.label ?? f} from ${show(a)} to ${show(b)} in row #${Number(idx) + 1}`);
+      if (rowParts.length >= 3) break outer;
+    }
+  }
+  if (rowParts.length) out.push(`changed the values for ${rowParts.join(", ")}`);
+
+  for (const key of ["added", "removed"] as const) {
+    const counts = new Map<string, number>();
+    for (const [table] of (d[key] ?? []) as Array<[string]>) {
+      const df = field(meta, table);
+      if (visible(df)) counts.set(df.label ?? table, (counts.get(df.label ?? table) ?? 0) + 1);
+    }
+    const msgs = [...counts].map(([t, n]) => `${n} ${n > 1 ? "rows" : "row"} ${key === "added" ? "to" : "from"} ${t}`);
+    if (msgs.length) out.push(`${key} ${msgs.join(", ")}`);
   }
   return out;
 }
@@ -53,6 +99,7 @@ export default function Timeline({
   user,
   fullName,
   onChanged,
+  fieldPerm,
 }: {
   doc: Doc;
   docinfo: DocInfo;
@@ -61,6 +108,8 @@ export default function Timeline({
   user?: string;
   fullName?: string;
   onChanged: () => Promise<unknown> | void;
+  /** the form's field permission check: changes to fields the user can't read stay out of the timeline */
+  fieldPerm?: (df: DocField) => FieldStatus;
 }) {
   const [text, setText] = useState("");
   const [mentions, setMentions] = useState<Record<string, string>>({});
@@ -85,7 +134,7 @@ export default function Timeline({
         name: String(c.name),
       });
     for (const v of (docinfo.versions ?? []) as Array<Record<string, unknown>>) {
-      const lines = versionLines(String(v.data ?? "{}"), meta, childMetas);
+      const lines = versionLines(String(v.data ?? "{}"), meta, childMetas, fieldPerm);
       if (lines.length) list.push({ kind: "version", at: String(v.creation ?? ""), by: String(v.owner ?? ""), lines, name: String(v.name) });
     }
     for (const key of ["assignment_logs", "attachment_logs", "info_logs", "like_logs", "workflow_logs"]) {
@@ -93,7 +142,7 @@ export default function Timeline({
         list.push({ kind: "log", at: String(l.creation ?? ""), by: String(l.owner ?? ""), html: String(l.content ?? l.comment_type ?? ""), name: `${key}:${String(l.name)}` });
     }
     return list.sort((a, b) => b.at.localeCompare(a.at));
-  }, [docinfo, meta, childMetas]);
+  }, [docinfo, meta, childMetas, fieldPerm]);
 
   // @mention autocomplete on the word before the caret
   const onType = async (v: string) => {

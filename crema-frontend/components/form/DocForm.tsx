@@ -283,10 +283,17 @@ export default function DocForm({ doctype, name }: Props) {
   }, [snap?.dirty]);
 
   // ── actions ─────────────────────────────────────────────────────────────
+  // Desk form/save.js + form.js validate_and_save: a plain Save of an unchanged doc sends nothing and says
+  // "No changes in document"; after a real save the form refreshes in place from the savedocs response
   const persist = useCallback(
     async (action: SaveAction) => {
       const c = ctlRef.current;
       if (!c) return;
+      const wasNew = isNewDoc(c.getDoc());
+      if (action === "Save" && !wasNew && !c.isDirty()) {
+        toast.warning("No changes in document");
+        return;
+      }
       if (!(await c.trigger("validate"))) return;
       if (action !== "Submit" && !(await c.trigger("before_save"))) return;
       if (action === "Submit" && !(await c.trigger("before_submit"))) return;
@@ -295,8 +302,7 @@ export default function DocForm({ doctype, name }: Props) {
         setMissing(miss);
         return;
       }
-      const wasNew = isNewDoc(c.getDoc());
-      const { doc: saved, messages } = await saveDoc(c.getDoc(), action);
+      const { doc: saved, docinfo, messages } = await saveDoc(c.getDoc(), action);
       messages.forEach((m) => toast.info(m));
       c.load(saved);
       await c.trigger(action === "Submit" ? "on_submit" : "after_save");
@@ -309,8 +315,9 @@ export default function DocForm({ doctype, name }: Props) {
       toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
       if (wasNew) router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
       else {
-        // refresh docinfo too (versions, comments) — Desk reloads it after every save
-        await load();
+        // docinfo (versions, comments) came back with the save; the controller already holds the saved doc
+        if (docinfo) setLoaded({ doc: saved, docinfo });
+        else await load();
         await c.runLoadEvents(false);
       }
     },
@@ -640,7 +647,7 @@ export default function DocForm({ doctype, name }: Props) {
           />
 
           {!isNewDoc(doc) && (
-            <Timeline doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} meta={meta} childMetas={metas.children} user={ctx?.user} fullName={ctx?.full_name} onChanged={load} />
+            <Timeline doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} meta={meta} childMetas={metas.children} user={ctx?.user} fullName={ctx?.full_name} onChanged={load} fieldPerm={ctl?.fieldStatus} />
           )}
         </div>
 
