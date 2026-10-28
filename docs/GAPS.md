@@ -1,6 +1,6 @@
-# Trevo ↔ Frappe Desk: what's left, and how we get there
+# Crema ↔ Frappe Desk: what's left, and how we get there
 
-Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, hub hub).
+Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on vendor1.localhost, and a second site without ERPNext).
 Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
 Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (48 today, all passing).
 
@@ -10,16 +10,16 @@ Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs eve
 
 | Phase | Goal | Repos |
 |---|---|---|
-| **1 — transcription** (now) | Everything a user can do in Desk works in Trevo, verified against a live bench | `trevo` (Next.js) + benches in `School_saas` |
+| **1 — transcription** (now) | Everything a user can do in Desk works in Crema, verified against a live bench | `crema-frontend` (Next.js) + a local Frappe v16 bench |
 | **2 — UI/UX** | Improve space use, navigation, density, inline editing once behaviour is pinned by e2e | same |
-| **3 — Frappe app** | Ship Trevo as a Frappe custom app that replaces `/desk` on any site | `trevo` becomes an app (python package + built frontend) |
+| **3 — Frappe app** | Ship Crema as a Frappe custom app that replaces `/desk` on any site | `crema` becomes an app (python package + built frontend) |
 
-Rule for phase 1: never hard-code an app (ERPNext, hub). Behaviour comes from metadata, the site's own JS,
+Rule for phase 1: never hard-code an app (ERPNext or any custom app). Behaviour comes from metadata, the site's own JS,
 and whitelisted methods — so any Frappe app works.
 
 ---
 
-## 1. How Frappe's JavaScript runs in Trevo (compatibility architecture)
+## 1. How Frappe's JavaScript runs in Crema (compatibility architecture)
 
 Frappe's frontend is four kinds of code; each gets a different strategy.
 
@@ -28,7 +28,7 @@ Frappe's frontend is four kinds of code; each gets a different strategy.
 | **L1 Metadata UI** | DocType forms, lists, views, reports | Native React driven by meta; the site's JS (`__js`, `__list_js`, `__tree_js`, `__calendar_js`, report JS, Client Scripts) runs in the Desk runtime (`lib/desk-runtime`) against a `frappe` / `frm` / `cur_frm` compatibility API | ✅ core done |
 | **L2 Script DOM** | Form scripts that write into the page: `frm.fields_dict.x.$wrapper.html()`, `$(frm.wrapper).find()`, `frm.dashboard.add_section()` | Load **real jQuery** into the runtime and give scripts real DOM nodes: each HTML field renders a container whose node is `fields_dict[f].wrapper` / `$wrapper`; `frm.dashboard`, `frm.page.body`, `frm.layout.wrapper` get containers too. Unknown members stay chainable no-ops (NOOP) | ✅ real jQuery + HTML-field containers (`e2e/scriptdom.mjs`); 🟡 `frm.dashboard` / `frm.page.body` still NOOP |
 | **L3 Desk widgets** | jQuery widgets Desk mounts inside forms: RoleEditor, ModuleEditor, Permission Manager, form tour, dashboard heatmap/graph | Rebuild natively, keyed by DocType + HTML field (`components/form/widgets`), writing to the **same child tables** as Desk so saving is identical | ✅ RoleEditor + ModuleEditor |
-| **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page (served at Trevo's `/app/<path>`) in a same-origin frame; `/assets`, `/files`, `/api/method`, `/api/resource` proxied; Desk chrome hidden; title and Form/List/Report navigation bridged back to Trevo. Replace page by page with native rebuilds where UX matters (POS first) | ✅ (`e2e/legacy.mjs` — ERPNext POS) |
+| **L4 Whole pages** | Desk Pages built with jQuery/Vue: POS, Setup Wizard, Visual Plant Floor, BOM Comparison, Sales Funnel, any app's `/app/<page>` | **Legacy page host**: `/desk/page/<name>` mounts Frappe's own page (served at Crema's `/app/<path>`) in a same-origin frame; `/assets`, `/files`, `/api/method`, `/api/resource` proxied; Desk chrome hidden; title and Form/List/Report navigation bridged back to Crema. Replace page by page with native rebuilds where UX matters (POS first) | ✅ (`e2e/legacy.mjs` — ERPNext POS) |
 
 Why not import Frappe's whole `desk.bundle.js` into React? It assumes it owns `document`, the router,
 `frappe.boot`, global CSS and jQuery event delegation; mixing it with React rendering breaks both. L4 isolates it in
@@ -56,7 +56,7 @@ a frame instead — which is exactly how it will run in phase 3 (same origin, no
 
 Full inventory of Frappe v16's desk frontend (`frappe/public/js/frappe/**`, the `*.bundle.js` entry points, Desk
 Pages) and ERPNext's scripted UIs (`erpnext/public/js/**`), audited 2026-10-18. Paths in `code` are Frappe/ERPNext
-sources to transcribe from. Every ❌ is something a Desk user can do today that Trevo can't.
+sources to transcribe from. Every ❌ is something a Desk user can do today that Crema can't.
 
 **Order of work (impact on daily use):**
 1. Users track: User Permissions UX (2.12), impersonation banner (2.8).
@@ -87,8 +87,9 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ❌ Success action after submit/save (`success_action.js`, Success Action doctype).
 - ❌ Info card (`form/info_card.js`) and side panel record preview (`ui/side_panel.js`) — v16.
 - ❌ Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
-- ❌ Permlevel: sections and fields above the user's permlevel read-only/hidden, "Not permitted" banners,
-  `frm.perm` checks in custom buttons, `read_only_depends_on` re-check after save.
+- ✅ Field permlevels (`lib/form/perm.ts`, Desk `model/perm.js`): a field at a level the user cannot read is hidden,
+  one they cannot write is read-only; `frm.perm`, `frm.has_perm`, `frappe.perm.*` for scripts (`e2e/permlevel.mjs`).
+- ❌ Permlevel extras: "Not permitted" banners, `read_only_depends_on` re-check after save.
 - ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
 - ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`), in grid row
   forms with the child doctype + row (`trigger(fieldname, cdt, cdn)`).
@@ -101,7 +102,7 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   `.wrapper` is a jQuery set, `frappe.require` runs its callback, deep-lenient namespaces no longer wrap class
   instances / DOM nodes.
 - ✅ Runtime robustness: `frappe.ui/utils/db/defaults/model/meta/user/tools/datetime` and field objects return no-ops
-  for helpers Trevo hasn't shimmed; `new frappe.Unknown()` is a no-op object; `has_common`, `frappe.user.has_role`,
+  for helpers Crema hasn't shimmed; `new frappe.Unknown()` is a no-op object; `has_common`, `frappe.user.has_role`,
   `frappe.ui.show_change_password_dialog`, `frappe.db.get_single_value`, `frappe.defaults.is_enabled`,
   `frappe.tools.downloadify`, `frappe.utils.copy_to_clipboard`, `dialog.show_message`, `control.set_data`; Escape closes
   script dialogs; `set_route(..., {options})`.
@@ -141,7 +142,7 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
   draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
   MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
 - ❌ Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
-- ✅ Data `options` validation (`lib/trevo-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
+- ✅ Data `options` validation (`lib/crema-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
   Phone, URL, Name — red field + message, `aria-invalid`; native email/tel/url inputs — `e2e/datavalidation.mjs`
   (agent-built, judged). IBAN: Desk has no client check either.
 - ❌ Link: `show_title_field_in_link` (title shown instead of name), "Create a new X" + "Advanced search" in the
@@ -187,7 +188,7 @@ sources to transcribe from. Every ❌ is something a Desk user can do today that
 - ✅ Report view, Kanban, Calendar, Gantt, Tree, Image, Inbox, File manager, Dashboard view.
 - ❌ Map view (`views/map`, `leaflet.bundle.js`): Geolocation / latitude+longitude doctypes.
 - ❌ Kanban v2 (`views/kanban_v2`, v16): board settings, card fields, column colours/priority styles, swimlanes —
-  Trevo has the classic Kanban Board doctype flow only.
+  Crema has the classic Kanban Board doctype flow only.
 - ❌ Report view extras: group-by with aggregates, "Pick columns" from child tables, column resize/reorder persisted,
   Save As / Save report (Report doctype, `report_type: Report Builder`), print/PDF, link side panel (`link_side_panel.js`).
 - ❌ Tree view extras: drag to move node, "Add Child" with quick entry fields, expand all, root filters per company.
@@ -342,12 +343,12 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 
 ---
 
-## 3. Phase 3 — Trevo as a Frappe custom app
+## 3. Phase 3 — Crema as a Frappe custom app
 
-Target: `bench get-app trevo && bench --site X install-app trevo` → `/desk` is Trevo.
+Target: `bench get-app crema && bench --site X install-app crema` → `/desk` is Crema.
 
-1. **App skeleton**: `trevo/` python package, `hooks.py` with `website_route_rules` mapping `/desk/<path:app_path>`
-   to the built SPA shell; built assets in `trevo/public/`.
+1. **App skeleton**: `crema/` python package, `hooks.py` with `website_route_rules` mapping `/desk/<path:app_path>`
+   to the built SPA shell; built assets in `crema/public/`.
 2. **Build**: Next.js `output: "export"` served by Frappe (or a Node server behind nginx). Static export fits best:
    the BFF routes (`app/api/*`) go away because the SPA is same-origin with Frappe.
 3. **Data layer**: every call already goes through `deskCall` / `lib/frappe/client`; switch the base from
@@ -356,7 +357,7 @@ Target: `bench get-app trevo && bench --site X install-app trevo` → `/desk` is
 4. **Assets and files**: `/assets`, `/files`, `/private/files` served by Frappe/nginx — proxy routes removed.
 5. **L4 pages** become same-origin frames of Frappe's own `/app/<page>`.
 6. **Realtime**: socket.io on the same host (no `NEXT_PUBLIC_SOCKETIO_URL`).
-7. **Rollout**: keep classic Desk at `/app` with a "Use classic Desk" link; a `Trevo Settings` single DocType for
+7. **Rollout**: keep classic Desk at `/app` with a "Use classic Desk" link; a `Crema Settings` single DocType for
    feature flags.
 
 Prep now (while repos stay separate): keep backend calls behind `deskCall` / `frappeServerFetch`, no Node-only
