@@ -102,6 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clientLogout();
     storeLogout();
     setUser(null);
+    // full navigation, like Desk: drops every query cached for the previous user
+    window.location.assign("/login");
   }, [storeLogout]);
 
   return (
