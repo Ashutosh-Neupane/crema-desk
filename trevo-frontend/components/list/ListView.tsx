@@ -333,6 +333,9 @@ export default function ListView({ doctype }: { doctype: string }) {
               <DropdownMenuItem onClick={() => setListSettingsOpen(true)}>List settings</DropdownMenuItem>
               {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setExporting(true)}>Export</DropdownMenuItem>
+              {/* Desk list_view.js: System Manager only */}
+              {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/User%20Permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
+              {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/page/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
           {selected.size > 0 ? (
