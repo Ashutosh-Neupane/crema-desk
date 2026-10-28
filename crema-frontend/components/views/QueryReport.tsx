@@ -18,6 +18,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { evalDependsOn } from "@/lib/crema-form/dependsOn";
 import LinkInput from "@/components/list/LinkInput";
 import DatePicker from "@/components/form/DatePicker";
+import TimePicker from "@/components/form/TimePicker";
 import DeskChart from "@/components/desk/DeskChart";
 import {
   defaultFormatter,
@@ -743,6 +744,8 @@ function FilterControl({ f, value, values, onChange }: { f: ReportFilter; value:
     }
     case "Date":
       return wrap(<DatePicker id={id} compact value={(value as string) ?? ""} onChange={(v) => onChange(v ?? "")} ariaLabel={label} />);
+    case "Time":
+      return wrap(<TimePicker id={id} compact value={(value as string) ?? ""} onChange={(v) => onChange(v ?? "")} ariaLabel={label} />);
     case "DateRange": {
       const [from, to] = Array.isArray(value) ? (value as string[]) : ["", ""];
       return wrap(

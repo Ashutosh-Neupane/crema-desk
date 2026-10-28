@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import LinkInput from "@/components/list/LinkInput";
 import DatePicker from "@/components/form/DatePicker";
+import TimePicker from "@/components/form/TimePicker";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 type Kind = "delete" | "submit" | "cancel" | "edit" | "assign" | "tags" | { workflow: string };
@@ -188,6 +189,8 @@ function BulkEdit({ meta, count, onClose, onApply }: { meta: DocTypeMeta; count:
         );
       case "Date":
         return <DatePicker value={String(value ?? "")} onChange={(v) => setValue(v ?? "")} ariaLabel="Value" />;
+      case "Time":
+        return <TimePicker value={String(value ?? "")} onChange={(v) => setValue(v ?? "")} ariaLabel="Value" />;
       default:
         return <input aria-label="Value" type={["Int", "Float", "Currency", "Percent"].includes(df.fieldtype) ? "number" : "text"} value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className={inputCls} />;
     }

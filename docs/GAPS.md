@@ -158,8 +158,11 @@ Order of work: the milestones in § 0.1.
   Attach Image, HTML, Code.
 - ✅ Text Editor read-only values render as HTML (addresses, terms, tax breakup); editable is a rich-text box.
   🟡 still to match Quill: images, @mentions (`quill-mention`), tables, paste cleanup.
+- ✅ Time and the time part of Datetime: Crema's TimePicker (hour / minute / second columns, Now, Clear, typed
+  "2:30 pm"), the site's `time_format`, no native `<input type="time">`; also in grids, bulk edit, report view and
+  report filters — `e2e/timepicker.mjs`.
 - 🟡 Exist but not verified against Desk:
-  Markdown Editor, HTML Editor, JSON, Small/Long Text, Time, Duration, Rating, Color (`color_picker/`), Phone
+  Markdown Editor, HTML Editor, JSON, Small/Long Text, Duration, Rating, Color (`color_picker/`), Phone
   (`phone_picker/`, country codes), Password (strength meter), Signature, Barcode (+ camera scanner), Geolocation (map
   draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
   MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
