@@ -2,7 +2,17 @@
 
 import * as React from "react";
 
-const DialogContext = React.createContext<{ open: boolean; setOpen: (open: boolean) => void; titleId?: string; descriptionId?: string } | null>(null);
+type DialogContextValue = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  titleId?: string;
+  descriptionId?: string;
+  setWidth: (maxWidth: string) => void;
+};
+
+const DialogContext = React.createContext<DialogContextValue | null>(null);
+
+const DEFAULT_WIDTH = "max-w-lg";
 
 /**
  * Modal dialog: role="dialog" + aria-modal, Escape and backdrop click close,
@@ -13,6 +23,8 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
   const descriptionId = React.useId();
+  // the panel's width is the max-w-* class given to DialogContent (DialogContent reports it up)
+  const [width, setWidth] = React.useState(DEFAULT_WIDTH);
   React.useEffect(() => {
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
@@ -29,11 +41,11 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
     };
   }, [open, onOpenChange]);
   return (
-    <DialogContext.Provider value={{ open, setOpen: onOpenChange, titleId, descriptionId }}>
+    <DialogContext.Provider value={{ open, setOpen: onOpenChange, titleId, descriptionId, setWidth }}>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} aria-hidden="true" />
-          <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="relative z-50 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900">
+          <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className={`relative z-50 max-h-[90vh] w-full ${width} overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900`}>
             {children}
           </div>
         </div>
@@ -43,7 +55,14 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
 }
 
 export function DialogContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  // width classes (max-w-*) apply to the content; the panel itself caps at max-w-lg
+  // width classes (max-w-*) size the panel (via context); the content itself keeps the rest of className
+  const ctx = React.useContext(DialogContext);
+  const maxWidth = className.match(/\bmax-w-\S+/)?.[0] ?? DEFAULT_WIDTH;
+  const setWidth = ctx?.setWidth;
+  React.useLayoutEffect(() => {
+    setWidth?.(maxWidth);
+    return () => setWidth?.(DEFAULT_WIDTH);
+  }, [setWidth, maxWidth]);
   return <div className={className.replace(/\bmax-w-\S+/g, "")}>{children}</div>;
 }
 

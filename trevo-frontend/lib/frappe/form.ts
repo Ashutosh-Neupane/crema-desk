@@ -6,7 +6,7 @@
  *   delete  frappe.client.delete
  * Errors throw DeskError carrying Frappe's own message (what Desk would show).
  */
-import { frappeErrorMessage, parseServerMessages } from "./errors";
+import { frappeErrorMessage, frappeTraceback, parseServerMessages } from "./errors";
 
 export type Doc = Record<string, unknown> & { doctype: string; name: string; docstatus?: number; modified?: string };
 
@@ -27,12 +27,15 @@ export class DeskError extends Error {
   excType?: string;
   serverMessages: string[];
   status: number;
-  constructor(message: string, opts: { excType?: string; serverMessages?: string[]; status: number }) {
+  /** Server traceback (Desk's `exc`), present only when the server allows showing it */
+  traceback?: string;
+  constructor(message: string, opts: { excType?: string; serverMessages?: string[]; status: number; traceback?: string }) {
     super(message);
     this.name = "DeskError";
     this.excType = opts.excType;
     this.serverMessages = opts.serverMessages ?? [];
     this.status = opts.status;
+    this.traceback = opts.traceback;
   }
 }
 
@@ -70,6 +73,7 @@ export async function deskCall(
       excType: env.exc_type,
       serverMessages: messages,
       status: res.status,
+      traceback: frappeTraceback(env),
     });
   }
   return { env, messages };

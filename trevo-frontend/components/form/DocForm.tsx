@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { toastError } from "@/lib/frappe/errors";
 import { AlarmClock, ChevronDown, ClipboardCopy, Copy, CopyPlus, FileCode, Link2, Pencil, Printer, Settings2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
@@ -243,7 +244,7 @@ export default function DocForm({ doctype, name }: Props) {
           qc.invalidateQueries({ queryKey: ["list", doctype] });
           toast.success(`${t.action}: ${t.next_state}`);
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Workflow action failed", { duration: 10000 });
+          toastError(e, "Workflow action failed", { duration: 10000 });
         } finally {
           setWfBusy(false);
         }
@@ -322,7 +323,7 @@ export default function DocForm({ doctype, name }: Props) {
       try {
         await persist(action);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Save failed", { duration: 10000 });
+        toastError(e, "Save failed", { duration: 10000 });
       } finally {
         setBusy(null);
       }
@@ -376,7 +377,7 @@ export default function DocForm({ doctype, name }: Props) {
       await load();
       await c.trigger("after_cancel");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Cancel failed", { duration: 10000 });
+      toastError(e, "Cancel failed", { duration: 10000 });
     } finally {
       setBusy(null);
     }
@@ -393,7 +394,7 @@ export default function DocForm({ doctype, name }: Props) {
       qc.invalidateQueries({ queryKey: ["list", doctype] });
       router.push(`/desk/doctype/${enc(doctype)}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete failed", { duration: 10000 });
+      toastError(e, "Delete failed", { duration: 10000 });
       setBusy(null);
     }
   };

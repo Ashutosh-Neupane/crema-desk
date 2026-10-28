@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/frappe/auth";
 import { useMemo } from "react";
+import { ErrorDetailsHost } from "@/components/desk/ErrorDetails";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = useMemo(() => {
@@ -23,6 +24,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         {children}
         <Toaster position="bottom-right" richColors />
+        <ErrorDetailsHost />
       </AuthProvider>
     </QueryClientProvider>
   );
