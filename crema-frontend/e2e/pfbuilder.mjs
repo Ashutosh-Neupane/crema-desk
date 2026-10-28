@@ -1,4 +1,4 @@
-// Print Format Builder host (GAPS § 2.19 A): "Edit Format" opens Desk's v16 builder full screen in Crema with one
+// Print Format Builder host (GAPS § 2.19 A): `?ui=desk` opens Desk's v16 builder full screen in Crema with one
 // header, the frame follows Crema's light / dark theme, an emptied section can be removed (Desk hides the section
 // toolbar in preview mode; Crema keeps it on the selected section), the letter head zone explains itself, and
 // Save & Apply writes format_data.
@@ -23,12 +23,12 @@ await post("frappe.client.insert", {
   doc: { doctype: "Print Format", name: PF, doc_type: "Sales Order", standard: "No", print_format_builder_beta: 1, format_data: JSON.stringify(layout) },
 });
 
-step("Edit Format → full-screen builder");
-await page.goto(`${BASE}/desk/doctype/Print%20Format/${encodeURIComponent(PF)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.getByRole("button", { name: "Edit Format" }).click({ timeout: 90000 });
-await page.waitForURL(/\/desk\/print-format-builder\//, { timeout: 30000 });
+step("?ui=desk → Desk's builder full screen");
+await page.goto(`${BASE}/desk/print-format-builder/${encodeURIComponent(PF)}?ui=desk`, { waitUntil: "domcontentloaded", timeout: 180000 });
 check(true, `opened ${decodeURIComponent(new URL(page.url()).pathname)}`);
-check(await page.getByRole("heading", { name: new RegExp(`Print Format Builder · ${PF}`) }).isVisible(), "one slim header with the format name");
+const heading = page.getByRole("heading", { name: new RegExp(`Print Format Builder · ${PF}`) });
+await heading.waitFor({ timeout: 90000 }).catch(() => {});
+check(await heading.isVisible(), "one slim header with the format name");
 check(!(await page.getByText("Frappe page", { exact: true }).count()), "no generic Frappe page bar");
 const frame = page.frameLocator("iframe").first();
 const hello = frame.getByText("Hello block").first();

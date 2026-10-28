@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Print Format Builder host (docs/GAPS.md § 2.19 A): Desk's v16 builder (`print_format_builder_beta`, or the classic
+ * Print Format Builder host (docs/GAPS.md § 2.19). By default Crema's own builder (§ 2.19 B, PrintBuilder);
+ * `?ui=desk` / `?ui=classic` keep Desk's builder framed (§ 2.19 A): Desk's v16 builder (`print_format_builder_beta`, or the classic
  * one) framed full screen with one slim header, Crema's theme, and CSS fixes for what users trip over:
  *  - with a preview record Desk hides every section toolbar (`.section--preview .section-toolbar`), so an emptied
  *    section has no remove button; the selected section keeps its toolbar here
@@ -11,6 +12,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import LegacyPage from "@/components/views/LegacyPage";
+import PrintBuilder from "@/components/print-builder/PrintBuilder";
 import { useUIStore } from "@/lib/stores/ui.store";
 
 const FRAME_CSS = `
@@ -22,7 +24,7 @@ const FRAME_CSS = `
 }
 `;
 
-export default function PrintFormatBuilderHost({ name, classic }: { name: string; classic?: boolean }) {
+export default function PrintFormatBuilderHost({ name, ui = "crema" }: { name: string; ui?: "crema" | "desk" | "classic" }) {
   // Desk folds its sidebar for the builder; do the same with Crema's and restore it on the way out
   useEffect(() => {
     const ui = useUIStore.getState();
@@ -31,6 +33,9 @@ export default function PrintFormatBuilderHost({ name, classic }: { name: string
     return () => useUIStore.getState().setSidebarOpen(was);
   }, []);
 
+  const base = `/desk/print-format-builder/${encodeURIComponent(name)}`;
+  if (ui === "crema") return <PrintBuilder name={name} deskHref={`${base}?ui=desk`} />;
+  const classic = ui === "classic";
   const route = `${classic ? "print-format-builder" : "print-format-builder-beta"}/${encodeURIComponent(name)}`;
   const formHref = `/desk/doctype/Print%20Format/${encodeURIComponent(name)}`;
   return (
@@ -46,7 +51,10 @@ export default function PrintFormatBuilderHost({ name, classic }: { name: string
             <h1 className="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               <span className="font-normal text-zinc-500">Print Format Builder ·</span> {name}
             </h1>
-            <a href={`/app/${route}`} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-xs text-zinc-600 hover:underline dark:text-zinc-300">
+            <Link href={base} className="ml-auto text-xs font-medium text-zinc-700 hover:underline dark:text-zinc-200">
+              Crema builder
+            </Link>
+            <a href={`/app/${route}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:underline dark:text-zinc-300">
               Open in Desk <ExternalLink className="h-3 w-3" aria-hidden />
             </a>
           </div>

@@ -5,8 +5,8 @@ interface Props {
   searchParams: Promise<{ ui?: string }>;
 }
 
-/** Print Format "Edit Format": Desk's builder full screen (docs/GAPS.md § 2.19 A) */
+/** Print Format "Edit Format": Crema's builder full screen; `?ui=desk` / `?ui=classic` frame Desk's (docs/GAPS.md § 2.19) */
 export default async function PrintFormatBuilderRoute({ params, searchParams }: Props) {
   const [{ name }, { ui }] = await Promise.all([params, searchParams]);
-  return <PrintFormatBuilderHost name={decodeURIComponent(name)} classic={ui === "classic"} />;
+  return <PrintFormatBuilderHost name={decodeURIComponent(name)} ui={ui === "classic" || ui === "desk" ? ui : "crema"} />;
 }

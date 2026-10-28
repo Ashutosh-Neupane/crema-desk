@@ -460,8 +460,18 @@ only prints after **Save & Apply** (`apply_draft`), named versions (`save_versio
   zone when selected. (Root cause of "can't remove a block": with a preview record Desk hides every section toolbar.)
 - e2e: open, add field, delete field and its section, Save & Apply, print view shows it, dark mode follows Crema.
 
-**B — Native Crema builder, same data (L1, weeks)**: React port that reads / writes the same `format_data` and calls
-the same whitelisted methods (draft / apply / versions), so Desk and Crema stay interchangeable.
+**B — Native Crema builder, same data (L1)** — B1 ✅ 2026-10-28, `e2e/pfnative.mjs`. React builder that reads / writes
+the same `format_data` and calls the same whitelisted methods (draft / apply), so Desk and Crema stay interchangeable.
+"Edit Format" opens it; `?ui=desk` keeps Desk's framed builder (A), `?ui=classic` the old one; a classic (array)
+layout asks to convert it in Desk once.
+- B1 done: canvas (sections, 1–4 columns, header / footer zones, drag sections and fields, sample record values,
+  HTML blocks rendered sanitized), Fields (searchable; child tables get Desk's column pick) and Blocks (section, page
+  break, text, HTML, spacer, divider, image, barcode / QR) panels, inspector for page / section / field, Delete with
+  an emptied section removed too and Undo in the toast, ⌘Z / ⇧⌘Z, autosave to the server draft (status in the bar,
+  stale `modified` → Reload), Discard draft, Save & Apply, Preview = `render_builder_preview` of the unsaved draft,
+  paper white in dark mode.
+- Still to do (B2): resizable columns, table column picker in the inspector, letter head select, PDF button,
+  versions drawer, copy / duplicate, multi-select, tablet sheets, signature / totals blocks, snippet library.
 - Canvas with dnd-kit (already used by the grid): sections → columns (1–4, resizable) → fields; header / footer zones.
 - Left: Fields (searchable, grouped by section of the DocType, child tables as table blocks with column picker),
   Blocks (text, HTML, image, divider, spacer, page break, barcode / QR, signature, totals), Library (snippets).
