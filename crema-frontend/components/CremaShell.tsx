@@ -262,6 +262,8 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
   const { sidebarOpen, toggleSidebar, theme, setTheme, themeSeeded, seedThemeFromUser, fullWidth, hydrateFullWidth } = useUIStore();
   // phones: the sidebar is an overlay, so it starts closed and closes after each navigation (Desk: sidebar.js on mobile)
   const shellPath = usePathname();
+  // full-screen tools (Print Format Builder): no breadcrumb row, no width cap — they bring their own header
+  const fullScreen = shellPath.startsWith("/desk/print-format-builder/");
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) useUIStore.getState().setSidebarOpen(false);
   }, [shellPath]);
@@ -461,13 +463,15 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
           {/* Desk's container: capped at its xl width (variables.scss $container-max-widths) unless "Toggle Full Width" is on */}
           <div
             id="main-container"
-            data-fullwidth={fullWidth ? "true" : "false"}
-            className={fullWidth ? "w-full" : "mx-auto w-full max-w-[1290px]"}
+            data-fullwidth={fullWidth || fullScreen ? "true" : "false"}
+            className={fullWidth || fullScreen ? "w-full" : "mx-auto w-full max-w-[1290px]"}
           >
             <SiteBanners />
-            <div className="mb-stack">
-              <Breadcrumbs />
-            </div>
+            {!fullScreen && (
+              <div className="mb-stack">
+                <Breadcrumbs />
+              </div>
+            )}
             {children}
           </div>
         </main>

@@ -2,6 +2,15 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — Print Format Builder, step A (framed, usable)
+- "Edit Format" → `/desk/print-format-builder/<name>`: Desk's v16 builder full screen (no breadcrumb row, no width
+  cap, sidebar folded), one header with Back and Open in Desk; framed Desk pages follow Crema's light / dark theme.
+- Why blocks "couldn't be removed": deleting a field leaves its section, and in preview mode Desk hides every section
+  toolbar (`.section--preview .section-toolbar`), so the section's × is gone; the letter head zone is not deletable
+  at all (Letter head → None). Injected CSS keeps the toolbar on the selected section and explains the letter head.
+- e2e/pfbuilder (new): edit format, theme, delete block + section, letter head hint, Save & Apply → format_data.
+- Plan for the native builder (B) and beyond Desk (C): GAPS § 2.19.
+
 ## 2026-10-28 — M6: works on a phone
 - Below 640px: list as cards (+ select all, count), filters folded behind "More filters", child tables as row cards
   opening the row form (Add row opens it too), form actions in a bottom bar, toasts above it.

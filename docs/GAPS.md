@@ -284,8 +284,8 @@ Order of work: the milestones in § 0.1.
 - ❌ DocType permission editor dialog (`ui/permission_dialog.js`, v16) used by the form builder / DocType form.
 - ✅ Print Format editing (Jinja + CSS) from Crema's form: the new-form Name field for prompt-named DocTypes, Custom
   Format, the template in a Code field, then the format in the print view's picker — `e2e/printformat.mjs`.
-- ❌ Print Format Builder (`print_format_builder/`, page + beta Vue builder): "Edit Format" opens Desk's builder page
-  through L4; verify, then native later.
+- 🟡 Print Format Builder: "Edit Format" opens Desk's v16 Vue builder (`print_format_builder_beta`) framed (L4).
+  Problems found and the plan to fix them are in § 2.19.
 - ❌ Web Form builder (`web_form/`, field list editor), Workflow builder parity (`workflow_builder/` Vue flow),
   Custom Field from the form menu, Translation tool, Naming Series dialog (`ui/naming_series.js`, v16 Document
   Naming Settings), Letter Head builder, Email Template preview (`utils/preview_email.js`, `views/render_preview.js`).
@@ -432,6 +432,53 @@ Left:
   user menu is a link out and stays.
 - ❌ Server Components for first paint: load meta + doc on the server for `/desk/doctype/X/Y` so the form renders
   without a client round trip (TanStack Query hydration).
+
+### 2.19 Print Format Builder (plan)
+**What Desk v16 has** (`frappe/public/js/print_format_builder/`, ~6,200 lines of Vue; page
+`printing/page/print_format_builder_beta`): a page canvas (A4, zoom, preview record), left panel (Fields / Layers /
+Blocks / Library of snippets), right inspector (typography, label / value colours, margins, PDF renderer, letter head,
+page numbers, custom CSS; per field: label, format, visibility conditions), letter head header / footer zones,
+undo / redo, copy / paste / duplicate, multi-select, keyboard moves, **server draft** (`save_draft`, autosaved) that
+only prints after **Save & Apply** (`apply_draft`), named versions (`save_version`, `restore_version`,
+`discard_draft`). Layout is JSON in `format_data` (`sections[] → columns[] → fields[]`, `header`, `footer`).
+
+**Problems seen in Crema today** (2026-10-28, framed builder):
+1. Deleting a block removes the field but leaves its empty section; the section's own delete is a small × that only
+   shows while hovering its top bar — users conclude "remove doesn't work".
+2. The letter head **Header** zone (company name / doctype / name) can't be deleted by design; the only way is
+   Document → Letter head → None. Nothing says so.
+3. Three stacked headers (Crema breadcrumb "Page > Print Format Builder Beta", Crema title bar, Desk's page head);
+   the builder wants the full screen.
+4. Dark mode inside the frame follows Desk's own theme setting, not Crema's toggle.
+5. An empty HTML block prints its label ("Custom HTML —").
+
+**A — Make the framed builder usable now (L4) ✅ 2026-10-28** — `e2e/pfbuilder.mjs`
+- Full-screen route `/desk/print-format-builder/<name>`: no Crema title bar, breadcrumb "Print Format › <name>",
+  Back to the form; the sidebar folds like Desk does.
+- Sync Crema's theme into the frame (same origin: set `data-theme` on the frame's `<html>`, follow changes).
+- Small CSS fixes injected into the frame: section toolbar visible on the selected section; hint on the letter head
+  zone when selected. (Root cause of "can't remove a block": with a preview record Desk hides every section toolbar.)
+- e2e: open, add field, delete field and its section, Save & Apply, print view shows it, dark mode follows Crema.
+
+**B — Native Crema builder, same data (L1, weeks)**: React port that reads / writes the same `format_data` and calls
+the same whitelisted methods (draft / apply / versions), so Desk and Crema stay interchangeable.
+- Canvas with dnd-kit (already used by the grid): sections → columns (1–4, resizable) → fields; header / footer zones.
+- Left: Fields (searchable, grouped by section of the DocType, child tables as table blocks with column picker),
+  Blocks (text, HTML, image, divider, spacer, page break, barcode / QR, signature, totals), Library (snippets).
+- Right: inspector for page / section / field, built from Crema's own controls (TimePicker, DatePicker, colour, …).
+- Live preview of a real record (server `generate_preview`), PDF button, version history drawer, undo / redo,
+  keyboard (Delete removes the selection — **an emptied section goes with its last field**, with Undo in the toast).
+- Works in dark mode (the paper stays white), on tablets (panels as sheets).
+
+**C — Better than Desk**
+- Start from a template gallery (Classic / Modern / Bordered + "match my letter head"), not a blank page.
+- Side-by-side preview with 2–3 sample records (short / long / many items) to catch overflow before printing.
+- Conditional blocks in plain words ("show when Status is Overdue"), not Jinja.
+- Number / date / currency formatting per field with a live sample; amount in words (Nepali / Indian lakh-crore).
+- Paper presets (A4, A5, Letter, 80 mm thermal for POS) with margins that match the printer.
+- Check before Apply: empty blocks, fields the role can't read, images too large, page overflow.
+- Export / import a format as JSON to share between sites (pairs with multi-site, PLAN.md § 2.1).
+- Optional AI: "describe the invoice you want" → a draft layout (PLAN.md § 2.2), always as a draft.
 
 ### Out of scope (Frappe Cloud / dev-only)
 `billing.bundle.js` (Frappe Cloud trial banners), `telemetry.bundle.js`, `sentry.bundle.js`, `build_events`
