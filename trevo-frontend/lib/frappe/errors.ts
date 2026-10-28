@@ -1,3 +1,6 @@
+import { toast } from "sonner";
+import { showErrorDetails, tracebacksAllowed } from "@/components/desk/ErrorDetails";
+
 /**
  * Frappe error → human message, shared by server (BFF) and browser code.
  * Mirrors what Desk shows: msgprint/throw text from `_server_messages`
@@ -59,3 +62,35 @@ export function parseServerMessages(raw?: string | null): string[] {
   }
 }
 
+
+/**
+ * The server traceback Desk shows in its "Server Error" dialog: `exc` is a JSON list of
+ * traceback strings. The server only sends it when the user may see tracebacks
+ * (frappe/utils/response.py is_traceback_allowed: allow_error_traceback + System User, or dev server),
+ * so its presence is the gate, as in Desk's request.js report_error.
+ */
+export function frappeTraceback(envelope: unknown): string | undefined {
+  const exc = (envelope as { exc?: unknown } | null)?.exc;
+  if (typeof exc !== "string" || !exc) return undefined;
+  try {
+    const arr = JSON.parse(exc);
+    if (Array.isArray(arr)) return arr.filter(Boolean).map(String).join("\n") || undefined;
+  } catch {
+    /* not JSON — the raw text is the traceback */
+  }
+  return exc;
+}
+
+/**
+ * Error toast with a "Details" action when the error carries a server traceback and the user is a
+ * System Manager (opens showErrorDetails). Other errors get a plain toast.
+ */
+export function toastError(e: unknown, fallback: string, opts: { duration?: number } = {}) {
+  const message = e instanceof Error && e.message ? e.message : fallback;
+  const traceback = e instanceof Error && "traceback" in e && typeof e.traceback === "string" ? e.traceback : undefined;
+  if (!traceback || !tracebacksAllowed()) return toast.error(message, opts);
+  return toast.error(message, {
+    ...opts,
+    action: { label: "Details", onClick: () => showErrorDetails({ message, traceback }) },
+  });
+}
