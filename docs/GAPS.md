@@ -35,7 +35,7 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M3 | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
 | M4 | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
 | M5 | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs` | partly |
-| M6 | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
+| M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
 | M7 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
 
 Left for later (not needed to call phase 1 done): builders (2.9), workspace editing and the v16 dock (2.7), Map /
@@ -358,9 +358,12 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ React Doctor warnings (~110); split DocForm/ListView further.
 - ❌ Virtualized lists and report grids for large data.
 - ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
-- 🟡 Mobile layouts (M6, started): fluid spacing tokens (`--space-*` with `clamp()`, Tailwind `p-gutter` / `gap-field` …), form
+- ✅ Mobile layouts (M6): fluid spacing tokens (`--space-*` with `clamp()`, Tailwind `p-gutter` / `gap-field` …), form
   columns by container width (`@container`), sidebar closed on phones, compact header — no horizontal scroll at
-  390 / 768 / 1280 px on workspace, list, form, report. ❌ grid and list as cards on phones, bottom action bar.
+  390 / 768 / 1280 px on workspace, list, form, report. ✅ Phones (< 640px, `lib/hooks/useIsPhone.ts`, one layout
+  rendered): list rows as cards (title, status, three list fields, select all), standard filters / Group by / stats
+  behind "More filters"; child tables as row cards that open the row form; form actions (Save / Submit / workflow /
+  custom buttons) in a bottom bar; toasts lifted above it; no native date / time inputs left — `e2e/mobile.mjs`.
 - ❌ Keyboard-only pass, a11y labels everywhere (✅ dialogs are now named by their title). ✅ Pointer cursor on
   everything clickable (base CSS: buttons, `role=button/tab/menuitem/option`, labels, selects, checkboxes).
 - ✅ No hydration mismatches on home / forms / reports: client-only values (stored theme icon, report-manager

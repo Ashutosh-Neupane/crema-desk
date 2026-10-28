@@ -9,7 +9,7 @@
  *  - sort, group-by counts, page size + load more, bulk actions (components/list/BulkActions)
  *  - only the views that make sense for the DocType; quick entry for New when allowed
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,8 @@ import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
 import BulkActions from "@/components/list/BulkActions";
 import ExportDialog from "@/components/list/ExportDialog";
 import ListSidebar from "@/components/list/ListSidebar";
+import DatePicker from "@/components/form/DatePicker";
+import { useIsPhone } from "@/lib/hooks/useIsPhone";
 import { useShortcuts } from "@/lib/shortcuts";
 import { useListRealtime } from "@/lib/services/realtime";
 import type { DocField } from "@/lib/frappe/types";
@@ -95,6 +97,9 @@ export default function ListView({ doctype }: { doctype: string }) {
   const [quickEntry, setQuickEntry] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [listSettingsOpen, setListSettingsOpen] = useState(false);
+  const phone = useIsPhone();
+  // phones: standard filters, Group by and sidebar stats fold behind "More filters"
+  const [moreFilters, setMoreFilters] = useState(false);
 
   // Desk list_view.js setup_defaults: filters / sort_by / sort_order restored from user_settings["List"]
   // (URL filters win); before_render saves them back (+ last_view). Query is not cached so a revisit re-reads it.
@@ -373,7 +378,17 @@ export default function ListView({ doctype }: { doctype: string }) {
             className="h-8 w-full rounded-md border border-zinc-200 bg-white pl-8 pr-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           />
         </div>
-        {standardFilters.map((f) => {
+        {phone && (standardFilters.length > 0 || !lvs?.disable_sidebar_stats) && (
+          <button
+            type="button"
+            onClick={() => setMoreFilters((v) => !v)}
+            aria-expanded={moreFilters}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <ListFilter className="h-3.5 w-3.5" /> {moreFilters ? "Fewer filters" : "More filters"}
+          </button>
+        )}
+        {(!phone || moreFilters) && standardFilters.map((f) => {
           const current = filters.find((x) => x[1] === f.fieldname && x[2] === "=");
           const val = current ? String(current[3]) : "";
           const set = (v: string) => setFilters(v ? [...filters.filter((x) => x[1] !== f.fieldname), [doctype, f.fieldname, "=", v]] : filters.filter((x) => x[1] !== f.fieldname));
@@ -390,8 +405,12 @@ export default function ListView({ doctype }: { doctype: string }) {
               <option value="1">Yes</option>
               <option value="0">No</option>
             </select>
+          ) : f.fieldtype === "Date" ? (
+            <div key={f.fieldname} className="w-40">
+              <DatePicker compact value={val || null} onChange={(v) => set(v ?? "")} ariaLabel={f.label ?? f.fieldname} />
+            </div>
           ) : (
-            <input key={f.fieldname} type={f.fieldtype === "Date" ? "date" : "text"} defaultValue={val} title={f.label ?? f.fieldname} aria-label={f.label ?? f.fieldname} onBlur={(e) => set(e.target.value)} onKeyDown={(e) => e.key === "Enter" && set((e.target as HTMLInputElement).value)} placeholder={f.label ?? f.fieldname} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+            <input key={f.fieldname} type="text" defaultValue={val} title={f.label ?? f.fieldname} aria-label={f.label ?? f.fieldname} onBlur={(e) => set(e.target.value)} onKeyDown={(e) => e.key === "Enter" && set((e.target as HTMLInputElement).value)} placeholder={f.label ?? f.fieldname} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
           );
         })}
 
@@ -405,16 +424,18 @@ export default function ListView({ doctype }: { doctype: string }) {
           </PopoverContent>
         </Popover>
 
-        <Popover>
-          <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-            <Layers className="h-3.5 w-3.5" /> Group by
-          </PopoverTrigger>
-          <PopoverContent className="w-72">
-            <GroupBy meta={meta} filters={allFilters} onPick={addFilter} />
-          </PopoverContent>
-        </Popover>
+        {(!phone || moreFilters) && (
+          <Popover>
+            <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+              <Layers className="h-3.5 w-3.5" /> Group by
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <GroupBy meta={meta} filters={allFilters} onPick={addFilter} />
+            </PopoverContent>
+          </Popover>
+        )}
 
-        {!lvs?.disable_sidebar_stats && <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />}
+        {(!phone || moreFilters) && !lvs?.disable_sidebar_stats && <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />}
 
         <div className="ml-auto flex items-center gap-1">
           <select
@@ -458,105 +479,179 @@ export default function ListView({ doctype }: { doctype: string }) {
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50/60 text-left text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
-                <th className="w-10 px-3 py-2.5">
+        {phone ? (
+          // Phones: one card per row (title + status, up to three list fields, updated) instead of a wide table
+          <>
+          {rows.length > 0 && (
+            <div className="flex items-center gap-3 border-b border-zinc-200 bg-zinc-50/60 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <input
+                type="checkbox"
+                aria-label="Select all"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
+                className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
+              />
+              <span>{selected.size > 0 ? `${selected.size} selected` : "Select all"}</span>
+              {!disableCount && <span className="ml-auto">{rows.length} of {total}</span>}
+            </div>
+          )}
+          <ul aria-label={`${doctype} list`} className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+            {rows.map((r) => {
+              const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
+              const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+              const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
+              return (
+                <li key={r.name} className={`relative flex gap-3 px-3 py-3 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}>
                   <input
                     type="checkbox"
-                    aria-label="Select all"
-                    checked={allSelected}
-                    onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
-                    className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
-                  />
-                </th>
-                <th className="px-3 py-2.5" style={colWidth(colSettings[0]?.fieldname ?? "name") ? { minWidth: colWidth(colSettings[0]?.fieldname ?? "name") } : undefined}>{subjectLabel}</th>
-                {hasIndicator && <th className="px-3 py-2.5">Status</th>}
-                {listFields.map((f) => (
-                  <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
-                ))}
-                <th className="w-24 px-3 py-2.5 text-right">
-                  {!disableCount && `${rows.length} of ${total}`}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
-                const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
-                const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
-                return (
-                  <tr
-                    key={r.name}
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).closest("a,button,input")) return;
-                      if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
-                      else router.push(href);
+                    aria-label={`Select ${r.name}`}
+                    checked={selected.has(r.name)}
+                    onChange={() => {
+                      const next = new Set(selected);
+                      if (next.has(r.name)) next.delete(r.name);
+                      else next.add(r.name);
+                      setSelected(next);
                     }}
-                    className={`group cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
-                  >
-                    <td className="px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${r.name}`}
-                        checked={selected.has(r.name)}
-                        onChange={() => {
-                          const next = new Set(selected);
-                          if (next.has(r.name)) next.delete(r.name);
-                          else next.add(r.name);
-                          setSelected(next);
-                        }}
-                        className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
-                      />
-                    </td>
-                    <td className="max-w-[18rem] px-3 py-2.5">
-                      <Link href={href} className="block truncate font-medium text-zinc-900 hover:underline dark:text-zinc-100">{subject}</Link>
-                      {subject !== r.name && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
-                    </td>
-                    {hasIndicator && (
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        {ind && (
-                          <button
-                            type="button"
-                            title={`Filter by ${ind[0]}`}
-                            onClick={() => ind[2] && setFilters([...filters, ...(indicatorFilters(doctype, ind[2]) as Filter[])])}
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}
-                          >
-                            {ind[0]}
-                          </button>
-                        )}
-                      </td>
-                    )}
-                    {listFields.map((f) => {
-                      const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
-                      const numeric = ["Currency", "Float", "Int", "Percent"].includes(f.fieldtype);
-                      return (
-                        <td key={f.fieldname} className={`max-w-[16rem] truncate whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-300 ${numeric ? "text-right tabular-nums" : ""}`}>
-                          {f.fieldtype === "Link" && text ? (
-                            <button type="button" onClick={() => addFilter([doctype, f.fieldname, "=", r[f.fieldname]])} className="truncate hover:underline" title={`Filter by ${text}`}>
-                              {text}
-                            </button>
-                          ) : (
-                            text
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
-                      <span className="inline-flex items-center gap-2">
+                    className="relative z-10 mt-0.5 h-4 w-4 shrink-0 rounded accent-zinc-900 dark:accent-zinc-100"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2">
+                      {/* the link covers the card (after:inset-0) so the whole card opens the document */}
+                      <Link href={href} className="min-w-0 flex-1 truncate font-medium text-zinc-900 after:absolute after:inset-0 dark:text-zinc-100">
+                        {subject}
+                      </Link>
+                      {ind && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}>{ind[0]}</span>}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
+                      {subject !== r.name && <span className="truncate">{r.name}</span>}
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-2">
                         {!disableCommentCount && Number(r._comment_count) > 0 && (
                           <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
                         )}
                         {timeAgo(r.modified)}
                       </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    {listFields.length > 0 && (
+                      <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
+                        {listFields.slice(0, 3).map((f) => {
+                          const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
+                          if (!text) return null;
+                          return (
+                            <Fragment key={f.fieldname}>
+                              <dt className="text-zinc-400">{f.label}</dt>
+                              <dd className="truncate text-zinc-700 dark:text-zinc-300">{text}</dd>
+                            </Fragment>
+                          );
+                        })}
+                      </dl>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          </>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 bg-zinc-50/60 text-left text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <th className="w-10 px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={allSelected}
+                      onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
+                      className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
+                    />
+                  </th>
+                  <th className="px-3 py-2.5" style={colWidth(colSettings[0]?.fieldname ?? "name") ? { minWidth: colWidth(colSettings[0]?.fieldname ?? "name") } : undefined}>{subjectLabel}</th>
+                  {hasIndicator && <th className="px-3 py-2.5">Status</th>}
+                  {listFields.map((f) => (
+                    <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
+                  ))}
+                  <th className="w-24 px-3 py-2.5 text-right">
+                    {!disableCount && `${rows.length} of ${total}`}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
+                  const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+                  const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
+                  return (
+                    <tr
+                      key={r.name}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest("a,button,input")) return;
+                        if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
+                        else router.push(href);
+                      }}
+                      className={`group cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
+                    >
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${r.name}`}
+                          checked={selected.has(r.name)}
+                          onChange={() => {
+                            const next = new Set(selected);
+                            if (next.has(r.name)) next.delete(r.name);
+                            else next.add(r.name);
+                            setSelected(next);
+                          }}
+                          className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
+                        />
+                      </td>
+                      <td className="max-w-[18rem] px-3 py-2.5">
+                        <Link href={href} className="block truncate font-medium text-zinc-900 hover:underline dark:text-zinc-100">{subject}</Link>
+                        {subject !== r.name && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
+                      </td>
+                      {hasIndicator && (
+                        <td className="whitespace-nowrap px-3 py-2.5">
+                          {ind && (
+                            <button
+                              type="button"
+                              title={`Filter by ${ind[0]}`}
+                              onClick={() => ind[2] && setFilters([...filters, ...(indicatorFilters(doctype, ind[2]) as Filter[])])}
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}
+                            >
+                              {ind[0]}
+                            </button>
+                          )}
+                        </td>
+                      )}
+                      {listFields.map((f) => {
+                        const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
+                        const numeric = ["Currency", "Float", "Int", "Percent"].includes(f.fieldtype);
+                        return (
+                          <td key={f.fieldname} className={`max-w-[16rem] truncate whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-300 ${numeric ? "text-right tabular-nums" : ""}`}>
+                            {f.fieldtype === "Link" && text ? (
+                              <button type="button" onClick={() => addFilter([doctype, f.fieldname, "=", r[f.fieldname]])} className="truncate hover:underline" title={`Filter by ${text}`}>
+                                {text}
+                              </button>
+                            ) : (
+                              text
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
+                        <span className="inline-flex items-center gap-2">
+                          {!disableCommentCount && Number(r._comment_count) > 0 && (
+                            <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
+                          )}
+                          {timeAgo(r.modified)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {!rowsQuery.isLoading && rows.length === 0 && (
           <div className="px-6 py-14 text-center">

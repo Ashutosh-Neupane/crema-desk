@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { CalendarIcon, X } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
 import { Card } from "@/components/shadcn/card";
+import DatePicker from "@/components/form/DatePicker";
 import type { FieldControlProps } from "@/lib/crema-form/controls";
 
 /** Stored value is `{from, to}`, possibly JSON-encoded by the backend. */
@@ -59,21 +60,13 @@ export default function DateRangeField({ field, value, onChange, disabled }: Fie
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <input aria-label="From date"
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          disabled={disabled}
-          className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
+        <div className="w-40">
+          <DatePicker ariaLabel="From date" value={from || null} onChange={(v) => setFrom(v ?? "")} disabled={disabled} />
+        </div>
         <span className="text-xs text-zinc-500">to</span>
-        <input aria-label="To date"
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          disabled={disabled}
-          className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
+        <div className="w-40">
+          <DatePicker ariaLabel="To date" value={to || null} onChange={(v) => setTo(v ?? "")} disabled={disabled} />
+        </div>
         <Button size="sm" onClick={applyRange} disabled={disabled || (!from && !to)}>
           Apply
         </Button>

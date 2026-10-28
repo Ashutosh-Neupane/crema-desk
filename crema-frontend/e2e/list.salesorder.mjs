@@ -74,7 +74,9 @@ await page.keyboard.press("Escape");
 
 step("sort ascending by name");
 await page.getByLabel("Sort by").selectOption("name");
-await page.getByRole("button", { name: /Descending/ }).click();
+// the sort is saved per user (Desk user_settings), so an earlier run may have left it ascending already
+const desc = page.getByRole("button", { name: /Descending/ });
+if (await desc.isVisible().catch(() => false)) await desc.click();
 await settle();
 const firstId = await page.locator("tbody tr").first().locator("td").nth(1).innerText();
 check(firstId.includes("SAL-ORD-2026-00001"), `first row is 00001 when ascending (${firstId.split("\n").pop()})`);
