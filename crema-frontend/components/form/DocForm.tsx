@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastError } from "@/lib/frappe/errors";
-import { AlarmClock, ChevronDown, ClipboardCopy, Copy, CopyPlus, FileCode, Link2, Pencil, Printer, Settings2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlarmClock, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Copy, CopyPlus, FileCode, Link2, Pencil, Printer, Settings2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
@@ -23,7 +23,7 @@ import { useFormMetas } from "@/lib/hooks/useFormMetas";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { FormController, newFormDoc } from "@/lib/form/FormController";
 import { attachDoctypeAdapters } from "@/lib/form/adapters";
-import { cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
+import { DeskError, cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
 import { PREFILL_KEY, takePrefill } from "@/lib/form/prefill";
 import { asksForName, withNewNameField } from "@/lib/form/newName";
 import FormSidebar from "@/components/form/FormSidebar";
@@ -36,6 +36,7 @@ import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/For
 import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
+import { loadUserSettings, userSettingsKey } from "@/lib/list/useUserListState";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useShortcuts } from "@/lib/shortcuts";
 import { Command } from "cmdk";
@@ -139,7 +140,7 @@ export default function DocForm({ doctype, name }: Props) {
   const isNew = !name;
 
   const [loaded, setLoaded] = useState<{ doc: Doc; docinfo: DocInfo } | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ message: string; status?: number } | null>(null);
   const [busy, setBusy] = useState<null | "save" | "submit" | "cancel" | "delete">(null);
   const [confirm, setConfirm] = useState<null | "submit" | "cancel" | "delete">(null);
   const [missing, setMissing] = useState<string[] | null>(null);
@@ -153,7 +154,7 @@ export default function DocForm({ doctype, name }: Props) {
       setLoaded(r);
       setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Failed to load document");
+      setLoadError({ message: e instanceof Error ? e.message : "Failed to load document", status: e instanceof DeskError ? e.status : undefined });
     }
   }, [doctype, name]);
 
@@ -348,6 +349,32 @@ export default function DocForm({ doctype, name }: Props) {
   }, [ctl, run, load]);
 
   const [jumpOpen, setJumpOpen] = useState(false);
+  // Desk form.js navigate_records: the next / previous record in the list's own filters and sort
+  // (frappe.desk.form.utils.get_next; user_settings.List when the list isn't open), keeping the active tab
+  const navigate = useCallback(
+    async (prev: boolean) => {
+      const c = ctlRef.current;
+      if (!c || isNewDoc(c.getDoc())) return;
+      try {
+        const s = await qc.fetchQuery({ queryKey: userSettingsKey(doctype), queryFn: () => loadUserSettings(doctype), staleTime: 30_000 });
+        const list = s.List ?? {};
+        const { env, messages } = await deskCall("frappe.desk.form.utils.get_next", {
+          doctype,
+          value: c.docname,
+          prev: prev ? 1 : 0,
+          filters: JSON.stringify(list.filters ?? []),
+          ...(list.sort_by ? { sort_field: list.sort_by } : {}),
+          ...(list.sort_order ? { sort_order: list.sort_order } : {}),
+        });
+        const next = typeof env.message === "string" ? env.message : "";
+        if (next) router.push(`/desk/doctype/${enc(doctype)}/${enc(next)}${window.location.hash}`);
+        else toast.info(messages[0] ?? "No further records");
+      } catch (e) {
+        toastError(e, "Could not open the next document");
+      }
+    },
+    [doctype, qc, router],
+  );
   const [formDialog, setFormDialog] = useState<null | "rename" | "links" | "remind">(null);
   const [focusRequest, setFocusRequest] = useState<{ fieldname: string; n: number } | null>(null);
   const docstatusNow = () => Number(ctlRef.current?.getDoc().docstatus ?? 0);
@@ -359,6 +386,8 @@ export default function DocForm({ doctype, name }: Props) {
       { keys: "mod+b", description: `New ${doctype}`, group: "Form", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) },
       { keys: "shift+mod+d", description: "Delete", group: "Form", action: () => ctlRef.current && !isNewDoc(ctlRef.current.getDoc()) && docstatusNow() !== 1 && setConfirm("delete") },
       { keys: "shift+r", description: "Reload", group: "Form", action: () => void load() },
+      { keys: "shift+mod+>", description: "Next document", group: "Form", action: () => void navigate(false) },
+      { keys: "shift+mod+<", description: "Previous document", group: "Form", action: () => void navigate(true) },
       {
         keys: "mod+p",
         description: "Print",
@@ -417,11 +446,20 @@ export default function DocForm({ doctype, name }: Props) {
   };
 
   // ── render ──────────────────────────────────────────────────────────────
-  if (metaError) return <div className="p-6 text-sm text-red-600" role="alert">{(metaError as Error).message}</div>;
-  if (loadError) {
+  const pageError = loadError ?? (metaError ? { message: (metaError as Error).message, status: (metaError as { status?: number }).status } : null);
+  if (pageError) {
+    // Desk pageview.js show_not_permitted / show_not_found
+    const heading = pageError.status === 403 ? "Not permitted" : pageError.status === 404 ? "Not found" : "Could not open this document";
+    const detail =
+      pageError.status === 403
+        ? `Sorry! You are not permitted to view ${doctype}${name ? ` ${name}` : ""}. Ask your System Manager for access.`
+        : pageError.status === 404
+          ? `${doctype} ${name ?? ""} does not exist, or was deleted or renamed.`
+          : pageError.message;
     return (
-      <div className="mx-auto max-w-lg p-10 text-center">
-        <p className="text-sm text-red-600" role="alert">{loadError}</p>
+      <div className="mx-auto max-w-lg p-10 text-center" role="alert">
+        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{heading}</h1>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{detail}</p>
         <Link href={`/desk/doctype/${enc(doctype)}`} className="mt-4 inline-block text-sm text-zinc-600 underline">Back to {doctype} list</Link>
       </div>
     );
@@ -489,7 +527,7 @@ export default function DocForm({ doctype, name }: Props) {
       <div className="sticky top-12 z-20 -mx-gutter flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg-color)]/95 px-gutter py-2 backdrop-blur">
         {canRename ? (
           <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            <button type="button" onClick={() => setFormDialog("rename")} title="Rename" className="max-w-full truncate rounded px-1 -mx-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <button type="button" onClick={() => setFormDialog("rename")} title="Rename" className="max-w-full truncate rounded px-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
               {title}
             </button>
           </h1>
@@ -526,6 +564,16 @@ export default function DocForm({ doctype, name }: Props) {
                 </button>
               ))
             ),
+          )}
+          {!isNewDoc(doc) && !meta.issingle && (ctx?.boot?.desk_settings as { form_navigation_buttons?: number } | undefined)?.form_navigation_buttons !== 0 && (
+            <span className="inline-flex">
+              <button type="button" onClick={() => void navigate(true)} aria-label="Previous document" title="Previous document (⇧⌘<)" className="rounded-l-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
+                <ChevronLeft className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
+              </button>
+              <button type="button" onClick={() => void navigate(false)} aria-label="Next document" title="Next document (⇧⌘>)" className="-ml-px rounded-r-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
+                <ChevronRight className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
+              </button>
+            </span>
           )}
           {!isNewDoc(doc) && (
             <Link href={`/desk/print/${enc(doctype)}/${enc(doc.name)}`} aria-label="Print" title="Print (⌘P)" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">

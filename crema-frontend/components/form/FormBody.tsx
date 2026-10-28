@@ -16,6 +16,10 @@ import FormControl from "@/lib/crema-form/controls/FormControl";
 import { parseDoctypeMeta } from "@/lib/crema-form/meta/parseDoctypeMeta";
 import { evalDependsOn } from "@/lib/crema-form/dependsOn";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+import { sysEnabled } from "@/lib/frappe/format";
+
+/** Desk keeps these when read-only and empty (plus Table / Check / Heading, which Crema renders on their own) */
+const KEEP_WHEN_EMPTY = new Set(["Table", "Check", "Heading", "HTML", "Button", "Image", "Geolocation", "Attachment Gallery"]);
 
 type Values = Record<string, unknown>;
 
@@ -105,8 +109,9 @@ export default function FormBody({
     const ro = permStatus !== "Write" || !!merged.read_only || (!!merged.read_only_depends_on && evalWith(String(merged.read_only_depends_on), ctx, parent));
     const reqd = !!merged.reqd || (!!merged.mandatory_depends_on && evalWith(String(merged.mandatory_depends_on), ctx, parent));
     let hidden = permStatus === "None" || !!merged.hidden || (!!merged.depends_on && !evalWith(String(merged.depends_on), ctx, parent));
-    // Desk hides read-only fields that have nothing to show
-    if (!hidden && (ro || readOnly) && merged.fieldtype !== "Table" && merged.fieldtype !== "Check" && merged.fieldtype !== "Heading" && merged.fieldtype !== "HTML" && merged.fieldtype !== "Button" && isEmpty(values[df.fieldname])) {
+    // Desk base_control.js get_status: read-only fields with no value are hidden when System Settings
+    // "Hide Empty Read-Only Fields" is on (the default); fields that show something without a value stay
+    if (!hidden && (ro || readOnly) && !KEEP_WHEN_EMPTY.has(merged.fieldtype) && isEmpty(values[df.fieldname]) && sysEnabled("hide_empty_read_only_fields", true)) {
       hidden = true;
     }
     if (merged.fieldtype === "Button" && readOnly) hidden = true;

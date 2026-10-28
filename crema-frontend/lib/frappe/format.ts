@@ -47,6 +47,12 @@ const userDefault = (k: string) => {
 const getDefault = (k: string) => userDefault(k) ?? sys(k);
 
 /** frappe.model.get_value over boot docs (":Currency", "Company", …) */
+/** frappe.defaults.is_enabled: a System Settings check in sysdefaults ("1" / 1), `fallback` when the boot lacks it */
+export function sysEnabled(key: string, fallback = false): boolean {
+  const v = sys(key);
+  return v == null || v === "" ? fallback : v === 1 || v === "1" || v === true;
+}
+
 export function bootValue(doctype: string, name: unknown, field: string): unknown {
   const dt = doctype.replace(/^:/, "");
   return settings.docs?.[dt]?.[cstr(name)]?.[field];

@@ -30,7 +30,7 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 
 | # | Milestone | Items (§) | Desk source | Proof | Cloud |
 |---|---|---|---|---|---|
-| M1 | **Form feels like Desk** | Save rules (2.17), timeline wording (2.17), visibility rules audit (2.15), previous / next doc, title editing, Jump to field verify (2.1), "Not permitted" + "shared with you" messages (2.1) | `form/save.js`, `form/form.js`, `form/toolbar.js`, `form/footer/version_timeline_content_builder.js` | `e2e/formsave.mjs`, `form.salesorder.mjs` | partly |
+| M1 ✅ | **Form feels like Desk** | Save rules (2.17), timeline wording (2.17), visibility rules audit (2.15), previous / next doc, title editing, Jump to field verify (2.1), "Not permitted" + "shared with you" messages (2.1) | `form/save.js`, `form/form.js`, `form/toolbar.js`, `form/footer/version_timeline_content_builder.js` | `e2e/formsave.mjs`, `form.salesorder.mjs` | partly |
 | M2 | **Workflow you can follow** | workflow stepper, "waiting on me", Workflow Action list, self-approval and condition messages (2.16) | `form/workflow.js`, `model/workflow.js`, `frappe/workflow/doctype/workflow_action` | `e2e/workflow.mjs` extended | yes |
 | M3 | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
 | M4 | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
@@ -95,9 +95,12 @@ Order of work: the milestones in § 0.1.
   jQuery), reset on every refresh, Desk's "Submit this document to confirm" — `e2e/dashboard.mjs`.
 - ❌ Dashboard heatmap (`timeline_data` from `get_open_count`) and graph (`data.graph_method`).
 - ❌ `frm.page.body`, `frm.layout.wrapper`, `frm.toolbar` containers for scripts (L2 for the rest of the page).
-- ❌ Form toolbar extras (`toolbar.js`): previous / next document (`frappe.desk.form.utils.get_next`), indicator
-  click actions, title editing for `title_field`, star/like in the header, "Jump to field" (Ctrl+J), `frm.page.add_menu_item`
-  / `add_action_item` verification.
+- ✅ Previous / next document (`form.js` `navigate_records`, `frappe.desk.form.utils.get_next` with the list's
+  saved filters and sort, keeps the tab hash, "No further records", Shift+Ctrl+< / >, hidden when Desk Settings turn
+  `form_navigation_buttons` off), title editing for `title_field` (click the title; name too when `allow_rename`),
+  Jump to field (Ctrl+J) — `e2e/formnav.mjs`, `e2e/formmenu.mjs`.
+- ❌ Form toolbar extras still open: indicator click actions, star/like in the header, `frm.page.add_menu_item` /
+  `add_action_item` verification.
 - ❌ Undo / redo (`form/undo_manager.js`, Ctrl+Z / Ctrl+Y on field changes).
 - ❌ Form tour (`form_tour.js`, Form Tour doctype, `onboarding_tours.bundle.js`).
 - ❌ Success action after submit/save (`success_action.js`, Success Action doctype).
@@ -105,8 +108,9 @@ Order of work: the milestones in § 0.1.
 - ❌ Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
 - ✅ Field permlevels (`lib/form/perm.ts`, Desk `model/perm.js`): a field at a level the user cannot read is hidden,
   one they cannot write is read-only; `frm.perm`, `frm.has_perm`, `frappe.perm.*` for scripts (`e2e/permlevel.mjs`).
-- ❌ Permlevel extras: "Not permitted" banners, `read_only_depends_on` re-check after save.
-- ❌ Doc-level permission messages: "You are viewing a document shared with you", restricted fields.
+- ✅ "Not permitted" / "Not found" pages instead of a raw error (`pageview.js` `show_not_permitted`), for the
+  document (getdoc 403/404) and the DocType (getdoctype 403); `read_only_depends_on` is evaluated on every render,
+  so it re-checks after save. (Desk has no "shared with you" banner; sharing shows in the sidebar.)
 - ✅ Button fields fire the form event named after the field (Desk `script_manager.trigger(fieldname)`), in grid row
   forms with the child doctype + row (`trigger(fieldname, cdt, cdn)`).
 - ✅ Field descriptions render as (sanitized) HTML.
@@ -372,7 +376,7 @@ together (source: `form/layout.js` `refresh_dependency`, `model/perm.js`, `form/
 | `read_only_depends_on`, `mandatory_depends_on` | DocField | same | ✅ (❌ re-check after save, 2.1) |
 | permlevel | DocPerm rows per level | per user and document | ✅ hidden if no read, read-only if no write |
 | `frm.toggle_display / set_df_property` | form scripts | when the script runs | ✅ |
-| empty read-only fields | Desk hides read-only fields with no value (`base_control.js` `refresh_input`, `df.read_only && is_null(value)`) | on refresh | 🟡 verify on Sales Order (e.g. Amended From) |
+| empty read-only fields | Desk hides read-only fields with no value when System Settings "Hide Empty Read-Only Fields" is on (default), except HTML / Image / Button / Geolocation / Attachment Gallery (`base_control.js` `get_status`) | on refresh | ✅ |
 | sections / tabs | hidden when every field in them is hidden | after the above | ✅ |
 
 **In the timeline** Desk does *not* evaluate `depends_on`: a change is listed when the field isn't `hidden` (or has
