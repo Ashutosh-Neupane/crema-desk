@@ -42,6 +42,16 @@ Any Frappe v16 site with ERPNext works. The local bench (containers, sites, comp
 Push with `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` — the macOS keychain
 helper blocks on a GUI prompt. Repo: github.com/Ashutosh-Neupane/crema-desk (public). Work on a feature branch
 off `main` and merge through a pull request; keep client and bench names out of commits, docs and screenshots.
+Commits and PRs are authored by Ashutosh Neupane <ashutoshneupane495@gmail.com> only: no `Co-Authored-By` lines and
+no "Generated with Claude Code" or other AI attribution in commit messages or PR descriptions.
+
+## Cloud sessions (claude.ai/code)
+- No Frappe bench is reachable from the cloud, so e2e suites (`node e2e/*.mjs`) can't run there. Check work with
+  `npx tsc --noEmit`, `npm run lint` and `npm run build` (from `crema-frontend/`), and say in the PR which e2e suite
+  should be run locally against the bench before merging.
+- Start from `docs/GAPS.md` (❌ items) and `PROGRESS.md`; port behaviour from Frappe's Desk source
+  (github.com/frappe/frappe, `frappe/public/js/frappe`) rather than guessing, and name the source file in comments.
+- Add or extend an e2e suite for each feature, even though it runs locally later.
 
 ## Commands (from `crema-frontend/`)
 - `npm run dev` · `npx tsc --noEmit` · `npm run lint` · `npm run build`
