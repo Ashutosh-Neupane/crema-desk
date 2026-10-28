@@ -24,6 +24,7 @@ import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
 import { currencyFor } from "@/lib/crema-form/controls/NumberField";
+import { useIsPhone } from "@/lib/hooks/useIsPhone";
 
 const NO_VALUE = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading", "Image", "Table", "Table MultiSelect"]);
 const NUMERIC = new Set(["Int", "Float", "Currency", "Percent"]);
@@ -225,6 +226,7 @@ export default function Grid({
   const cols = useMemo(() => gridColumns(meta, overrides, table), [meta, overrides, table]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
+  const phone = useIsPhone();
   // Desk grid_row.move(): "Move To" prompt for the row number (value kept as typed)
   const [moveOpen, setMoveOpen] = useState<{ name: string; value: string } | null>(null);
   const tableReadOnly = readOnly || !!(overrides[table]?.read_only ?? df.read_only);
@@ -278,7 +280,8 @@ export default function Grid({
     const row = await ctl.add_child(table, {}, at);
     if (at === undefined) setPage(Math.floor(rows.length / PAGE_SIZE));
     // Desk focuses the first cell of the new row; open the editor if no inline columns
-    if (!cols.length) setEditing(row.name);
+    // (phones edit rows in the row form, so it opens right away)
+    if (!cols.length || phone) setEditing(row.name);
   };
 
   // Desk grid_row.insert(show, below, duplicate): new row at idx (0-based `at`), editor opens on it
@@ -303,84 +306,134 @@ export default function Grid({
 
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
-      <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
-          <div className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
-            <div className="flex justify-center py-2">
-              {!tableReadOnly && (
-                <input type="checkbox" aria-label="Select all rows" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))} className="h-3.5 w-3.5 accent-zinc-900 dark:accent-zinc-100" />
-              )}
-            </div>
-            <div className="py-2 text-center">No.</div>
-            {cols.map((c) => (
-              <div key={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
-                {c.label}
-                {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
+      {phone ? (
+        // Phones: each row is a card (row number + its first columns); tapping opens the row form
+        <ul aria-label={`${df.label ?? table} rows`} className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          {pageRows.map((row, k) => {
+            const i = pageStart + k;
+            const parent = ctl.getDoc();
+            const shown = cols
+              .map((c) => ({ c, text: formatCell(row[c.fieldname], c, { ...row, currency: parent.currency }, { currency: currencyFor(c, { ...parent, ...row }) }) }))
+              .filter((x) => x.text !== "" && x.text != null);
+            const [first, ...rest] = shown;
+            const rowError = Object.keys(errors).some((e) => e.startsWith(`${table}.${i}.`));
+            return (
+              <li key={row.name} className={`relative flex items-start gap-3 px-3 py-2.5 ${selected.has(row.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}>
+                {!tableReadOnly && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Select row ${i + 1}`}
+                    checked={selected.has(row.name)}
+                    onChange={() => {
+                      const next = new Set(selected);
+                      if (next.has(row.name)) next.delete(row.name);
+                      else next.add(row.name);
+                      setSelected(next);
+                    }}
+                    className="relative z-10 mt-1 h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-100"
+                  />
+                )}
+                <span className="mt-0.5 w-5 shrink-0 text-xs tabular-nums text-zinc-400">{i + 1}</span>
+                <button type="button" onClick={() => setEditing(row.name)} aria-label={`Edit row ${i + 1}`} className="min-w-0 flex-1 text-left after:absolute after:inset-0">
+                  <span className={`block truncate text-sm font-medium ${rowError ? "text-red-600" : "text-zinc-900 dark:text-zinc-100"}`}>
+                    {first ? first.text : <span className="font-normal text-zinc-400">Empty row</span>}
+                  </span>
+                  {rest.length > 0 && (
+                    <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-zinc-500">
+                      {rest.slice(0, 3).map(({ c, text }) => (
+                        <span key={c.fieldname} className="min-w-0 truncate">
+                          <span className="text-zinc-400">{c.label}</span> {text}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </button>
+                <Pencil className="mt-1 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden />
+              </li>
+            );
+          })}
+          {rows.length === 0 && <li className="px-4 py-6 text-center text-sm text-zinc-400">No rows</li>}
+        </ul>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            <div className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
+              <div className="flex justify-center py-2">
+                {!tableReadOnly && (
+                  <input type="checkbox" aria-label="Select all rows" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))} className="h-3.5 w-3.5 accent-zinc-900 dark:accent-zinc-100" />
+                )}
               </div>
-            ))}
-            <div />
-          </div>
+              <div className="py-2 text-center">No.</div>
+              {cols.map((c) => (
+                <div key={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
+                  {c.label}
+                  {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
+                </div>
+              ))}
+              <div />
+            </div>
 
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={pageRows.map((r) => r.name)} strategy={verticalListSortingStrategy}>
-              {pageRows.map((row, k) => {
-                const i = pageStart + k;
-                return (
-                  <SortableGridRow key={row.name} id={row.name} disabled={tableReadOnly} template={template} selected={selected.has(row.name)}>
-                    {(handle) => (
-                      <>
-                        <div className="flex justify-center">
-                          {!tableReadOnly && (
-                            <input
-                              type="checkbox"
-                              aria-label={`Select row ${i + 1}`}
-                              checked={selected.has(row.name)}
-                              onChange={() => {
-                                const next = new Set(selected);
-                                if (next.has(row.name)) next.delete(row.name);
-                                else next.add(row.name);
-                                setSelected(next);
-                              }}
-                              className="h-3.5 w-3.5 accent-zinc-900 dark:accent-zinc-100"
-                            />
-                          )}
-                        </div>
-                        <div className="relative flex items-center justify-center text-xs tabular-nums text-zinc-400">
-                          <span className={tableReadOnly ? "" : "group-hover:opacity-0"}>{i + 1}</span>
-                          {!tableReadOnly && (
-                            <button type="button" {...handle} aria-label={`Drag row ${i + 1}`} className="absolute inset-0 m-auto flex h-6 w-6 cursor-grab items-center justify-center rounded text-zinc-400 opacity-0 hover:bg-zinc-100 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-zinc-800">
-                              <GripVertical className="h-3.5 w-3.5" aria-hidden />
-                            </button>
-                          )}
-                        </div>
-                        {cols.map((c) => (
-                          <div key={c.fieldname} className="min-w-0 px-0.5 py-0.5">
-                            <Cell
-                              df={{ ...c, ...(overrides[`${table}.${c.fieldname}`] as Partial<DocField>) }}
-                              row={row}
-                              table={table}
-                              ctl={ctl}
-                              readOnly={tableReadOnly || !!(overrides[`${table}.${c.fieldname}`]?.read_only ?? c.read_only)}
-                              error={errors[`${table}.${i}.${c.fieldname}`]}
-                            />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={pageRows.map((r) => r.name)} strategy={verticalListSortingStrategy}>
+                {pageRows.map((row, k) => {
+                  const i = pageStart + k;
+                  return (
+                    <SortableGridRow key={row.name} id={row.name} disabled={tableReadOnly} template={template} selected={selected.has(row.name)}>
+                      {(handle) => (
+                        <>
+                          <div className="flex justify-center">
+                            {!tableReadOnly && (
+                              <input
+                                type="checkbox"
+                                aria-label={`Select row ${i + 1}`}
+                                checked={selected.has(row.name)}
+                                onChange={() => {
+                                  const next = new Set(selected);
+                                  if (next.has(row.name)) next.delete(row.name);
+                                  else next.add(row.name);
+                                  setSelected(next);
+                                }}
+                                className="h-3.5 w-3.5 accent-zinc-900 dark:accent-zinc-100"
+                              />
+                            )}
                           </div>
-                        ))}
-                        <div className="flex justify-center">
-                          <button type="button" onClick={() => setEditing(row.name)} aria-label={`Edit row ${i + 1}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </SortableGridRow>
-                );
-              })}
-            </SortableContext>
-          </DndContext>
+                          <div className="relative flex items-center justify-center text-xs tabular-nums text-zinc-400">
+                            <span className={tableReadOnly ? "" : "group-hover:opacity-0"}>{i + 1}</span>
+                            {!tableReadOnly && (
+                              <button type="button" {...handle} aria-label={`Drag row ${i + 1}`} className="absolute inset-0 m-auto flex h-6 w-6 cursor-grab items-center justify-center rounded text-zinc-400 opacity-0 hover:bg-zinc-100 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-zinc-800">
+                                <GripVertical className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            )}
+                          </div>
+                          {cols.map((c) => (
+                            <div key={c.fieldname} className="min-w-0 px-0.5 py-0.5">
+                              <Cell
+                                df={{ ...c, ...(overrides[`${table}.${c.fieldname}`] as Partial<DocField>) }}
+                                row={row}
+                                table={table}
+                                ctl={ctl}
+                                readOnly={tableReadOnly || !!(overrides[`${table}.${c.fieldname}`]?.read_only ?? c.read_only)}
+                                error={errors[`${table}.${i}.${c.fieldname}`]}
+                              />
+                            </div>
+                          ))}
+                          <div className="flex justify-center">
+                            <button type="button" onClick={() => setEditing(row.name)} aria-label={`Edit row ${i + 1}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </SortableGridRow>
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
 
-          {rows.length === 0 && <div className="px-4 py-6 text-center text-sm text-zinc-400">No rows</div>}
+            {rows.length === 0 && <div className="px-4 py-6 text-center text-sm text-zinc-400">No rows</div>}
+          </div>
         </div>
-      </div>
+      )}
 
       {(pages > 1 || bulkEdit) && (
         <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-xs text-zinc-500 dark:border-zinc-800">
@@ -479,11 +532,11 @@ export default function Grid({
       {editRow && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onMouseDown={(e) => e.target === e.currentTarget && setEditing(null)} role="dialog" aria-modal="true" aria-label={`Editing row ${editRow.idx}`}>
           <div className="flex h-full w-full max-w-2xl flex-col bg-zinc-50 shadow-2xl dark:bg-zinc-950">
-            <div className="flex items-center gap-2 border-b border-zinc-200 bg-white px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-4 py-3 sm:px-5 dark:border-zinc-800 dark:bg-zinc-900">
               <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                 {df.label} · Row #{editRow.idx}
               </h3>
-              <div className="ml-auto flex items-center gap-1">
+              <div className="ml-auto flex flex-wrap items-center gap-1">
                 {!tableReadOnly && (
                   <>
                     <button type="button" onClick={() => ctl.move_row(table, editRow.name, -1)} aria-label="Move up" className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><ArrowUp className="h-4 w-4" /></button>

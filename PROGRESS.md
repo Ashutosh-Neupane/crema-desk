@@ -2,6 +2,15 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — M6: works on a phone
+- Below 640px: list as cards (+ select all, count), filters folded behind "More filters", child tables as row cards
+  opening the row form (Add row opens it too), form actions in a bottom bar, toasts above it.
+- List Date filter and Date Range field use DatePicker: no native date / time inputs remain.
+- e2e/mobile (new); list.salesorder no longer depends on the saved sort. 17/17 related suites.
+- Gotcha: a `fixed` child of a `space-y-*` parent gets its margin (Tailwind 4 `:where()`), so the bar needs `mb-0`.
+
+Next: Print Format Builder (user request), then M2 workflow.
+
 ## 2026-10-28 — M1: form toolbar like Desk
 - Previous / next document buttons + Shift+Ctrl+< / > (`get_next` with the list's saved filters and sort,
   "No further records"); "Not permitted" / "Not found" pages for doc and DocType errors; empty read-only fields follow

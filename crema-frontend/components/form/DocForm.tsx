@@ -37,6 +37,7 @@ import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColo
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { loadUserSettings, userSettingsKey } from "@/lib/list/useUserListState";
+import { useIsPhone } from "@/lib/hooks/useIsPhone";
 import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
 import { useShortcuts } from "@/lib/shortcuts";
 import { Command } from "cmdk";
@@ -137,6 +138,7 @@ export default function DocForm({ doctype, name }: Props) {
   const qc = useQueryClient();
   const { data: metas, error: metaError } = useFormMetas(doctype);
   const { data: ctx } = useDeskContext();
+  const phone = useIsPhone();
   const isNew = !name;
 
   const [loaded, setLoaded] = useState<{ doc: Doc; docinfo: DocInfo } | null>(null);
@@ -521,8 +523,73 @@ export default function DocForm({ doctype, name }: Props) {
   }
   const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
+  // custom buttons and the main actions: in the header on wider screens, in a bottom bar on phones (thumb reach)
+  const customButtons = (
+    <>
+      {[...groups.entries()].map(([g, btns]) =>
+        g ? (
+          <DropdownMenu key={g}>
+            <DropdownMenuTrigger className={`inline-flex items-center gap-1 ${btnCls}`}>
+              {g} <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {btns.map((b) => (
+                <DropdownMenuItem key={b.label} onClick={() => void b.action()}>{b.label}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          btns.map((b) => (
+            <button key={b.label} type="button" onClick={() => void b.action()} className={btnCls}>
+              {b.label}
+            </button>
+          ))
+        ),
+      )}
+    </>
+  );
+  const mainActions = (
+    <>
+      {docstatus === 2 && can("amend") && (
+        <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">Amend</button>
+      )}
+      {showActions && (
+        <DropdownMenu>
+          <DropdownMenuTrigger disabled={wfBusy} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
+            {wfBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+            Actions <ChevronDown className="h-3.5 w-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {transitions.map((t) => (
+              <DropdownMenuItem key={`${t.action}|${t.next_state}`} onClick={() => void runTransition(t)}>
+                {t.action}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {primary && (
+        <button
+          type="button"
+          disabled={!!busy}
+          onClick={() => (primary!.kind === "save" ? void run("save", "Save") : setConfirm(primary!.kind))}
+          className={[
+            "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60",
+            primary.kind === "cancel"
+              ? "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200",
+          ].join(" ")}
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          {primary.label}
+        </button>
+      )}
+    </>
+  );
+  const hasBottomBar = phone && (snap.buttons.length > 0 || !!primary || showActions || (docstatus === 2 && can("amend")));
+
   return (
-    <div className="space-y-stack pb-16">
+    <div className={`space-y-stack ${hasBottomBar ? "pb-28" : "pb-16"}`}>
       {/* Header (sticks under the navbar so actions stay reachable on long forms) */}
       <div className="sticky top-12 z-20 -mx-gutter flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg-color)]/95 px-gutter py-2 backdrop-blur">
         {canRename ? (
@@ -545,26 +612,7 @@ export default function DocForm({ doctype, name }: Props) {
           </span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {[...groups.entries()].map(([g, btns]) =>
-            g ? (
-              <DropdownMenu key={g}>
-                <DropdownMenuTrigger className={`inline-flex items-center gap-1 ${btnCls}`}>
-                  {g} <ChevronDown className="h-3.5 w-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  {btns.map((b) => (
-                    <DropdownMenuItem key={b.label} onClick={() => void b.action()}>{b.label}</DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              btns.map((b) => (
-                <button key={b.label} type="button" onClick={() => void b.action()} className={btnCls}>
-                  {b.label}
-                </button>
-              ))
-            ),
-          )}
+          {!phone && customButtons}
           {!isNewDoc(doc) && !meta.issingle && (ctx?.boot?.desk_settings as { form_navigation_buttons?: number } | undefined)?.form_navigation_buttons !== 0 && (
             <span className="inline-flex">
               <button type="button" onClick={() => void navigate(true)} aria-label="Previous document" title="Previous document (⇧⌘<)" className="rounded-l-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
@@ -611,42 +659,16 @@ export default function DocForm({ doctype, name }: Props) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {docstatus === 2 && can("amend") && (
-            <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">Amend</button>
-          )}
-          {showActions && (
-            <DropdownMenu>
-              <DropdownMenuTrigger disabled={wfBusy} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
-                {wfBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-                Actions <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                {transitions.map((t) => (
-                  <DropdownMenuItem key={`${t.action}|${t.next_state}`} onClick={() => void runTransition(t)}>
-                    {t.action}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {primary && (
-            <button
-              type="button"
-              disabled={!!busy}
-              onClick={() => (primary!.kind === "save" ? void run("save", "Save") : setConfirm(primary!.kind))}
-              className={[
-                "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60",
-                primary.kind === "cancel"
-                  ? "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                  : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200",
-              ].join(" ")}
-            >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {primary.label}
-            </button>
-          )}
+          {!phone && mainActions}
         </div>
       </div>
+
+      {hasBottomBar && (
+        <div role="toolbar" aria-label="Document actions" className="fixed inset-x-0 bottom-0 z-30 mb-0 flex items-center gap-2 border-t border-zinc-200 bg-[var(--bg-color)]/95 px-gutter pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none]">{customButtons}</div>
+          <div className="flex shrink-0 items-center gap-2">{mainActions}</div>
+        </div>
+      )}
 
       {conflict && (
         <div role="alert" className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">

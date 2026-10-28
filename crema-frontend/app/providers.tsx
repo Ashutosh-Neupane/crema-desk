@@ -23,7 +23,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         {children}
-        <Toaster position="bottom-right" richColors />
+        {/* phones: clear the form's bottom action bar */}
+        <Toaster position="bottom-right" richColors mobileOffset={{ bottom: "4.5rem" }} />
         <ErrorDetailsHost />
       </AuthProvider>
     </QueryClientProvider>
