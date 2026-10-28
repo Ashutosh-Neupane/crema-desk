@@ -15,6 +15,8 @@ export interface DeskContext {
   /** permission lists from boot.user (can_create, in_create, …) for app scripts */
   perms: Record<string, string[]>;
   developer_mode: boolean;
+  /** boot.user.impersonated_by — the user who started this impersonated session (site_banners.js) */
+  impersonated_by: string | null;
   /** the rest of frappe.boot (party_account_types, current_fiscal_year, …) for app JS */
   boot: Record<string, unknown>;
   /** boot.docs Desk keeps in locals for formatting (":Currency" symbol/number_format, ":Company" default_currency) */
@@ -39,6 +41,7 @@ export async function GET() {
         .map((k) => [k, user[k] as string[]]),
     ),
     developer_mode: !!boot?.developer_mode,
+    impersonated_by: (user.impersonated_by as string | null | undefined) || null,
     boot: Object.fromEntries(Object.entries((boot ?? {}) as Record<string, unknown>).filter(([k]) => !HEAVY_BOOT_KEYS.has(k))),
     docs: {},
   };

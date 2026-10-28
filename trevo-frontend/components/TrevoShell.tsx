@@ -12,6 +12,7 @@ import DeskSidebar from "@/components/DeskSidebar";
 import DialogHost from "@/components/desk/DialogHost";
 import MultiSelectHost from "@/components/desk/MultiSelectHost";
 import ShortcutsDialog from "@/components/desk/ShortcutsDialog";
+import SiteBanners from "@/components/desk/SiteBanners";
 import UserMenu from "@/components/desk/UserMenu";
 import { deskCall } from "@/lib/frappe/form";
 import { useShortcuts } from "@/lib/shortcuts";
@@ -458,6 +459,7 @@ export default function TrevoShell({ children }: { children: React.ReactNode }) 
             data-fullwidth={fullWidth ? "true" : "false"}
             className={fullWidth ? "w-full" : "mx-auto w-full max-w-[1290px]"}
           >
+            <SiteBanners />
             <div className="mb-4">
               <Breadcrumbs />
             </div>
