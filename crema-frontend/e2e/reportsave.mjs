@@ -1,7 +1,7 @@
 // Query report "Save As" (query_report.save_report → Custom Report) + "PDF" (report_to_pdf).
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/reportsave.mjs
 import fs from "node:fs";
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, OUT } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -62,7 +62,7 @@ try {
   check(resp.status() === 200 && /pdf/.test(resp.headers()["content-type"] ?? ""), `report_to_pdf -> ${resp.status()} ${resp.headers()["content-type"]}`);
   const buf = fs.readFileSync(await dl.path());
   check(buf.subarray(0, 5).toString() === "%PDF-" && buf.length > 2000, `PDF file ${dl.suggestedFilename()} (${buf.length} bytes)`);
-  fs.writeFileSync(`${process.env.OUT ?? "."}/report_saved.pdf`, buf);
+  fs.writeFileSync(`${OUT}/report_saved.pdf`, buf);
 } finally {
   await del(NAME);
   const gone = await page.request.get(`${BASE}/api/frappe/api/resource/Report/${enc(NAME)}`);

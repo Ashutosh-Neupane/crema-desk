@@ -47,7 +47,8 @@ check(page.url().endsWith("/new"), "still on /new");
 
 step("fill Description and save");
 const desc = `Crema e2e ${Date.now()}`;
-await page.locator("textarea").first().fill(desc);
+// Description is a Text Editor: a rich-text box (contenteditable, role textbox) like Desk's Quill
+await page.getByRole("textbox", { name: /^Description/ }).first().fill(desc);
 await page.getByRole("button", { name: /^Save/ }).click();
 await page.waitForURL((u) => !u.pathname.endsWith("/new"), { timeout: 15000 });
 const name = decodeURIComponent(page.url().split("/").pop());

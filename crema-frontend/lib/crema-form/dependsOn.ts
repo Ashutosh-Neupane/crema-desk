@@ -32,14 +32,16 @@ export function evalDependsOn(
   // Plain fieldname → show when that field has a value
   if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr)) {
     const v = values[expr];
+    if (Array.isArray(v)) return v.length > 0;
     return !!v && v !== "0";
   }
 
   try {
     // Desk evaluates depends_on JS from the DocType definition the same way (only
     // `doc` / `parent` / `locals` in scope); the expressions are site config, not user input.
+    // `let out = …; return out` like Desk's frappe.utils.eval, so a trailing `;` (`eval:doc.x === "Report";`) is valid
     // eslint-disable-next-line no-new-func
-    const fn = new Function("doc", "parent", "locals", `"use strict"; return (${expr});`); // react-doctor-disable-line no-eval
+    const fn = new Function("doc", "parent", "locals", `"use strict"; let out = ${expr}; return out;`); // react-doctor-disable-line no-eval
     return !!fn(values, parent ?? {}, values);
   } catch {
     return true;

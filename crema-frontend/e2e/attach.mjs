@@ -32,7 +32,9 @@ check(r.ok(), `DocType created (${r.status()})`);
 // 1x1 PNG + a text file
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "crema-attach-"));
 const png = path.join(dir, "pixel.png");
-fs.writeFileSync(png, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
+// bytes after IEND make each run's image unique: Frappe dedupes uploads by content hash and would hand back another
+// suite's identical pixel under its file name
+fs.writeFileSync(png, Buffer.concat([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"), Buffer.from(`crema-${Date.now()}`)]));
 const txt = path.join(dir, "notes.txt");
 fs.writeFileSync(txt, "hello crema");
 

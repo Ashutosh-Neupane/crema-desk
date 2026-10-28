@@ -493,8 +493,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     const code = String(expr ?? "").replace(/^\s*eval:\s*/, "").trim();
     if (!code) return undefined;
     try {
+      // Desk utils.js eval: `let out = …; return out`, so a trailing `;` is allowed
       // eslint-disable-next-line no-new-func
-      return new Function("__scope", `with (__scope) { return (${code}\n); }`)(scope); // react-doctor-disable-line no-eval
+      return new Function("__scope", `with (__scope) { let out = ${code}\n; return out; }`)(scope); // react-doctor-disable-line no-eval
     } catch (err) {
       console.warn(`[desk-runtime] ${label} failed:`, err);
       return undefined;
