@@ -40,7 +40,8 @@ Any Frappe v16 site with ERPNext works. The local bench (containers, sites, comp
 
 ## Git
 Push with `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` — the macOS keychain
-helper blocks on a GUI prompt. Work branch: `feat/frappe-desk-parity`.
+helper blocks on a GUI prompt. Repo: github.com/Ashutosh-Neupane/crema-desk (public). Work on a feature branch
+off `main` and merge through a pull request; keep client and bench names out of commits, docs and screenshots.
 
 ## Commands (from `crema-frontend/`)
 - `npm run dev` · `npx tsc --noEmit` · `npm run lint` · `npm run build`

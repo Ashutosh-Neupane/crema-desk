@@ -2,6 +2,21 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-10-28 — Crema, public
+- Renamed Trevo → Crema: `crema-frontend/`, `lib/crema-form`, `CremaShell`, `CREMA_*` env vars, storage keys.
+- Field permlevels (`lib/form/perm.ts`), site banners + impersonation, server traceback behind a toast's Details action,
+  dialog width from DialogContent's `max-w-*`. e2e: permlevel, impersonation, errordetails.
+- Login survives slow hydration (uncontrolled inputs, Sign in disabled until hydrated); Log out goes to /login.
+- Test fixes found on the way: Server Script uses `disabled` (no `enabled`), DocPerm.write defaults to 1,
+  `waitForFunction` with an async predicate returns at once, `get_value` answers `{}` for a missing record.
+- ERPNext suites read the site's default company (`defaultCompany` in e2e/lib.mjs, or `CREMA_COMPANY`).
+- README (what works / next / why), LICENSE (MIT) and THIRD_PARTY_NOTICES (Frappe MIT, ERPNext-derived files GPL-3.0),
+  screenshots via `e2e/readme-shots.mjs`.
+- Published as github.com/Ashutosh-Neupane/crema-desk with the history scrubbed of client names; the old private repo
+  is kept as a fetch-only `trevo-archive` remote.
+
+Next: Tier 1 form gaps in docs/GAPS.md (undo/redo, prev/next document, "Not permitted" banners), then the grid extras.
+
 ## 2026-10-17 — session 2 (cont.): gap audit, Tier 1
 - `docs/GAPS.md`: audit of what's left for 1:1 Desk parity (Tier 1 everyday gaps, Tier 2 views/pages, Tier 3
   polish), then phase 2 UI/UX. Work through it top-down.
