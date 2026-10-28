@@ -126,7 +126,16 @@ export default function TimePicker({
         aria-haspopup="dialog"
         onFocus={() => !disabled && setOpen(true)}
         onClick={() => !disabled && setOpen(true)}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          const v = e.target.value;
+          setText(v);
+          // a complete time ("10:00", "10:00:30", "2:30 pm") goes to the form right away, so Ctrl+S before blur saves it
+          // (a half-typed "1" waits for blur / Enter rather than becoming 01:00)
+          if (/^\s*\d{1,2}[:.]\d{2}([:.]\d{2})?\s*(am|pm|a|p)?\s*$/i.test(v)) {
+            const parsed = parseUserTime(v);
+            if (parsed) emit(parsed);
+          }
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") {

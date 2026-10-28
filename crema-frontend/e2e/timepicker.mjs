@@ -74,8 +74,8 @@ await page.getByLabel("Meet At", { exact: true }).click();
 await page.getByRole("dialog", { name: "Choose date" }).getByRole("button", { name: "Today", exact: true }).click();
 const meetTime = page.getByLabel("Meet At time", { exact: true });
 await meetTime.click();
+// no Enter / blur: Ctrl+S right after typing must still save the typed time
 await meetTime.fill("18:45");
-await meetTime.press("Enter");
 
 step("save → values in the API");
 await page.keyboard.press("Control+s");
