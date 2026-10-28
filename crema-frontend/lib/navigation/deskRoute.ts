@@ -27,6 +27,9 @@ export function cremaUrlForRoute(route: string[], options?: Record<string, unkno
   } else if (kind === "Tree" && a) url = `/desk/doctype/${enc(a)}/view/tree`;
   else if (kind === "query-report" && a) url = `/desk/query-report/${enc(a)}`;
   else if (kind === "Workspaces" && a) url = `/desk/workspace/${enc(a)}`;
+  // Print Format "Edit Format" (print_format.js): Crema's full-screen builder host
+  else if ((kind === "print-format-builder-beta" || kind === "print-format-builder") && a)
+    url = `/desk/print-format-builder/${enc(a)}${kind === "print-format-builder" ? "?ui=classic" : ""}`;
   return url && withQuery(url, options);
 }
 
