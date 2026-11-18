@@ -29,8 +29,10 @@ import {
 } from "lucide-react";
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { DEFAULT_LAYOUT, fetchLayouts, findBySignature, layoutColumns, layoutFilters, type ListLayout } from "@/lib/list/layouts";
+import { LayoutDialog, LayoutMenu, ManageLayoutsDialog } from "@/components/list/Layouts";
 import { useListSettings } from "@/lib/list/useListSettings";
-import { lvsKey, parseColumnSettings, useListViewSettings } from "@/lib/list/useListViewSettings";
+import { lvsKey, parseColumnSettings, useListViewSettings, type ListColumnSetting } from "@/lib/list/useListViewSettings";
 import { loadUserSettings, saveListState, userSettingsKey, type UserSettings } from "@/lib/list/useUserListState";
 import ListSettingsDialog from "@/components/list/ListSettingsDialog";
 import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
@@ -84,7 +86,17 @@ export default function ListView({ doctype }: { doctype: string }) {
   const lvsQuery = useListViewSettings(doctype);
   const lvs = lvsQuery.data;
   const lvsReady = lvsQuery.isSuccess || lvsQuery.isError;
-  const colSettings = useMemo(() => parseColumnSettings(lvs), [lvs]);
+  const lvsColumns = useMemo(() => parseColumnSettings(lvs), [lvs]);
+  // saved layouts (Desk v16 list_filter/): the active one's columns replace the List View Settings columns
+  const layoutsQuery = useQuery({ queryKey: ["list-layouts", doctype, ctx?.user ?? ""], queryFn: () => fetchLayouts(doctype, ctx?.user ?? ""), enabled: !!ctx?.user, staleTime: 60_000 });
+  const layouts = useMemo(() => layoutsQuery.data ?? [], [layoutsQuery.data]);
+  const [activeLayout, setActiveLayout] = useState<string | null>(null);
+  const [layoutCols, setLayoutCols] = useState<ListColumnSetting[] | null>(null);
+  const [layoutDialog, setLayoutDialog] = useState<{ layout: ListLayout | null; duplicateFrom: ListLayout | null } | null>(null);
+  const [manageLayouts, setManageLayouts] = useState(false);
+  // list_filter_menu.js capture_default_layout_state: the Default Layout's filters / sort, taken when leaving it
+  const defaultSnapshot = useRef<{ filters: Filter[]; sort: Sort | null } | null>(null);
+  const colSettings = layoutCols ?? lvsColumns;
   const disableCount = !!lvs?.disable_count;
   const disableCommentCount = !!lvs?.disable_comment_count;
 
@@ -248,13 +260,59 @@ export default function ListView({ doctype }: { doctype: string }) {
   // before_render: save { filters, sort_by, sort_order } (and last_view) to the user's settings
   useEffect(() => {
     if (!stateReady || !meta) return;
-    const value = { filters, sort_by: sort.field, sort_order: sort.order };
+    const value = { filters, sort_by: sort.field, sort_order: sort.order, active_layout_name: activeLayout && activeLayout !== DEFAULT_LAYOUT ? activeLayout : "" };
     const cur = userSettings.current;
     const next = { ...cur, List: { ...(cur.List ?? {}), ...value }, last_view: "List" };
     if (JSON.stringify(next) === JSON.stringify(cur)) return;
     userSettings.current = next;
     saveListState(doctype, cur, value).catch(() => {});
-  }, [stateReady, meta, doctype, filters, sort.field, sort.order]);
+  }, [stateReady, meta, doctype, filters, sort.field, sort.order, activeLayout]);
+
+  // list_filter_menu.js apply_saved_layout / apply_default_layout
+  const applyLayout = useCallback(
+    (name: string, list: ListLayout[] = layouts) => {
+      if (name === DEFAULT_LAYOUT) {
+        const snap = defaultSnapshot.current;
+        setActiveLayout(DEFAULT_LAYOUT);
+        setLayoutCols(null);
+        if (snap) {
+          setSort(snap.sort);
+          setFilters(snap.filters);
+        }
+        return;
+      }
+      const l = list.find((x) => x.name === name);
+      if (!l) return;
+      setActiveLayout(l.name);
+      const cols = layoutColumns(l);
+      setLayoutCols(cols.length ? cols : null);
+      if (l.sort_field) setSort({ field: l.sort_field, order: String(l.sort_order).toLowerCase() === "asc" ? "asc" : "desc" });
+      setFilters(layoutFilters(l));
+    },
+    [layouts, setFilters],
+  );
+  const selectLayout = (name: string) => {
+    if (name === activeLayout) return;
+    if ((activeLayout ?? DEFAULT_LAYOUT) === DEFAULT_LAYOUT) defaultSnapshot.current = { filters, sort: sortState };
+    applyLayout(name);
+  };
+  // restore_layout_from_route_signature: URL filters that match a layout select it; no filters → the last one used
+  useEffect(() => {
+    if (activeLayout !== null || !stateReady || !layoutsQuery.isSuccess) return;
+    const matched = findBySignature(layouts, doctype, filters);
+    const saved = String(userSettings.current.List?.active_layout_name ?? "");
+    const savedLayout = !filters.length && saved ? layouts.find((l) => l.name === saved) : undefined;
+    /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore once layouts and saved state are in */
+    if (matched) {
+      setActiveLayout(matched.name);
+      const cols = layoutColumns(matched);
+      setLayoutCols(cols.length ? cols : null);
+    } else if (savedLayout) {
+      defaultSnapshot.current = { filters, sort: sortState };
+      applyLayout(savedLayout.name);
+    } else setActiveLayout(DEFAULT_LAYOUT);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activeLayout, stateReady, layoutsQuery.isSuccess, layouts, doctype, filters, sortState, applyLayout]);
 
   const views = useMemo(() => {
     if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
@@ -329,6 +387,16 @@ export default function ListView({ doctype }: { doctype: string }) {
       {/* Title row */}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{doctype}</h1>
+        {layoutsQuery.isSuccess && (
+          <LayoutMenu
+            layouts={layouts}
+            active={activeLayout ?? DEFAULT_LAYOUT}
+            user={ctx?.user ?? ""}
+            onSelect={selectLayout}
+            onCreate={() => setLayoutDialog({ layout: null, duplicateFrom: null })}
+            onManage={() => setManageLayouts(true)}
+          />
+        )}
         {views.length > 1 && (
           <nav aria-label="Views" className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
             {views.map((v) => (
@@ -705,6 +773,57 @@ export default function ListView({ doctype }: { doctype: string }) {
             qc.invalidateQueries({ queryKey: lvsKey(doctype) });
             qc.invalidateQueries({ queryKey: ["doctype", doctype] });
             refresh();
+          }}
+        />
+      )}
+
+      {layoutDialog && (
+        <LayoutDialog
+          meta={meta}
+          layout={layoutDialog.layout}
+          duplicateFrom={layoutDialog.duplicateFrom}
+          ctx={{ user: ctx?.user ?? "", roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode }}
+          layouts={layouts}
+          current={{
+            filters,
+            sort_field: sort.field,
+            sort_order: sort.order,
+            // get_current_columns_state: what the list shows now
+            columns: colSettings.length
+              ? colSettings
+              : [
+                  { fieldname: titleField || "name", label: subjectLabel },
+                  ...(hasIndicator ? [{ fieldname: "status_field", label: "Status" }] : []),
+                  ...listFields.map((f) => ({ fieldname: f.fieldname, label: f.label || f.fieldname })),
+                ],
+          }}
+          onClose={() => setLayoutDialog(null)}
+          onSaved={async (saved) => {
+            setLayoutDialog(null);
+            const fresh = (await layoutsQuery.refetch()).data ?? [];
+            // a layout just created or edited is applied (Desk re-applies the active one after on_save)
+            if ((activeLayout ?? DEFAULT_LAYOUT) === DEFAULT_LAYOUT) defaultSnapshot.current = { filters, sort: sortState };
+            applyLayout(saved.name, fresh);
+          }}
+        />
+      )}
+      {manageLayouts && (
+        <ManageLayoutsDialog
+          layouts={layouts}
+          ctx={{ user: ctx?.user ?? "", roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode }}
+          onClose={() => setManageLayouts(false)}
+          onEdit={(l) => {
+            setManageLayouts(false);
+            setLayoutDialog({ layout: l, duplicateFrom: null });
+          }}
+          onDuplicate={(l) => {
+            setManageLayouts(false);
+            setLayoutDialog({ layout: null, duplicateFrom: l });
+          }}
+          onDeleted={(l) => {
+            void layoutsQuery.refetch();
+            // delete_layout: deleting the active layout goes back to Default Layout
+            if (activeLayout === l.name) applyLayout(DEFAULT_LAYOUT);
           }}
         />
       )}

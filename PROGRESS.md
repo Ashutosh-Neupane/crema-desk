@@ -2,6 +2,15 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M5 started: saved list layouts
+- Saved layouts (Desk v16 List Filter) on every list: menu next to the view switcher, create / edit / duplicate /
+  delete, global or personal, applied filters + sort + columns, remembered per user, picked from URL filters by
+  route signature, stored in Desk's format so Desk and Crema share them.
+- e2e: listlayouts (new). listsettings, formsave green. React Doctor 0 errors, score 57.
+- Commits go back to the repo's Conventional Commits style (`feat(list): …`, `test(e2e): …`, `docs: …`).
+- Next in M5: row extras (comment counts, assignees, likes, unread), listview_settings hooks, report view
+  group-by, ERPNext financial statements.
+
 ## 2026-11-18 — M4: dialog controls like Desk; React Doctor back to 0 errors
 - MultiSelect, MultiSelect Pills, MultiSelect List, MultiCheck, Date Range return Desk's values from a dialog
   (string / arrays / [from, to]); options as lines, JSON, {label, value, checked} items or get_data(txt).
