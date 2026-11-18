@@ -159,6 +159,29 @@ check(saved[2][0] === "Grape" && saved[3][1] === 10 && saved[3][3] === "2026-12-
 check(saved[5][1] === 30 && saved[5][2] === 4 && saved[5][3] === "2026-12-03", "pasted overflow row 6");
 check(JSON.stringify(doc.lines.map((l) => l.idx)) === "[1,2,3,4,5,6]", "idx 1..6");
 
+step("row menu (⋯): Insert Below, Duplicate, Move Down, Delete");
+const rowMenu = async (n, item) => {
+  await page.locator(`[data-cell="${n - 1}:0"]`).hover();
+  await page.getByRole("button", { name: `Row ${n} actions` }).click();
+  await page.getByRole("menuitem", { name: item }).click();
+  await page.waitForTimeout(400);
+};
+// rows now: Elderberry, Fig, Grape, Banana, Banana, (empty)
+await rowMenu(1, "Insert Below");
+check(JSON.stringify((await values(0)).slice(0, 3)) === JSON.stringify(["Elderberry", "", "Fig"]), `inserted below row 1 (${JSON.stringify(await values(0))})`);
+check((await focusedCell()) === "1:0", `focus in the inserted row (${await focusedCell()})`);
+await rowMenu(2, "Delete");
+check(JSON.stringify((await values(0)).slice(0, 2)) === JSON.stringify(["Elderberry", "Fig"]), "deleted it");
+await rowMenu(2, "Duplicate");
+check(JSON.stringify((await values(0)).slice(0, 4)) === JSON.stringify(["Elderberry", "Fig", "Fig", "Grape"]), `duplicated Fig (${JSON.stringify(await values(0))})`);
+await rowMenu(1, "Move Down");
+check(JSON.stringify((await values(0)).slice(0, 2)) === JSON.stringify(["Fig", "Elderberry"]), `moved down (${JSON.stringify(await values(0))})`);
+await page.locator('[data-cell="0:0"]').hover();
+await page.getByRole("button", { name: "Row 1 actions" }).click();
+check(!(await page.getByRole("menuitem", { name: "Move Up" }).isVisible()), "no Move Up on the first row");
+await page.keyboard.press("Escape");
+await shot("gridkeys_rowmenu", false);
+
 step("cleanup");
 await cleanup();
 await t.finish();

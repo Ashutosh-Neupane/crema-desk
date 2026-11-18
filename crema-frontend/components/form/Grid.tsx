@@ -15,7 +15,9 @@
  *    a header row of labels / fieldnames picks the columns
  */
 import { useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Download, GripVertical, ListPlus, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Download, GripVertical, ListPlus, MoreHorizontal, Pencil, Plus, Settings2, Trash2, Upload, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -26,6 +28,9 @@ import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import LinkField from "@/lib/crema-form/controls/LinkField";
 import FormBody from "@/components/form/FormBody";
 import AddMultipleDialog from "@/components/form/AddMultipleDialog";
+import GridColumnsDialog, { clampWidth, type GridViewColumn } from "@/components/form/GridColumnsDialog";
+import { loadUserSettings, userSettingsKey, type UserSettings } from "@/lib/list/useUserListState";
+import { deskCall } from "@/lib/frappe/form";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
@@ -101,6 +106,9 @@ function SortableGridRow({ id, disabled, template, selected, children }: { id: s
   );
 }
 
+/** Desk grid.js LEGACY_COLSIZE_TO_PX: the 1–12 `columns` units → px */
+const UNITS_TO_PX: Record<number, number> = { 1: 60, 2: 100, 3: 140, 4: 200, 5: 250, 6: 300, 7: 350, 8: 400, 9: 450, 10: 500, 11: 550, 12: 600 };
+
 function defaultWidth(df: DocField): number {
   if (df.columns) return Number(df.columns);
   if (df.fieldtype === "Check") return 1;
@@ -109,8 +117,31 @@ function defaultWidth(df: DocField): number {
   return 2;
 }
 
-export function gridColumns(meta: DocTypeMeta, overrides: Record<string, Record<string, unknown>>, table: string): Array<DocField & { width: number }> {
-  const visible = (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !(overrides[`${table}.${f.fieldname}`]?.hidden ?? f.hidden));
+/** fields that can be grid columns (Desk: not a layout field, not hidden) */
+const columnFields = (meta: DocTypeMeta, overrides: Record<string, Record<string, unknown>>, table: string) =>
+  (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !(overrides[`${table}.${f.fieldname}`]?.hidden ?? f.hidden));
+
+/**
+ * Grid columns with their width in px. The user's own columns (GridView user setting, Desk setup_user_defined_columns)
+ * win; otherwise in_list_view fields up to 10 units, Desk's default.
+ */
+export function gridColumns(
+  meta: DocTypeMeta,
+  overrides: Record<string, Record<string, unknown>>,
+  table: string,
+  userCols?: Array<{ fieldname?: string; width?: number | string; columns?: number | string }>,
+): Array<DocField & { width: number }> {
+  const visible = columnFields(meta, overrides, table);
+  if (userCols?.length) {
+    const mine = userCols
+      .map((u) => {
+        const f = visible.find((x) => x.fieldname === u.fieldname);
+        // Desk migrates legacy `columns` (1–12) to px
+        return f ? { ...f, width: clampWidth(Number(u.width) || UNITS_TO_PX[Number(u.columns)] || 140) } : null;
+      })
+      .filter((x): x is DocField & { width: number } => !!x);
+    if (mine.length) return mine;
+  }
   let cols = visible.filter((f) => f.in_list_view);
   if (!cols.length) cols = visible.filter((f) => f.reqd).concat(visible.filter((f) => !f.reqd)).slice(0, 4);
   const out: Array<DocField & { width: number }> = [];
@@ -119,7 +150,7 @@ export function gridColumns(meta: DocTypeMeta, overrides: Record<string, Record<
     const w = defaultWidth(f);
     if (total + w > 10) break;
     total += w;
-    out.push({ ...f, width: w });
+    out.push({ ...f, width: UNITS_TO_PX[w] ?? 100 });
   }
   return out;
 }
@@ -243,7 +274,21 @@ export default function Grid({
 }) {
   const table = df.fieldname;
   const rows = (ctl.getDoc()[table] as Row[]) ?? [];
-  const cols = useMemo(() => gridColumns(meta, overrides, table), [meta, overrides, table]);
+  // the user's column settings for this child table: GridView in the parent DocType's user settings
+  const qc = useQueryClient();
+  const parentDt = ctl.meta.name;
+  const { data: userSettings } = useQuery({ queryKey: userSettingsKey(parentDt), queryFn: () => loadUserSettings(parentDt), staleTime: 60_000 });
+  const gridView = (userSettings?.GridView ?? {}) as Record<string, GridViewColumn[] | undefined>;
+  const userCols = gridView[meta.name];
+  const cols = useMemo(() => gridColumns(meta, overrides, table, userCols), [meta, overrides, table, userCols]);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  /** merge per child table: Desk's server merges user settings only at the top level, so GridView goes whole */
+  const saveGridView = async (next: GridViewColumn[] | null) => {
+    const merged: Record<string, GridViewColumn[] | undefined> = { ...gridView, [meta.name]: next ?? undefined };
+    if (!next) delete merged[meta.name];
+    await deskCall("frappe.model.utils.user_settings.save", { doctype: parentDt, user_settings: JSON.stringify({ GridView: merged }) });
+    qc.setQueryData<UserSettings>(userSettingsKey(parentDt), (s) => ({ ...(s ?? {}), GridView: merged }));
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const phone = useIsPhone();
@@ -252,7 +297,7 @@ export default function Grid({
   const tableReadOnly = readOnly || !!(overrides[table]?.read_only ?? df.read_only);
   const cannotAdd = !!(df as { cannot_add_rows?: unknown }).cannot_add_rows || !!overrides[table]?.cannot_add_rows;
   const cannotDelete = !!(df as { cannot_delete_rows?: unknown }).cannot_delete_rows;
-  const template = `2.25rem 2.5rem ${cols.map((c) => `minmax(0,${c.width}fr)`).join(" ")} 2.5rem`;
+  const template = `2.25rem 2.5rem ${cols.map((c) => `minmax(0,${c.width}fr)`).join(" ")} ${tableReadOnly ? "2.5rem" : "4rem"}`;
   const editRow = rows.find((r) => r.name === editing);
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
   // Desk grid_pagination: 50 rows per page
@@ -536,12 +581,17 @@ export default function Grid({
               </div>
               <div className="py-2 text-center">No.</div>
               {cols.map((c) => (
-                <div key={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
+                <div key={c.fieldname} role="columnheader" data-fieldname={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
                   {c.label}
                   {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
                 </div>
               ))}
-              <div />
+              <div className="flex justify-center">
+                {/* Desk grid_row.js configure_columns: the gear in the header row */}
+                <button type="button" onClick={() => setColumnsOpen(true)} aria-label={`Configure columns of ${df.label ?? table}`} title="Column settings" className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                  <Settings2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -588,7 +638,32 @@ export default function Grid({
                               />
                             </div>
                           ))}
-                          <div className="flex justify-center">
+                          <div className="flex items-center justify-center gap-0.5">
+                            {!tableReadOnly && (
+                              // Crema: the row form's actions (Desk grid_row_form.js) straight from the row
+                              <DropdownMenu>
+                                <DropdownMenuTrigger aria-label={`Row ${i + 1} actions`} className="rounded p-1 text-zinc-400 opacity-0 hover:bg-zinc-100 hover:text-zinc-700 focus:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  {!cannotAdd && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, {}, i).then(() => focusCell(i, "first"))}>Insert Above</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, {}, i + 1).then(() => focusCell(i + 1, "first"))}>Insert Below</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, copyOf(row), i + 1).then(() => focusCell(i + 1, "first"))}>Duplicate</DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {i > 0 && <DropdownMenuItem onClick={() => ctl.move_row(table, row.name, -1)}>Move Up</DropdownMenuItem>}
+                                  {i < rows.length - 1 && <DropdownMenuItem onClick={() => ctl.move_row(table, row.name, 1)}>Move Down</DropdownMenuItem>}
+                                  {!cannotDelete && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => void ctl.remove_rows(table, [row.name])} className="text-red-600 dark:text-red-400">Delete</DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                             <button type="button" onClick={() => setEditing(row.name)} aria-label={`Edit row ${i + 1}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -705,6 +780,17 @@ export default function Grid({
             )
           )}
         </div>
+      )}
+
+      {columnsOpen && (
+        <GridColumnsDialog
+          title={df.label ?? table}
+          current={cols.map((c) => ({ fieldname: c.fieldname, width: c.width, sticky: userCols?.find((u) => u.fieldname === c.fieldname)?.sticky ?? 0 }))}
+          available={columnFields(meta, overrides, table)}
+          onSave={(next) => saveGridView(next)}
+          onReset={() => saveGridView(null)}
+          onClose={() => setColumnsOpen(false)}
+        />
       )}
 
       {multipleOpen && multipleLink && (

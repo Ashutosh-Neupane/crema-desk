@@ -64,9 +64,11 @@ export default function AddMultipleDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctype, txt, length]);
 
+  // select the quantity once when a value is picked (not on every keystroke, which would replace each digit)
+  const pickedValue = picked?.value;
   useEffect(() => {
-    if (picked) qtyRef.current?.select();
-  }, [picked]);
+    if (pickedValue) qtyRef.current?.select();
+  }, [pickedValue]);
 
   const add = async (value: string, qty?: number) => {
     setBusy(true);

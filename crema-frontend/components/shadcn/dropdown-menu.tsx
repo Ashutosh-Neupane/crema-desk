@@ -69,6 +69,8 @@ export function DropdownMenuTrigger({ children, ...props }: { children: React.Re
   return (
     <button
       type="button"
+      aria-haspopup="menu"
+      aria-expanded={open}
       onClick={() => setOpen(!open)}
       {...props}
     >
