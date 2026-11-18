@@ -92,7 +92,9 @@ const desc = page.getByRole("button", { name: /Descending/ });
 if (await desc.isVisible().catch(() => false)) await desc.click();
 await settle();
 const firstId = await page.locator("tbody tr").first().locator("td").nth(1).innerText();
-check(firstId.includes("SAL-ORD-2026-00001"), `first row is 00001 when ascending (${firstId.split("\n").pop()})`);
+// the site's first order by name, whatever the series
+const firstSO = (await (await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.get_list`, { data: { doctype: "Sales Order", fields: ["name"], order_by: "name asc", limit_page_length: 1 } })).json()).message?.[0]?.name;
+check(!!firstSO && firstId.includes(firstSO), `first row is ${firstSO} when ascending (${firstId.split("\n").pop()})`);
 
 step("row click opens document");
 await page.locator("tbody tr").first().locator("td").nth(3).click();
