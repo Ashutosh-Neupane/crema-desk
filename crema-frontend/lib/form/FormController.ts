@@ -878,7 +878,11 @@ export class FormController {
     model.set_value = (cdt: string, cdn: string, f: string | Record<string, unknown>, v?: unknown) =>
       cdt === self.meta.name ? self.set_value(f, v) : self.set_child_value(cdt, cdn, f, v);
     model.get_value = (cdt: string, cdn: string, f: string) => (cdt === self.meta.name ? self.doc[f] : self.findRow(cdn)?.row[f]);
-    model.get_doc = (cdt: string, cdn: string) => (cdt === self.meta.name ? self.doc : self.findRow(cdn)?.row);
+    // model.js get_doc: locals[doctype][name] — the open doc and its rows, else what scripts cached (with_doc)
+    model.get_doc = (cdt: string, cdn: string) => {
+      if (cdt === self.meta.name && (cdn === undefined || cdn === self.doc.name)) return self.doc;
+      return self.findRow(cdn)?.row ?? ((self.runtime.globals.locals as Record<string, Record<string, unknown>> | undefined)?.[cdt]?.[cdn]);
+    };
     model.add_child = (doc: unknown, cdtOrTable: string, table?: string) => {
       const t = table ?? this.tableFor(cdtOrTable)?.fieldname ?? cdtOrTable;
       return (frm.add_child as (t: string) => Row)(t);
@@ -887,6 +891,11 @@ export class FormController {
     model.with_doc = async (dt: string, dn: string, cb?: (name: string, r: unknown) => unknown) => {
       const { env } = await deskCall("frappe.desk.form.load.getdoc", { doctype: dt, name: dn }, { get: true });
       const d = (env.docs as Doc[] | undefined)?.[0];
+      // model.js with_doc syncs the doc into locals, where the callback reads it back (frappe.model.get_doc)
+      if (d) {
+        const locals = (self.runtime.globals.locals ??= {}) as Record<string, Record<string, unknown>>;
+        (locals[dt] ??= {})[dn] = d;
+      }
       cb?.(dn, d);
       return d;
     };
