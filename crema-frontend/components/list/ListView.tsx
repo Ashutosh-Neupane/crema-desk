@@ -20,7 +20,7 @@ import {
   Filter as FilterIcon,
   Layers,
   ListFilter,
-  MessageSquare,
+  Heart,
   Plus,
   RefreshCw,
   Search,
@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { AssigneeAvatars, CommentCount, LikeButton } from "@/components/list/RowExtras";
+import { isUnread, jsonList } from "@/lib/list/rowMeta";
 import { DEFAULT_LAYOUT, fetchLayouts, findBySignature, layoutColumns, layoutFilters, type ListLayout } from "@/lib/list/layouts";
 import { LayoutDialog, LayoutMenu, ManageLayoutsDialog } from "@/components/list/Layouts";
 import { useListSettings } from "@/lib/list/useListSettings";
@@ -205,7 +207,9 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   const fetchFields = useMemo(() => {
     if (!meta) return [];
-    const fs = new Set<string>(["name", "docstatus", "modified", "owner", "_comment_count", "_assign"]);
+    const fs = new Set<string>(["name", "docstatus", "modified", "owner", "_comment_count", "_assign", "_liked_by"]);
+    // set_fields: _seen when the DocType tracks who opened each record
+    if (meta.track_seen) fs.add("_seen");
     if (titleField) fs.add(titleField);
     if (hasStatusField) fs.add("status");
     if (meta.fields?.some((f) => f.fieldname === "workflow_state")) fs.add("workflow_state");
@@ -378,6 +382,13 @@ export default function ListView({ doctype }: { doctype: string }) {
     if (canQuickEntry(meta)) setQuickEntry(true);
     else router.push(`/desk/doctype/${enc(doctype)}/new`);
   };
+  const me = ctx?.user ?? "";
+  const unread = (r: Record<string, unknown>) => !!meta.track_seen && !!me && isUnread(r._seen, me);
+  // avatar_group filterable: an assignee avatar filters the list to that user's assignments
+  const filterAssigned = (u: string) => addFilter([doctype, "_assign", "like", `%${u}%`]);
+  const likedByMe = filters.some((f) => f[1] === "_liked_by");
+  const toggleLikedByMe = () => setFilters(likedByMe ? filters.filter((f) => f[1] !== "_liked_by") : [...filters, [doctype, "_liked_by", "like", `%${me}%`]]);
+  const likeChanged = () => qc.invalidateQueries({ queryKey: ["list", doctype] });
   const dateFormat = String(ctx?.sysdefaults?.date_format ?? "yyyy-mm-dd");
   const defaultCurrency = (ctx?.defaults?.currency as string) || undefined;
   const subjectLabel = titleField ? fieldLabel(meta, titleField) : "ID";
@@ -599,7 +610,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-2">
                       {/* the link covers the card (after:inset-0) so the whole card opens the document */}
-                      <Link href={href} className="min-w-0 flex-1 truncate font-medium text-zinc-900 after:absolute after:inset-0 dark:text-zinc-100">
+                      <Link href={href} data-unread={unread(r) || undefined} className={`min-w-0 flex-1 truncate text-zinc-900 after:absolute after:inset-0 dark:text-zinc-100 ${unread(r) ? "font-bold" : "font-medium"}`}>
                         {subject}
                       </Link>
                       {ind && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}>{ind[0]}</span>}
@@ -607,9 +618,9 @@ export default function ListView({ doctype }: { doctype: string }) {
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
                       {subject !== r.name && <span className="truncate">{r.name}</span>}
                       <span className="ml-auto inline-flex shrink-0 items-center gap-2">
-                        {!disableCommentCount && Number(r._comment_count) > 0 && (
-                          <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
-                        )}
+                        <AssigneeAvatars users={jsonList(r._assign)} onFilter={filterAssigned} />
+                        {!disableCommentCount && <CommentCount count={r._comment_count} />}
+                        <LikeButton doctype={doctype} name={r.name} likedBy={r._liked_by} user={ctx?.user ?? ""} onChanged={likeChanged} />
                         {timeAgo(r.modified)}
                       </span>
                     </div>
@@ -653,7 +664,13 @@ export default function ListView({ doctype }: { doctype: string }) {
                     <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
                   ))}
                   <th className="w-24 px-3 py-2.5 text-right">
-                    {!disableCount && `${rows.length} of ${total}`}
+                    <span className="inline-flex items-center gap-2">
+                      {!disableCount && `${rows.length} of ${total}`}
+                      {/* .list-liked-by-me: filter to what I liked */}
+                      <button type="button" aria-pressed={likedByMe} aria-label="Liked by me" title="Liked by me" onClick={toggleLikedByMe} className="rounded p-0.5 hover:text-zinc-700 dark:hover:text-zinc-200">
+                        <Heart className={`h-3.5 w-3.5 ${likedByMe ? "fill-red-500 text-red-500" : ""}`} aria-hidden />
+                      </button>
+                    </span>
                   </th>
                 </tr>
               </thead>
@@ -687,7 +704,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                         />
                       </td>
                       <td className="max-w-[18rem] px-3 py-2.5">
-                        <Link href={href} className="block truncate font-medium text-zinc-900 hover:underline dark:text-zinc-100">{subject}</Link>
+                        <Link href={href} data-unread={unread(r) || undefined} className={`block truncate text-zinc-900 hover:underline dark:text-zinc-100 ${unread(r) ? "font-bold" : "font-medium"}`}>{subject}</Link>
                         {subject !== r.name && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
                       </td>
                       {hasIndicator && (
@@ -720,11 +737,12 @@ export default function ListView({ doctype }: { doctype: string }) {
                         );
                       })}
                       <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
+                        {/* get_meta_html: assignees · modified · comments · like */}
                         <span className="inline-flex items-center gap-2">
-                          {!disableCommentCount && Number(r._comment_count) > 0 && (
-                            <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{Number(r._comment_count)}</span>
-                          )}
+                          <AssigneeAvatars users={jsonList(r._assign)} onFilter={filterAssigned} />
                           {timeAgo(r.modified)}
+                          {!disableCommentCount && <CommentCount count={r._comment_count} />}
+                          <LikeButton doctype={doctype} name={r.name} likedBy={r._liked_by} user={ctx?.user ?? ""} onChanged={likeChanged} />
                         </span>
                       </td>
                     </tr>

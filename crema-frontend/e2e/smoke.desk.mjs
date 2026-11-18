@@ -12,7 +12,7 @@ const PASS = process.env.CREMA_PASS ?? "admin";
 const paths = process.argv.slice(2).length ? process.argv.slice(2) : ["/desk"];
 
 fs.mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on("console", (m) => {

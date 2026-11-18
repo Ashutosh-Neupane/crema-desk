@@ -7,7 +7,7 @@ import fs from "node:fs";
 const BASE = process.env.BASE ?? "http://localhost:3001";
 const OUT = process.env.OUT ?? "./smoke-shots";
 fs.mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message.slice(0, 200)}`));
@@ -18,6 +18,9 @@ const step = (m) => console.log(`• ${m}`);
 const LIST = `${BASE}/desk/doctype/Sales%20Order`;
 const rowCount = () => page.locator("tbody tr").count();
 const settle = () => page.waitForTimeout(1200);
+// expected values come from the bench itself, so the suite runs against any site with ERPNext data
+const api = async (path) => (await page.request.get(`${BASE}/api/frappe/${path}`)).json();
+const soCount = async (filters) => (await api(`api/method/frappe.client.get_count?doctype=Sales%20Order&filters=${encodeURIComponent(JSON.stringify(filters))}`)).message;
 
 await page.goto(`${BASE}/login`);
 await page.fill("input:not([type=password])", process.env.CREMA_USER ?? "Administrator");
@@ -25,20 +28,27 @@ await page.fill("input[type=password]", process.env.CREMA_PASS ?? "admin");
 await page.click("button[type=submit]");
 await page.waitForURL(/\/desk/);
 
+// the sort and filters are saved per user (Desk user_settings): start from the default (newest first)
+await page.request.post(`${BASE}/api/frappe/api/method/frappe.model.utils.user_settings.save`, { data: { doctype: "Sales Order", user_settings: JSON.stringify({ List: { filters: [], sort_by: "modified", sort_order: "desc", active_layout_name: "" } }) } });
+
 step("list loads with indicators");
 await page.goto(LIST, { waitUntil: "domcontentloaded" });
 await page.locator("tbody tr").first().waitFor({ timeout: 60000 });
 const n0 = await rowCount();
 check(n0 >= 5, `rows shown (${n0})`);
-check(await page.getByRole("button", { name: "To Deliver and Bill" }).first().isVisible(), "ERPNext indicator 'To Deliver and Bill'");
+const firstStatus = (await api(`api/resource/Sales%20Order?fields=${encodeURIComponent('["status"]')}&order_by=modified%20desc&limit_page_length=1`)).data[0].status;
+check(await page.getByRole("button", { name: firstStatus, exact: true }).first().isVisible(), `ERPNext indicator '${firstStatus}' on the newest order`);
 check((await page.getByRole("button", { name: /^Filter/ }).count()) === 1, "exactly one Filter button");
 
 step("search by customer name");
-await page.getByPlaceholder(/Search/).fill("Everest");
+const cust = (await api(`api/resource/Sales%20Order?fields=${encodeURIComponent('["customer_name"]')}&order_by=modified%20desc&limit_page_length=1`)).data[0].customer_name;
+const word = String(cust).split(" ")[0];
+await page.getByPlaceholder(/Search/).fill(word);
 await page.waitForFunction((n) => document.querySelectorAll("tbody tr").length < n, n0, { timeout: 30000 }).catch(() => {});
 await settle();
 const found = await page.locator("tbody tr").allInnerTexts();
-check(found.length >= 1 && found.length < n0 && found.every((r) => r.includes("Everest")), `search narrows to Everest rows (${found.length})`);
+const wantFound = Math.min(20, await soCount([["customer_name", "like", `%${word}%`]]));
+check(found.length === wantFound && found.every((r) => r.toLowerCase().includes(word.toLowerCase())), `search "${word}" → ${found.length} rows (expected ${wantFound})`);
 await page.getByPlaceholder(/Search/).fill("");
 await page.waitForFunction((n) => document.querySelectorAll("tbody tr").length === n, n0, { timeout: 30000 });
 await settle();
@@ -48,20 +58,23 @@ await page.getByRole("button", { name: "Draft" }).first().click();
 await page.waitForURL(/docstatus=0/, { timeout: 30000 }).catch(() => {});
 await settle();
 check(page.url().includes("docstatus=0"), "URL has docstatus=0");
-check((await rowCount()) === 2, "2 draft orders");
+const drafts = Math.min(20, await soCount([["docstatus", "=", 0]]));
+check((await rowCount()) === drafts, `${drafts} draft orders`);
 await page.getByRole("button", { name: /Remove Document Status filter/ }).click();
 await settle();
 check((await rowCount()) === n0, "chip × restores all rows");
 
-step("filter editor: Customer = Kathmandu Mart");
+const customer = (await api(`api/resource/Sales%20Order?fields=${encodeURIComponent('["customer"]')}&order_by=modified%20desc&limit_page_length=1`)).data[0].customer;
+const byCustomer = Math.min(20, await soCount([["customer", "=", customer]]));
+step(`filter editor: Customer = ${customer}`);
 await page.getByRole("button", { name: /^Filter/ }).click();
 await page.locator("select").filter({ hasText: "Customer" }).first().selectOption({ label: "Customer" });
 const linkInput = page.locator(".w-80 input").first();
-await linkInput.fill("Kathmandu Mart");
+await linkInput.fill(customer);
 await linkInput.press("Tab");
 await page.getByRole("button", { name: "Add filter" }).click();
 await settle();
-check((await rowCount()) === 1, "filter applied (1 row)");
+check((await rowCount()) === byCustomer, `filter applied (${byCustomer} rows)`);
 await page.getByRole("button", { name: "Clear all" }).click();
 await settle();
 check((await rowCount()) === n0, "Clear all restores rows");
@@ -69,7 +82,7 @@ check((await rowCount()) === n0, "Clear all restores rows");
 step("group by status counts");
 await page.getByRole("button", { name: /Group by/ }).click();
 await page.waitForTimeout(1500);
-check(await page.getByText("To Deliver and Bill").last().isVisible(), "group-by lists statuses");
+check(await page.getByText(firstStatus).last().isVisible(), "group-by lists statuses");
 await page.keyboard.press("Escape");
 
 step("sort ascending by name");
