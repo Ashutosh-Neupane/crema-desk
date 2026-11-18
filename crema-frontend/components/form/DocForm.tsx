@@ -337,6 +337,13 @@ export default function DocForm({ doctype, name }: Props) {
     async (kind: "save" | "submit", action: SaveAction) => {
       setBusy(kind);
       try {
+        // ⌘S / Save while a field still has focus: cells and inputs commit on blur (Link fields 150 ms later, so a
+        // click on a suggestion still counts), so blur it and let that land first, or the last edit is lost
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active.matches("input,textarea,select,[contenteditable=true]")) {
+          active.blur();
+          await new Promise((r) => setTimeout(r, 200));
+        }
         await persist(action);
       } catch (e) {
         toastError(e, "Save failed", { duration: 10000 });

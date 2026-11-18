@@ -25,10 +25,18 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
   const descriptionId = React.useId();
   // the panel's width is the max-w-* class given to DialogContent (DialogContent reports it up)
   const [width, setWidth] = React.useState(DEFAULT_WIDTH);
+  // the latest onOpenChange, so the focus effect below runs on open / close only: callers often pass an inline
+  // function, and re-running it on every render moved focus back to the opener and into the first input on each
+  // keystroke (an input whose onBlur sets state then looped: "Maximum update depth exceeded")
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  React.useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+  const close = React.useCallback(() => onOpenChangeRef.current(false), []);
   React.useEffect(() => {
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onOpenChange(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("keydown", onKey);
     // focus the primary action (last button) or the first focusable element
     const panel = panelRef.current;
@@ -39,7 +47,7 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
       document.removeEventListener("keydown", onKey);
       opener?.focus?.();
     };
-  }, [open, onOpenChange]);
+  }, [open, close]);
   return (
     <DialogContext.Provider value={{ open, setOpen: onOpenChange, titleId, descriptionId, setWidth }}>
       {open && (
