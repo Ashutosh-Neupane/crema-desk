@@ -8,8 +8,13 @@ Newest entries on top. Each session: append what was done, what's verified, what
   route signature, stored in Desk's format so Desk and Crema share them.
 - e2e: listlayouts (new). listsettings, formsave green. React Doctor 0 errors, score 57.
 - Commits go back to the repo's Conventional Commits style (`feat(list): …`, `test(e2e): …`, `docs: …`).
-- Next in M5: row extras (comment counts, assignees, likes, unread), listview_settings hooks, report view
-  group-by, ERPNext financial statements.
+- Row extras: assignee avatars that filter, comment count, like heart per row + "liked by me", unread rows bold
+  (track_seen). e2e: listrowextras (new).
+- e2e upkeep: list.salesorder reads its expected data from the bench (it was written against the old bench's
+  customers); the five suites that launch Chromium directly now honour PW_CHANNEL like e2e/lib.mjs.
+- Timeline for the rest of phase 1 (~12–14 h): M5 hooks + report group-by + M4 leftovers (~3.5 h), financial
+  statements (~2.5 h, licensing choice pending), "day of work" suite (~2–3 h), M7 minimum (~2–3 h). M6 is done.
+- Next in M5: listview_settings hooks, report view group-by, ERPNext financial statements.
 
 ## 2026-11-18 — M4: dialog controls like Desk; React Doctor back to 0 errors
 - MultiSelect, MultiSelect Pills, MultiSelect List, MultiCheck, Date Range return Desk's values from a dialog
