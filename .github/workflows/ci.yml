@@ -32,7 +32,7 @@ jobs:
       FRAPPE_SITE_NAME: ci.localhost
       NEXT_PUBLIC_FRAPPE_SITE_NAME: ci.localhost
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
