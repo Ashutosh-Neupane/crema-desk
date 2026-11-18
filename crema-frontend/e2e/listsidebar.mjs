@@ -113,7 +113,12 @@ await grp.waitFor({ timeout: 60000 });
 await grp.getByRole("button", { name: "Customize sidebar filters" }).click();
 await page.getByRole("checkbox", { name: "Priority" }).click();
 await grp.getByRole("button", { name: "Priority group by" }).waitFor({ timeout: 20000 });
-const us = JSON.parse((await post("frappe.model.utils.user_settings.get", { doctype: "ToDo" })) ?? "{}");
+// user settings are saved in the background (debounced): poll briefly instead of reading once
+let us = {};
+for (let i = 0; i < 10 && !us.group_by_fields?.includes("priority"); i++) {
+  if (i) await page.waitForTimeout(500);
+  us = JSON.parse((await post("frappe.model.utils.user_settings.get", { doctype: "ToDo" })) ?? "{}");
+}
 check(us.group_by_fields?.includes("priority"), "group_by_fields saved with priority");
 await page.keyboard.press("Escape");
 list = await open("Priority");

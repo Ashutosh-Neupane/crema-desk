@@ -63,7 +63,7 @@ export function DropdownMenuLabel({ children, className = "" }: { children: Reac
   return <div className={`px-3 pb-1 pt-2 text-xs font-medium text-zinc-500 ${className}`}>{children}</div>;
 }
 
-export function DropdownMenuTrigger({ children, ...props }: { children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+export function DropdownMenuTrigger({ children, onClick, ...props }: { children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const { setOpen, open } = useDropdown();
 
   return (
@@ -71,8 +71,12 @@ export function DropdownMenuTrigger({ children, ...props }: { children: React.Re
       type="button"
       aria-haspopup="menu"
       aria-expanded={open}
-      onClick={() => setOpen(!open)}
       {...props}
+      // a caller's onClick (e.g. stopPropagation inside a clickable row) runs as well as the toggle, not instead of it
+      onClick={(e) => {
+        onClick?.(e);
+        setOpen(!open);
+      }}
     >
       {children}
     </button>
