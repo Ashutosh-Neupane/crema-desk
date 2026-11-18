@@ -1,0 +1,7 @@
+# Keeps the pinned GitHub Actions in .github/workflows current (npm upgrades stay a deliberate, separate step).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

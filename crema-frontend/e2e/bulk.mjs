@@ -39,7 +39,8 @@ await openList();
 await page.getByRole("menuitem", { name: "Assign To" }).click();
 const user = page.getByRole("dialog").getByPlaceholder("Add a user");
 await user.fill("Administrator");
-await page.getByRole("option", { name: /Administrator/ }).first().click();
+// the user named Administrator, not another account whose full name is "Administrator" (shown with its email)
+await page.getByRole("option", { name: /Administrator/ }).filter({ hasNotText: "@" }).first().click();
 check(await page.getByRole("dialog").getByText("Administrator", { exact: true }).isVisible(), "user chip added");
 await page.getByRole("dialog").getByRole("button", { name: "Assign" }).click();
 await page.waitForTimeout(2500);

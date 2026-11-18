@@ -53,6 +53,10 @@ no "Generated with Claude Code" or other AI attribution in commit messages or PR
   (github.com/frappe/frappe, `frappe/public/js/frappe`) rather than guessing, and name the source file in comments.
 - Add or extend an e2e suite for each feature, even though it runs locally later.
 
+## CI
+`.github/workflows/ci.yml` runs on every PR and push to `main`: `npm ci`, `tsc --noEmit`, `npm run lint`,
+`npm run build`, and `node --check` on every e2e script. It must pass before merging; e2e suites still run locally.
+
 ## Commands (from `crema-frontend/`)
 - `npm run dev` · `npx tsc --noEmit` · `npm run lint` · `npm run build`
 - Browser checks against the live bench: `node e2e/smoke.desk.mjs /desk "/desk#k=sales order" …` (console/HTTP
