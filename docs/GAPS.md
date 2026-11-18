@@ -34,7 +34,7 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M2 ✅ | **Workflow you can follow** | workflow stepper, "waiting on me", Workflow Action list, self-approval and condition messages (2.16) | `form/workflow.js`, `model/workflow.js`, `frappe/workflow/doctype/workflow_action` | `e2e/workflow.mjs` extended | yes |
 | M3 ✅ | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
 | M4 | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
-| M5 | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs` | partly |
+| M5 ✅ | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs`, `financials.mjs` | partly |
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
 | M7 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
 
@@ -285,10 +285,21 @@ Order of work: the milestones in § 0.1.
   Print (`frappe.render_grid`), print_tree.html, CSV/Excel export options dialog (with/without
   indentation), "Setup Auto Email" from the menu, "Add to Workspace", column reorder/resize persistence, "Pick
   columns" / custom columns from linked doctypes, report link side panel.
-- ❌ ERPNext report helpers loaded by report JS: `erpnext.financial_statements` (formatter, tree, period selection),
-  `dimension_tree_filter.js` (accounting dimensions added to every finance report), `sales_trends_filters.js`,
-  `purchase_trends_filters.js`, `stock_analytics.js`, `stock_grid_report.js` — verify each family renders, and add
-  shims where the runtime is missing them.
+- ✅ ERPNext report helpers: the app's own `utils.js`, `financial_statements.js`, `sales_trends_filters.js`,
+  `purchase_trends_filters.js`, `subcontracting_inward_report_filters.js` run unchanged in the report runtime
+  (`lib/desk-runtime/appHelpers.ts`), with `frappe.boot.docs`, `frappe.form.link_formatters` and
+  `frappe.after_ajax` (accounting dimension filters from `erpnext.utils.add_dimensions`). Balance Sheet, Profit and
+  Loss, Cash Flow, Trial Balance, General Ledger, Stock Ledger, Gross Profit, Accounts Receivable (+ Summary) render
+  row for row like Desk (labels, figures, bold group rows, summary cards). Account links run the column's
+  `link_onclick` (`open_general_ledger` → General Ledger with route options as filters, `set_route_filters`).
+  Cell formatting follows `query_report.js` `format_cell` (`always_show_decimals`, quoted Link labels, blank
+  Currency → 0) — `e2e/financials.mjs`.
+  Fixed on the way: jQuery objects handed back to jQuery (`$($x)`, `$x.wrap(…)`) failed inside the lenient wrapper,
+  which made every formatter that builds jQuery fall back to the plain value; `frappe.set_route` from report JS
+  didn't navigate.
+- ❌ `get_datatable_options` → `checkboxColumn` + `events.onCheckRow` (Sales / Purchase / Stock Analytics plot the
+  checked rows; ~10 stock reports act on checked rows). Needs DataTable-shaped cells (`{content, html}`) and
+  `frappe.query_report.chart` / `render_chart`. `stock_analytics.js`, `stock_grid_report.js` not loaded yet.
 
 ### 2.7 Workspaces, desktop, sidebar (`views/workspace`, `widgets/*`, `ui/sidebar/*`, `desktop_icons.bundle.js`)
 - ✅ Workspace render: header, paragraph, spacer, shortcut (with stats filter count), card links, chart, number card,
