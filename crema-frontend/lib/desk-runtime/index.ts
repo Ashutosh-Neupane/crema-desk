@@ -35,6 +35,8 @@ export interface RuntimeContext {
   /** metas known to the page (parent + children) for frappe.meta.* */
   metas?: Record<string, DocTypeMeta>;
   navigate?: (href: string) => void;
+  /** docs a frappe.call({ doc }) returned (request.js syncs them into locals; the open form reloads its own) */
+  onDocs?: (docs: Array<Record<string, unknown>>) => void;
 }
 
 type Handler = (...args: unknown[]) => unknown;
@@ -219,9 +221,17 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   const afterAjax = async () => {
     while (inflight.size) await Promise.allSettled([...inflight]);
   };
-  const call = async (opts: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void; freeze?: boolean }, args?: Record<string, unknown>) => {
+  const call = async (opts: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void; freeze?: boolean; doc?: Record<string, unknown> }, args?: Record<string, unknown>) => {
     const o = typeof opts === "string" ? { method: opts, args } : opts;
-    const req = deskCall(o.method, o.args ?? {});
+    // request.js: frappe.call({ doc, method }) runs a method of that document (cmd run_doc_method); the docs it
+    // returns are synced back (stock_entry.js get_item_details fills the row this way)
+    const req = o.doc
+      ? deskCall("frappe.handler.run_doc_method", { docs: JSON.stringify(o.doc), method: o.method, args: JSON.stringify(o.args ?? {}) }).then((res) => {
+          const docs = (res.env as { docs?: Array<Record<string, unknown>> }).docs;
+          if (Array.isArray(docs) && docs.length) ctx.onDocs?.(docs);
+          return res;
+        })
+      : deskCall(o.method, o.args ?? {});
     inflight.add(req);
     try {
       const { env } = await req;

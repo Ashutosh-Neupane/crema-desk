@@ -94,7 +94,22 @@ export class FormController {
   constructor(meta: DocTypeMeta, childMetas: DocTypeMeta[], doc: Doc, ctx: RuntimeContext) {
     this.meta = meta;
     this.metas = Object.fromEntries([meta, ...childMetas].map((m) => [m.name, m]));
-    this.ctx = { ...ctx, metas: this.metas };
+    this.ctx = {
+      ...ctx,
+      metas: this.metas,
+      // frappe.call({ doc: frm.doc, … }) returns this doc updated by the server method → show it (Desk syncs locals)
+      onDocs: (docs) => {
+        const updated = docs.find((d) => d.doctype === this.meta.name && d.name === this.doc.name);
+        if (!updated) return;
+        // the server changed values the user hasn't saved: the form stays (or becomes) unsaved
+        const changed = this.dirty || JSON.stringify(this.normalize(updated as Doc)) !== JSON.stringify(this.doc);
+        this.load(updated as Doc);
+        if (changed) {
+          this.dirty = true;
+          this.emit();
+        }
+      },
+    };
     this.doc = this.normalize(doc);
     this.runtime = createRuntime(this.ctx);
     // Desk create_mandatory_children: a new doc gets one empty row in each mandatory table
