@@ -32,7 +32,7 @@ export function useCalendarSettings(meta: DocTypeMeta | undefined, opts: { gantt
   const { data: ctx } = useDeskContext();
   return useMemo(() => {
     if (!meta || !ctx) return null;
-    const rt = createRuntime({ user: ctx.user, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, boot: ctx.boot, metas: { [meta.name]: meta } });
+    const rt = createRuntime({ user: ctx.user, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, boot: ctx.boot, docs: ctx.docs, metas: { [meta.name]: meta } });
     const views = (rt.frappe as unknown as { views: Record<string, unknown> }).views;
     views.calendar ??= {};
     rt.evalScript(String((meta as { __calendar_js?: string }).__calendar_js ?? ""), `${meta.name} calendar js`);

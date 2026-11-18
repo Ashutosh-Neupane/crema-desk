@@ -28,6 +28,8 @@ export interface RuntimeContext {
   boot?: Record<string, unknown>;
   /** boot.user permission lists (can_create, in_create, …) */
   perms?: Record<string, string[]>;
+  /** boot.docs the context keeps ({ Currency: { INR: {…} }, Company: {…} }) → frappe.boot.docs as Desk has it */
+  docs?: Record<string, Record<string, Record<string, unknown>>>;
   developer_mode?: boolean;
   /** metas known to the page (parent + children) for frappe.meta.* */
   metas?: Record<string, DocTypeMeta>;
@@ -35,6 +37,11 @@ export interface RuntimeContext {
 }
 
 type Handler = (...args: unknown[]) => unknown;
+
+/** frappe.boot.docs: a flat list with doctype ":Currency" / ":Company" (erpnext.get_presentation_currency_list reads it) */
+function bootDocs(docs: RuntimeContext["docs"]): Array<Record<string, unknown>> {
+  return Object.entries(docs ?? {}).flatMap(([dt, byName]) => Object.values(byName).map((d) => ({ ...d, doctype: `:${dt}` })));
+}
 export type FormHandlers = Map<string, Map<string, Handler[]>>;
 
 // ── numbers / strings (frappe/public/js/frappe/utils/number_format.js) ──────
@@ -185,6 +192,8 @@ export interface Runtime {
   evalScript: (code: string, label: string) => boolean;
   /** Evaluate a JS expression in the runtime scope (Desk: frappe.utils.eval); `eval:` prefix allowed. Errors → undefined */
   evalExpr: (expr: string, label?: string) => unknown;
+  /** resolves once no frappe.call of this runtime is in flight (Desk frappe.after_ajax) */
+  afterAjax: () => Promise<void>;
 }
 
 export function createRuntime(ctx: RuntimeContext): Runtime {
@@ -203,10 +212,18 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     return obj;
   };
 
+  // calls in flight, for frappe.after_ajax (query_report.js reads a report's filters only after the calls its
+  // script started — erpnext.utils.add_dimensions adds the accounting dimension filters in a callback)
+  const inflight = new Set<Promise<unknown>>();
+  const afterAjax = async () => {
+    while (inflight.size) await Promise.allSettled([...inflight]);
+  };
   const call = async (opts: string | { method: string; args?: Record<string, unknown>; callback?: (r: unknown) => void; freeze?: boolean }, args?: Record<string, unknown>) => {
     const o = typeof opts === "string" ? { method: opts, args } : opts;
+    const req = deskCall(o.method, o.args ?? {});
+    inflight.add(req);
     try {
-      const { env } = await deskCall(o.method, o.args ?? {});
+      const { env } = await req;
       o.callback?.(env);
       return env;
     } catch (err) {
@@ -214,6 +231,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       // (a failed jQuery deferred) — never an unhandled rejection that crashes the page
       toast.error(err instanceof Error ? err.message : String(err), { duration: 8000 });
       return new Promise<never>(() => {});
+    } finally {
+      inflight.delete(req);
     }
   };
 
@@ -226,6 +245,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     query_reports: {} as Record<string, Record<string, unknown>>,
     views: {} as Record<string, unknown>,
     flags: {} as Record<string, unknown>,
+    // formatters.js: apps register link titles here (erpnext utils.js: Item → "code: item_name"); reports apply them
+    form: { link_formatters: {} as Record<string, (value: unknown, doc: unknown, df: unknown) => unknown> },
     ui: {
       form: {
         handlers,
@@ -276,7 +297,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       full_name: (u?: string) => (!u || u === ctx.user ? (ctx.full_name ?? ctx.user) : u),
     },
     user_roles: ctx.roles ?? [],
-    boot: { ...(ctx.boot ?? {}), developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
+    boot: { ...(ctx.boot ?? {}), docs: bootDocs(ctx.docs), developer_mode: ctx.developer_mode ? 1 : 0, sysdefaults: ctx.sysdefaults ?? {}, user: { defaults: ctx.defaults ?? {}, roles: ctx.roles ?? [], in_create: [], can_create: [], can_read: [], ...(ctx.perms ?? {}) } },
     sys_defaults: ctx.sysdefaults ?? {},
     defaults: {
       get_user_default: (k: string) => {
@@ -344,6 +365,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     },
     call,
     xcall: async (method: string, args?: Record<string, unknown>) => (await call({ method, args })).message,
+    after_ajax: (fn?: () => unknown) => afterAjax().then(() => (typeof fn === "function" ? fn() : undefined)),
     db: {
       get_single_value: async (doctype: string, field: string) =>
         (await call({ method: "frappe.client.get_single_value", args: { doctype, field } })).message,
@@ -417,7 +439,7 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   // rest of a script (frappe.ui.form stays separate so its handlers Map is never proxied)
   const ns = frappe as unknown as Record<string, Record<string, unknown>>;
   ns.ui.form = lenient(ns.ui.form as Record<string, unknown>, false);
-  for (const k of ["ui", "utils", "db", "defaults", "model", "meta", "user", "tools", "datetime"]) if (ns[k]) ns[k] = lenient(ns[k], false);
+  for (const k of ["ui", "form", "utils", "db", "defaults", "model", "meta", "user", "tools", "datetime"]) if (ns[k]) ns[k] = lenient(ns[k], false);
 
   Object.assign(globals, {
     // Desk's API is large: unknown frappe.* helpers become no-ops rather than aborting app scripts
@@ -508,5 +530,5 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   };
   (frappe.utils as Record<string, unknown>).eval = (code: string) => evalExpr(code, "frappe.utils.eval");
 
-  return { frappe: globals.frappe as Runtime["frappe"], globals, evalScript, evalExpr };
+  return { frappe: globals.frappe as Runtime["frappe"], globals, evalScript, evalExpr, afterAjax };
 }
