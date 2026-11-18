@@ -1,0 +1,59 @@
+# Pull request checks for the Next.js app in crema-frontend/.
+# No Frappe bench is reachable from GitHub, so the e2e suites (node e2e/*.mjs) still run locally against a bench;
+# this job catches type errors, lint errors and build breaks before anything reaches main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Type-check, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: crema-frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      # build-time values only; nothing is called during the build
+      NEXT_PUBLIC_FRAPPE_BASE_URL: http://localhost:8000
+      FRAPPE_BACKEND_URL: http://localhost:8000
+      FRAPPE_SITE_NAME: ci.localhost
+      NEXT_PUBLIC_FRAPPE_SITE_NAME: ci.localhost
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: crema-frontend/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: e2e scripts parse
+        # the suites can't run here (no bench), but a syntax error in one should still fail the PR
+        run: for f in e2e/*.mjs; do node --check "$f" || exit 1; done
