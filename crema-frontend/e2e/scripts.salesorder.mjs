@@ -1,7 +1,8 @@
 // Client Script + Server Script behaviour on Sales Order through Crema, verified on the server.
 // Creates the scripts, exercises them in the UI, then removes them.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/scripts.salesorder.mjs
-// Requires `server_script_enabled: 1` in the site config.
+// Server Script steps run only when the site has `server_script_enabled`; otherwise they are skipped (a Server
+// Script left on Sales Order there would block every save). Customer and item come from the site.
 import { start, BASE } from "./lib.mjs";
 
 const t = await start();
@@ -18,6 +19,15 @@ async function cleanup() {
 }
 await cleanup();
 
+const pick = async (doctype, filters) => (await (await post("frappe.client.get_list", { doctype, filters, fields: ["name"], limit_page_length: 1 })).json()).message?.[0]?.name;
+const CUSTOMER = await pick("Customer", { disabled: 0 });
+const ITEM = await pick("Item", { is_stock_item: 1, is_sales_item: 1, disabled: 0, has_variants: 0 });
+const SERVER = !!(await (await post("frappe.core.doctype.server_script.server_script.enabled", {})).json()).message;
+check(!!CUSTOMER && !!ITEM, `site data: customer ${CUSTOMER}, item ${ITEM}; server scripts ${SERVER ? "enabled" : "disabled — server steps skipped"}`);
+const PO_AUTO = `CS-${CUSTOMER.slice(0, 3).toUpperCase()}`;
+let saved = null;
+
+try {
 step("create Client Script + Server Scripts on the backend");
 const clientJs = `
 frappe.ui.form.on("Sales Order", {
@@ -43,6 +53,7 @@ frappe.ui.form.on("Sales Order Item", {
 });`;
 let r = await post("frappe.client.insert", { doc: { doctype: "Client Script", name: CS, dt: "Sales Order", view: "Form", enabled: 1, script: clientJs } });
 check(r.ok(), `Client Script created (${r.status()})`);
+if (SERVER) {
 r = await post("frappe.client.insert", {
   doc: {
     doctype: "Server Script", name: SS_SET, script_type: "DocType Event", reference_doctype: "Sales Order",
@@ -59,6 +70,7 @@ r = await post("frappe.client.insert", {
   },
 });
 check(r.ok(), `Server Script (Before Save) created (${r.status()})`);
+}
 
 step("new Sales Order: refresh handler ran");
 await page.goto(`${BASE}/desk/doctype/Sales%20Order/new`, { waitUntil: "domcontentloaded" });
@@ -73,8 +85,8 @@ check(await page.getByText("pong from client script").first().isVisible(), "cust
 step("customer change handler sets po_no");
 const cust = page.getByRole("combobox", { name: /^Customer/ }).first();
 await cust.click();
-await cust.fill("Pokhara");
-await page.getByRole("option", { name: /Pokhara Supplies/ }).first().click();
+await cust.fill(CUSTOMER);
+await page.getByRole("option", { name: CUSTOMER }).first().click();
 await page.waitForTimeout(2500);
 // po_no lives on another tab — Ctrl/⌘+J (jump to field) switches to it
 const jumpTo = async (label) => {
@@ -85,7 +97,7 @@ const jumpTo = async (label) => {
 };
 await jumpTo("Customer's Purchase Order");
 const po = page.getByRole("textbox", { name: /^Customer's Purchase Order$/ }).first();
-check((await po.inputValue()) === "CS-POK", `po_no = ${await po.inputValue()}`);
+check((await po.inputValue()) === PO_AUTO, `po_no = ${await po.inputValue()}`);
 const backToDetails = () => page.getByRole("tab", { name: "Details" }).click();
 await backToDetails();
 
@@ -97,8 +109,8 @@ await dd.press("Enter");
 const row = page.locator("[aria-label^='Select row']").first().locator("xpath=ancestor::div[contains(@class,'grid')][1]");
 const item = row.locator("input").nth(1);
 await item.click();
-await item.fill("SUGAR");
-await page.getByRole("option", { name: /SUGAR-1/ }).first().click();
+await item.fill(ITEM);
+await page.getByRole("option", { name: ITEM }).first().click();
 await page.waitForTimeout(2500);
 const qty = page.getByLabel("Quantity", { exact: true }).first();
 await qty.click();
@@ -117,6 +129,7 @@ await page.waitForTimeout(1500);
 check(await page.getByText(/PO BLOCK is not allowed/).first().isVisible(), "frappe.throw message shown");
 check(page.url().endsWith("/new"), "not saved");
 
+if (SERVER) {
 step("server Before Save blocks save");
 await jumpTo("Customer's Purchase Order");
 await po.fill("SERVER");
@@ -131,22 +144,27 @@ if (!serverMsg) {
 }
 check(serverMsg, "server frappe.throw message shown");
 check(page.url().endsWith("/new"), "still not saved");
+}
 
-step("valid save → server Before Validate sets po_date");
+step("valid save" + (SERVER ? " → server Before Validate sets po_date" : ""));
 await jumpTo("Customer's Purchase Order");
-await po.fill("CS-POK");
+await po.fill(PO_AUTO);
 await po.press("Tab");
 await page.getByRole("button", { name: /^Save$/ }).click();
 await page.waitForURL(/Sales%20Order\/SAL-ORD-/, { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
+saved = name;
 const so = (await api(`api/resource/Sales Order/${encodeURIComponent(name)}`)).data;
 const today = new Date().toISOString().slice(0, 10);
-check(so?.po_no === "CS-POK", `saved po_no ${so?.po_no}`);
-check(!!so?.po_date, `po_date set by server script (${so?.po_date}, today ${today})`);
+check(so?.po_no === PO_AUTO, `saved po_no ${so?.po_no}`);
+if (SERVER) check(!!so?.po_date, `po_date set by server script (${so?.po_date}, today ${today})`);
 check(so?.items?.[0]?.qty === 100, `server kept clamped qty ${so?.items?.[0]?.qty}`);
 await shot("so_scripts_saved");
 
-step("cleanup");
-await post("frappe.client.delete", { doctype: "Sales Order", name });
-await cleanup();
+} finally {
+  // always: a Server Script left behind blocks every Sales Order save on a site without server scripts
+  step("cleanup");
+  if (saved) await post("frappe.client.delete", { doctype: "Sales Order", name: saved });
+  await cleanup();
+}
 await t.finish();

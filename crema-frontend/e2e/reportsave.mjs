@@ -45,7 +45,11 @@ try {
   await page.getByRole("heading", { name: NAME, exact: true }).waitFor({ timeout: 60000 });
   await page.locator("tbody tr").first().waitFor({ timeout: 90000 });
   await page.waitForFunction(() => document.querySelector("#qr-filter-from_date")?.value || document.querySelector("input[aria-label='From Date'], input[id*='from_date']")?.value, null, { timeout: 30000 }).catch(() => {});
-  check((await page.getByLabel("From Date").first().inputValue()) === "2026-01-01", "From Date filter restored from the saved report");
+  // the control shows the date in the site's date_format (System Settings)
+  const fmt = (await (await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.get_single_value`, { data: { doctype: "System Settings", field: "date_format" } })).json()).message || "yyyy-mm-dd";
+  const want = fmt.replace("yyyy", "2026").replace("mm", "01").replace("dd", "01");
+  const shown = await page.getByLabel("From Date").first().inputValue();
+  check(shown === want, `From Date filter restored from the saved report (${shown}, ${fmt})`);
   check((await page.locator("tbody tr").count()) > 0, "rows rendered for the custom report");
   await shot("report_saved_custom");
 

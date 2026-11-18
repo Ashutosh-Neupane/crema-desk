@@ -18,8 +18,13 @@ const open = async (dt, name, wait) => {
   await page.getByRole("button", { name: /^Preview/ }).waitFor({ timeout: wait ?? 60000 });
 };
 
+// any customer and stock item of this site (no names from a particular bench)
+const CUSTOMER = (await post("frappe.client.get_list", { doctype: "Customer", filters: { disabled: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
+const ITEM = (await post("frappe.client.get_list", { doctype: "Item", filters: { is_stock_item: 1, is_sales_item: 1, is_purchase_item: 1, disabled: 0, has_variants: 0, has_serial_no: 0, has_batch_no: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
+check(!!CUSTOMER && !!ITEM, `site data: customer ${CUSTOMER}, item ${ITEM}`);
+
 step("draft Sales Invoice");
-const si = await post("frappe.client.insert", { doc: { doctype: "Sales Invoice", company: COMPANY, customer: "Himalayan Traders", set_posting_time: 0, items: [{ item_code: "SUGAR-1", qty: 2, rate: 100 }] } });
+const si = await post("frappe.client.insert", { doc: { doctype: "Sales Invoice", company: COMPANY, customer: CUSTOMER, set_posting_time: 0, items: [{ item_code: ITEM, qty: 2, rate: 100 }] } });
 check(!!si?.name, `inserted ${si?.name}`);
 created.push(["Sales Invoice", si.name]);
 const gl = await post(`${SC}.show_accounting_ledger_preview`, { company: si.company, doctype: "Sales Invoice", docname: si.name });
@@ -58,7 +63,7 @@ if (!sup) {
   sup = (await post("frappe.client.insert", { doc: { doctype: "Supplier", supplier_name: "Crema LP Supplier", supplier_group: "All Supplier Groups" } }))?.name;
   created.push(["Supplier", sup]);
 }
-const pi = await post("frappe.client.insert", { doc: { doctype: "Purchase Receipt", company: COMPANY, supplier: sup, set_warehouse: STORES, items: [{ item_code: "SUGAR-1", qty: 5, rate: 50, warehouse: STORES }] } });
+const pi = await post("frappe.client.insert", { doc: { doctype: "Purchase Receipt", company: COMPANY, supplier: sup, set_warehouse: STORES, items: [{ item_code: ITEM, qty: 5, rate: 50, warehouse: STORES }] } });
 check(!!pi?.name, `inserted ${pi?.name} for ${sup}`);
 if (!pi?.name) { await cleanup(); await t.finish(); }
 created.push(["Purchase Receipt", pi.name]);
@@ -75,7 +80,7 @@ const sh = (await stable.locator("thead th").allInnerTexts()).map((s) => s.trim(
 check(sh.join() === sl.sl_columns.map((c) => c.name).join(), `columns ${sh.join(" | ")}`);
 const srow = await stable.locator("tbody tr").first().evaluate((tr) => [...tr.children].map((td) => td.textContent.trim()));
 const ii = sl.sl_columns.findIndex((c) => c.name === "Item");
-check(srow[ii] === "SUGAR-1" && sl.sl_data[0][ii] === "SUGAR-1", "item row shown");
+check(srow[ii] === ITEM && sl.sl_data[0][ii] === ITEM, "item row shown");
 check(srow.some((c) => c === STORES), "warehouse shown");
 await shot("ledger_stock", false);
 
