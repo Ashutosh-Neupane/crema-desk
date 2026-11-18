@@ -263,8 +263,13 @@ Order of work: the milestones in § 0.1.
 - ❌ Map view (`views/map`, `leaflet.bundle.js`): Geolocation / latitude+longitude doctypes.
 - ❌ Kanban v2 (`views/kanban_v2`, v16): board settings, card fields, column colours/priority styles, swimlanes —
   Crema has the classic Kanban Board doctype flow only.
-- ❌ Report view extras: group-by with aggregates, "Pick columns" from child tables, column resize/reorder persisted,
-  Save As / Save report (Report doctype, `report_type: Report Builder`), print/PDF, link side panel (`link_side_panel.js`).
+- ✅ Report view group-by (`ui/group_by/group_by.js`): a field of the DocType or of a child table, Count / Sum /
+  Average over the DocType's or a child table's numbers, applied as soon as it is complete, Desk's parent-to-child
+  rule, aggregate column typed like Desk, saved in Desk's format (`` `tabX`.`field` ``, older plain settings still
+  read), `?_group_by=` share links, click a group to see its rows — `e2e/reportgroupby.mjs` (numbers checked
+  against the API).
+- ✅ Report view columns from child tables and Save As (Report Builder report) — `e2e/reportview.mjs`.
+- ❌ Report view extras: column resize/reorder persisted, print/PDF, link side panel (`link_side_panel.js`).
 - ❌ Tree view extras: drag to move node, "Add Child" with quick entry fields, expand all, root filters per company.
 - ❌ Calendar: Desk's calendar view settings per doctype (`calendar_settings`), quick create on date click with
   quick entry, filter sidebar.

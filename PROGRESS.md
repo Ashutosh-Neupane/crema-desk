@@ -19,7 +19,10 @@ Newest entries on top. Each session: append what was done, what's verified, what
   defaults, per-row button / dropdown_button, formatters, hide_name_column. e2e: listhooks (new).
 - Fixed on the way: tree DocType lists lost ?view=list on any filter change; ?field=value filters were dropped
   when ?filters= was also present; a dropdown trigger given an onClick never opened.
-- Next in M5: report view group-by, ERPNext financial statements.
+- Report view group-by brought to Desk parity: child-table groups and aggregates, Desk's settings format,
+  ?_group_by= links, live apply, Desk's aggregate column. e2e: reportgroupby (new).
+- Fixed: "_…" URL keys (route options such as _group_by) were read as list filters and the server refused them.
+- Next in M5: ERPNext financial statements (licensing choice pending).
 
 ## 2026-11-18 — M4: dialog controls like Desk; React Doctor back to 0 errors
 - MultiSelect, MultiSelect Pills, MultiSelect List, MultiCheck, Date Range return Desk's values from a dialog
