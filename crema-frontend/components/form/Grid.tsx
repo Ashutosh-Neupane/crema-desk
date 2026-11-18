@@ -15,7 +15,7 @@
  *    a header row of labels / fieldnames picks the columns
  */
 import { useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Download, GripVertical, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Download, GripVertical, ListPlus, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -25,6 +25,7 @@ import type { FormController, Row } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import LinkField from "@/lib/crema-form/controls/LinkField";
 import FormBody from "@/components/form/FormBody";
+import AddMultipleDialog from "@/components/form/AddMultipleDialog";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
@@ -318,6 +319,30 @@ export default function Grid({
   };
 
   const copyOf = (r: Row) => Object.fromEntries(Object.entries(r).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k)));
+  // Desk grid.set_multiple_add(link, qty) from the app's script → "Add Multiple"
+  const multiple = overrides[table]?.multiple_add as { link: string; qty?: string } | undefined;
+  const multipleLink = multiple ? meta.fields?.find((f) => f.fieldname === multiple.link && f.fieldtype === "Link") : undefined;
+  const multipleQty = multiple?.qty ? meta.fields?.find((f) => f.fieldname === multiple.qty) : undefined;
+  const [multipleOpen, setMultipleOpen] = useState(false);
+  // Desk link_selector.js set_in_grid: a row that already has the value gets the new quantity, else a new row
+  const pickMultiple = async (value: string, qty?: number) => {
+    if (!multipleLink) return;
+    const current = (ctl.getDoc()[table] as Row[]) ?? [];
+    const existing = multipleQty ? current.find((r) => r[multipleLink.fieldname] === value) : undefined;
+    if (existing && multipleQty) {
+      await ctl.set_child_value(existing.doctype, existing.name, multipleQty.fieldname, qty);
+    } else {
+      // a new form's blank row (Sales Order starts with one) is filled first instead of left above the picks
+      const last = current[current.length - 1];
+      // (Desk __unedited: added and not touched since; defaults such as a user's currency don't count as edits)
+      const blank = !!last?.__islocal && (!!last.__unedited || cols.every((c) => isEmpty(last[c.fieldname])));
+      const row = blank ? last : await ctl.add_child(table, {});
+      await ctl.set_child_value(row.doctype, row.name, multipleQty && qty !== undefined ? { [multipleLink.fieldname]: value, [multipleQty.fieldname]: qty } : { [multipleLink.fieldname]: value });
+    }
+    setPage(Math.floor((((ctl.getDoc()[table] as Row[]) ?? []).length - 1) / PAGE_SIZE));
+    toast.success(qty === undefined ? `${value} added` : `Added ${value} (${qty})`);
+  };
+
   const insertAt = async (at: number, copyFrom?: Row) => {
     const r = await ctl.add_child(table, copyFrom ? copyOf(copyFrom) : {}, at);
     setEditing(r.name);
@@ -402,8 +427,8 @@ export default function Grid({
       }
       return;
     }
-    if (e.key === "Escape" && !e.shiftKey && row?.__islocal && !cannotDelete && !input.value && cols.every((c) => isEmpty(row[c.fieldname]))) {
-      // Desk: Esc on a new row nobody filled in removes it
+    if (e.key === "Escape" && !e.shiftKey && row?.__islocal && !cannotDelete && !input.value && (!!row.__unedited || cols.every((c) => isEmpty(row[c.fieldname])))) {
+      // Desk: Esc on a new row nobody filled in (__unedited; defaults don't count) removes it
       e.preventDefault();
       void ctl.remove_rows(table, [row.name]);
       if (r > 0) focusCell(r - 1, col);
@@ -667,12 +692,29 @@ export default function Grid({
             </>
           ) : (
             !cannotAdd && (
-              <button type="button" onClick={() => void add()} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                <Plus className="h-3.5 w-3.5" /> Add row
-              </button>
+              <>
+                <button type="button" onClick={() => void add()} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                  <Plus className="h-3.5 w-3.5" /> Add row
+                </button>
+                {multipleLink && (
+                  <button type="button" onClick={() => setMultipleOpen(true)} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                    <ListPlus className="h-3.5 w-3.5" /> Add Multiple
+                  </button>
+                )}
+              </>
             )
           )}
         </div>
+      )}
+
+      {multipleOpen && multipleLink && (
+        <AddMultipleDialog
+          doctype={String(multipleLink.options)}
+          qtyLabel={multipleQty ? (multipleQty.label ?? multipleQty.fieldname) : undefined}
+          getQuery={() => ctl.getQuery(multipleLink.fieldname, table)?.(ctl.getDoc(), meta.name, "") as Record<string, unknown> | undefined}
+          onPick={pickMultiple}
+          onClose={() => setMultipleOpen(false)}
+        />
       )}
 
       {editRow && (
