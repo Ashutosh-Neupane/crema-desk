@@ -9,7 +9,7 @@ const USER = process.env.CREMA_USER ?? "Administrator";
 const PASS = process.env.CREMA_PASS ?? "admin";
 fs.mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message.slice(0, 200)}`));
