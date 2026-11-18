@@ -33,7 +33,7 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M1 ✅ | **Form feels like Desk** | Save rules (2.17), timeline wording (2.17), visibility rules audit (2.15), previous / next doc, title editing, Jump to field verify (2.1), "Not permitted" + "shared with you" messages (2.1) | `form/save.js`, `form/form.js`, `form/toolbar.js`, `form/footer/version_timeline_content_builder.js` | `e2e/formsave.mjs`, `form.salesorder.mjs` | partly |
 | M2 ✅ | **Workflow you can follow** | workflow stepper, "waiting on me", Workflow Action list, self-approval and condition messages (2.16) | `form/workflow.js`, `model/workflow.js`, `frappe/workflow/doctype/workflow_action` | `e2e/workflow.mjs` extended | yes |
 | M3 ✅ | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
-| M4 | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
+| M4 ✅ | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
 | M5 ✅ | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs`, `financials.mjs` | partly |
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
 | M7 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
@@ -195,7 +195,11 @@ Order of work: the milestones in § 0.1.
   Clear All, MultiCheck an array of values with `{label, value, checked}` options, sorting, `columns`, `select_all`
   (it read only lines), Date Range [from, to] (was {from, to} behind an Apply button), Switch 0/1; options as lines,
   JSON, items or `get_data(txt)`; no doubled labels.
-- 🟡 Exist but not verified against Desk: Small/Long Text, Button, Heading, Comment.
+- ✅ Small / Long Text and Text (`text.js`: 150 / 300px, `max_height`, read-only text keeps whitespace), Button
+  (`button.js`: `button_color` / `primary` / `btn_size` / `title`; always clickable, also on submitted documents —
+  `can_write()` is true; form handler, else the `options` method via run_doc_method; `df.click` in dialogs), Heading
+  (`<h4>`), Comment in dialogs (`comment.js`: Text Editor, Comment button once there's text, Ctrl+Enter →
+  `on_submit`) — `e2e/controls4.mjs`. Fixed: Buttons were hidden on read-only / submitted documents.
 - ✅ Code, HTML Editor, Markdown Editor, JSON (`controls/code.js`, `html_editor.js`, `markdown_editor.js`, `json.js`):
   one CodeMirror control with Desk's behaviour — Desk's language map (no options → plain text), 300px with
   Expand / Collapse unless `max_lines` / `min_lines` / `max_height`, `wrap`, Copy to Clipboard when read-only,
