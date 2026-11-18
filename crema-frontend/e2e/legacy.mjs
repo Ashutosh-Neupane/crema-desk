@@ -25,8 +25,10 @@ step("Form route inside a framed page opens natively in Crema");
 const inner = innerFrame();
 await inner.waitForFunction(() => window.__cremaBridgeReady === true, null, { timeout: 30000 });
 // Crema navigates away and unmounts the frame, so the evaluate call may end with "Frame was detached"
-await inner.evaluate(() => window.frappe.set_route("Form", "Customer", "Everest Foods")).catch(() => {});
-await page.waitForURL(/\/desk\/doctype\/Customer\/Everest%20Foods/, { timeout: 30000 });
+// any customer of this site
+const CUSTOMER = (await (await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.get_list`, { data: { doctype: "Customer", fields: ["name"], limit_page_length: 1 } })).json()).message?.[0]?.name ?? "Guest Customer";
+await inner.evaluate((c) => window.frappe.set_route("Form", "Customer", c), CUSTOMER).catch(() => {});
+await page.waitForURL(new RegExp(`/desk/doctype/Customer/${encodeURIComponent(CUSTOMER).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), { timeout: 30000 });
 check(true, "navigated to Crema's Customer form");
 
 check(!errors.some((e) => /socket\.io|ERR_CONNECTION_REFUSED/.test(e)), "no socket errors from the framed page");

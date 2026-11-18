@@ -127,6 +127,8 @@ export default function ListView({ doctype }: { doctype: string }) {
   const [sortState, setSort] = useState<Sort | null>(null);
   const sort = sortState ?? defaultSort;
   const [pageLength, setPageLength] = useState(20);
+  // base_list.js: the chosen page size (20 / 100 / 500) is also how many rows "Load more" adds (start += page_length)
+  const [pageStep, setPageStep] = useState(20);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [quickEntry, setQuickEntry] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -525,7 +527,9 @@ export default function ListView({ doctype }: { doctype: string }) {
               <button
                 type="button"
                 onClick={onAdd}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                // the app's listview_settings (primary_action) must be in before Add means the same as in Desk
+                disabled={settings === undefined}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 <Plus className="h-4 w-4" /> Add {doctype}
               </button>
@@ -842,7 +846,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             {filters.length || debounced ? (
               <button type="button" onClick={() => { setSearch(""); setFilters([]); }} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Clear filters</button>
             ) : (
-              canCreate && <button type="button" onClick={onAdd} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
+              canCreate && <button type="button" onClick={onAdd} disabled={settings === undefined} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
             )}
           </div>
         )}
@@ -851,12 +855,19 @@ export default function ListView({ doctype }: { doctype: string }) {
         {rows.length > 0 && (
           <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
             {[20, 100, 500].map((n) => (
-              <button key={n} type="button" onClick={() => setPageLength(n)} className={`rounded-md px-2 py-1 ${pageLength === n ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}>
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setPageStep(n);
+                  setPageLength(n);
+                }}
+                className={`rounded-md px-2 py-1 ${pageStep === n ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}>
                 {n}
               </button>
             ))}
             {moreRows && (
-              <button type="button" onClick={() => setPageLength(pageLength + 20)} className="ml-auto rounded-md border border-zinc-200 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+              <button type="button" onClick={() => setPageLength(pageLength + pageStep)} className="ml-auto rounded-md border border-zinc-200 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
                 Load more
               </button>
             )}

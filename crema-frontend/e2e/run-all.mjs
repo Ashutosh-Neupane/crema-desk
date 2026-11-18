@@ -11,7 +11,7 @@ const only = arg("only");
 const skip = new Set(arg("skip") ?? []);
 // helpers / one-off probes, not suites
 const NOT_SUITES = new Set(["lib", "run-all", "peek", "smoke.desk", "readme-shots"]);
-const ERPNEXT = new Set(["list.salesorder", "form.salesorder", "scripts.salesorder", "report", "reportview", "tree", "getitems", "print", "image", "gantt", "dataimport"]);
+const ERPNEXT = new Set(["list.salesorder", "form.salesorder", "scripts.salesorder", "report", "reportview", "tree", "getitems", "print", "image", "gantt", "dataimport", "financials", "dayofwork", "ledgerpreview", "itemdashboard", "serialbatch", "gridmulti", "reportsave", "reportgroupby"]);
 
 const suites = fs
   .readdirSync(dir)
