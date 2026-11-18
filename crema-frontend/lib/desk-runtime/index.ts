@@ -17,6 +17,7 @@ import { makeLenientJQuery } from "./jquery";
 import { deskRouteToUrl, deskSlug } from "@/lib/navigation/deskRoute";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 import * as fmt from "@/lib/frappe/format";
+import { PREFILL_KEY } from "@/lib/form/prefill";
 
 export interface RuntimeContext {
   user: string;
@@ -355,6 +356,24 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       get_value: () => undefined,
       /** locals cache filled by with_doc (Desk: frappe.model.with_doc → locals[dt][dn]) */
       get_doc: (dt: string, dn: string) => ((globals.locals as Record<string, Record<string, unknown>> | undefined)?.[dt] ?? {})[dn],
+      /**
+       * model/sync.js sync(r): docs from a response go into locals; one without a name is an unsaved local doc
+       * (add_to_locals: name "new-<doctype>-…", __islocal). ERPNext then routes to it — make_mapped_payment_entry
+       * does sync(r.message) + set_route("Form", dt, name), which set_route turns into a pre-filled new form.
+       */
+      sync: (r: unknown) => {
+        const box = (r && typeof r === "object" && !Array.isArray(r) && ("docs" in r || "docinfo" in r) ? (r as { docs?: unknown }).docs : r) ?? [];
+        const docs = (Array.isArray(box) ? box : [box]).filter((d): d is Record<string, unknown> => !!d && typeof d === "object" && !!(d as { doctype?: unknown }).doctype);
+        const locals = (globals.locals ??= {}) as Record<string, Record<string, unknown>>;
+        for (const d of docs) {
+          if (!d.name) {
+            d.name = `new-${deskSlug(String(d.doctype))}-${Math.random().toString(36).slice(2, 12)}`;
+            d.__islocal = 1;
+          }
+          (locals[String(d.doctype)] ??= {})[String(d.name)] = d;
+        }
+        return docs;
+      },
       with_doc: async (dt: string, dn: string, cb?: (name: string, r: unknown) => unknown) => {
         const d = (await call({ method: "frappe.client.get", args: { doctype: dt, name: dn } })).message as Record<string, unknown>;
         const locals = (globals.locals ??= {}) as Record<string, Record<string, unknown>>;
@@ -417,6 +436,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       const p = flat.length === 1 && flat[0].includes("/") ? flat[0].replace(/^\/?(app|desk)\//, "").split("/").map(decodeURIComponent) : flat;
       const options = frappe.route_options as Record<string, unknown> | null;
       frappe.route_options = null;
+      // ("Form", dt, <an unsaved local doc>) → the new form, pre-filled with that doc (Desk opens the local doc)
+      const local = p[0] === "Form" && p[1] && p[2] ? ((globals.locals as Record<string, Record<string, Record<string, unknown>>> | undefined)?.[p[1]]?.[p[2]]) : undefined;
+      if (local?.__islocal && typeof sessionStorage !== "undefined") {
+        const values = Object.fromEntries(Object.entries(local).filter(([k]) => k !== "name" && k !== "__islocal"));
+        sessionStorage.setItem(PREFILL_KEY(p[1]), JSON.stringify(values));
+        ctx.navigate?.(deskRouteToUrl(["Form", p[1]], options) ?? `/desk/doctype/${encodeURIComponent(p[1])}/new`);
+        return Promise.resolve();
+      }
       const url = deskRouteToUrl(p, options);
       if (url) ctx.navigate?.(url);
       return Promise.resolve();
