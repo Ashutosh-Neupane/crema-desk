@@ -49,7 +49,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import { FormSkeleton } from "@/components/Skeleton";
 import { INDICATOR_PILL } from "@/lib/list/indicator";
-import type { DocTypeMeta } from "@/lib/frappe/types";
+import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+import TableMultiSelectField from "@/lib/crema-form/controls/TableMultiSelectField";
 
 const enc = encodeURIComponent;
 
@@ -751,7 +752,20 @@ export default function DocForm({ doctype, name }: Props) {
             onChange={(f, v) => void ctl.set_value(f, v)}
             onButton={(f) => void ctl.trigger(f)}
             getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
-            renderTable={(df) => (
+            renderTable={(df) =>
+              df.fieldtype === "Table MultiSelect" ? (
+                <TableMultiSelectField
+                  field={df as DocField}
+                  value={doc[df.fieldname]}
+                  onChange={(v) => void ctl.set_value(df.fieldname, v)}
+                  onAddRow={(values) => ctl.add_child(df.fieldname, values)}
+                  onRemoveRow={(row) => ctl.remove_rows(df.fieldname, [String(row.name)])}
+                  disabled={readOnly && !df.allow_on_submit}
+                  error={snap.errors[df.fieldname]}
+                  getQuery={() => ctl.getQuery(df.fieldname)?.(ctl.getDoc())}
+                  doc={doc}
+                />
+              ) : (
               <Grid
                 ctl={ctl}
                 df={df}
@@ -760,7 +774,8 @@ export default function DocForm({ doctype, name }: Props) {
                 overrides={snap.overrides}
                 errors={snap.errors}
               />
-            )}
+              )
+            }
             renderHtml={(df) => {
               const widget = getHtmlWidget(doctype, df.fieldname);
               return widget ? widget({ ctl, readOnly }) : <HtmlHost el={ctl.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />;
