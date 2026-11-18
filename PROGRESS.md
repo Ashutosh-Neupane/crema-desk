@@ -2,6 +2,16 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4: Rating, Duration, Phone, Barcode, Geolocation store Desk's values
+- Five controls wrote values Desk can't read; each is now ported from its Desk control: Rating a fraction with half
+  stars (was the star count), Duration seconds with Desk's "1d 2h 3m 4s" text and picker (was "HH:MM:SS"), Phone
+  "+977-98…" with all countries and the site's country preselected (was "+977 98…", 14 countries), Barcode the SVG
+  Desk prints (was the raw value; EAN now validated), Geolocation GeoJSON on Leaflet / OpenStreetMap with drawing
+  tools (was {lat, lng} on Google Maps). Lists and reports already formatted Desk's values.
+- e2e: controls (new — a document written in Desk's format opens clean, Crema's edits are saved in Desk's format).
+  formsave, dialogs, form.salesorder green.
+- Next: the remaining 🟡 controls (Color, Password, Signature, Icon, Autocomplete, Table MultiSelect, dialog-only).
+
 ## 2026-11-18 — M4: code editors like Desk; phase-1 plan for today
 - Code / HTML Editor / Markdown Editor / JSON are one CodeMirror control ported from Desk's `code.js` family. Fixed
   on the way: HTML Editor was a WYSIWYG box (Desk edits HTML as code with a preview); Markdown preview used a regex

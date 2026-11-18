@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from "react";
 import type { FieldControlProps } from "./index";
+import { barcodeSvg, barcodeValue } from "@/lib/frappe/barcode";
+import { sanitizeHtml } from "@/lib/report/columns";
 
 /**
- * Barcode field — maps to Frappe fieldtype "Barcode".
+ * Barcode field (Desk: form/controls/barcode.js) — stored as the barcode's SVG (data-barcode-value holds the text),
+ * drawn below the input; the typed value is committed on blur / Enter (an EAN is invalid until complete).
  * - Text input for manual barcode entry.
  * - Camera scan button: opens a dialog with live <video> + BarcodeDetector API.
  * - Falls back gracefully if BarcodeDetector is not available (shows text-only mode).
@@ -18,8 +21,36 @@ function useHasBarcodeDetector() {
 }
 
 export default function BarcodeField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
-  const str = typeof value === "string" ? value : "";
+  const stored = typeof value === "string" ? value : "";
+  const str = barcodeValue(stored);
+  const [text, setText] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<string | null>(null);
   const isDisabled = disabled || !!field.read_only;
+  // barcode.js parse: a value becomes its SVG; an invalid one is not stored
+  const commit = (v: string) => {
+    setText(null);
+    if (v === str) return;
+    if (!v) {
+      setInvalid(null);
+      onChange("");
+      return;
+    }
+    try {
+      onChange(barcodeSvg(v, field.options));
+      setInvalid(null);
+    } catch (e) {
+      setInvalid(`Invalid Barcode: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  // a stored plain value (written by an import or a script) is drawn as Desk does on load
+  let svg = stored.startsWith("<svg") ? stored : "";
+  if (!svg && stored && typeof document !== "undefined") {
+    try {
+      svg = barcodeSvg(stored, field.options);
+    } catch {
+      svg = "";
+    }
+  }
   const hasBarcodeDetector = useHasBarcodeDetector();
 
   const [scanning, setScanning] = useState(false);
@@ -55,7 +86,7 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
             try {
               const barcodes = await detector.detect(videoRef.current);
               if (barcodes.length > 0) {
-                onChange(barcodes[0].rawValue);
+                commit(barcodes[0].rawValue);
                 stopCamera();
                 return;
               }
@@ -70,7 +101,8 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
       setCameraError(msg);
       stopCamera();
     }
-  }, [onChange, stopCamera, hasBarcodeDetector]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopCamera, hasBarcodeDetector]);
 
   // Cleanup on unmount
   useEffect(() => () => stopCamera(), [stopCamera]);
@@ -82,8 +114,15 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
         <input
           type="text"
           id={inputId ?? field.fieldname}
-          value={str}
-          onChange={(e) => onChange(e.target.value)}
+          value={text ?? str}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => text !== null && commit(text.trim())}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && text !== null) {
+              e.preventDefault();
+              commit(text.trim());
+            }
+          }}
           disabled={isDisabled}
           placeholder="Barcode / QR value"
           aria-label={field.label || field.fieldname}
@@ -134,6 +173,12 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
         </div>
       )}
 
+      {svg && <div data-barcode className="max-w-sm rounded-md bg-white p-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(svg) }} />}
+      {invalid && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {invalid}
+        </p>
+      )}
       {cameraError && (
         <p role="alert" className="text-xs text-red-600 dark:text-red-400">
           Camera error: {cameraError}
