@@ -174,10 +174,16 @@ Order of work: the milestones in § 0.1.
   "2:30 pm"), the site's `time_format`, no native `<input type="time">`; also in grids, bulk edit, report view and
   report filters — `e2e/timepicker.mjs`.
 - 🟡 Exist but not verified against Desk:
-  Markdown Editor, HTML Editor, JSON, Small/Long Text, Duration, Rating, Color (`color_picker/`), Phone
+  Small/Long Text, Duration, Rating, Color (`color_picker/`), Phone
   (`phone_picker/`, country codes), Password (strength meter), Signature, Barcode (+ camera scanner), Geolocation (map
   draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
   MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
+- ✅ Code, HTML Editor, Markdown Editor, JSON (`controls/code.js`, `html_editor.js`, `markdown_editor.js`, `json.js`):
+  one CodeMirror control with Desk's behaviour — Desk's language map (no options → plain text), 300px with
+  Expand / Collapse unless `max_lines` / `min_lines` / `max_height`, `wrap`, Copy to Clipboard when read-only,
+  `autocompletions` from `set_df_property` (Server Script, System Console); HTML Editor is code + Preview (scripts
+  removed) — it was a WYSIWYG box; Markdown Editor is code + Preview through `frappe.markdown` (showdown 2.1.0 +
+  Desk's sanitizer, also exposed to app scripts) and uploads dropped images as `![](url)` — `e2e/editors.mjs`.
 - ❌ Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
 - ✅ Data `options` validation (`lib/crema-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
   Phone, URL, Name — red field + message, `aria-invalid`; native email/tel/url inputs — `e2e/datavalidation.mjs`

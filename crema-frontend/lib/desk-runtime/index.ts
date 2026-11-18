@@ -8,6 +8,7 @@
  *
  * What's covered grows as views need it; anything DOM-specific is a no-op.
  */
+import { markdownToHtml } from "@/lib/frappe/markdown";
 import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
@@ -217,6 +218,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
   };
 
   const frappe = {
+    // tools.js frappe.markdown: showdown + Desk's sanitizer
+    markdown: (txt: unknown) => markdownToHtml(txt),
     // registries app JS assigns into directly (Desk predefines them)
     listview_settings: {} as Record<string, Record<string, unknown>>,
     treeview_settings: {} as Record<string, Record<string, unknown>>,
