@@ -25,7 +25,8 @@ await side.waitFor({ timeout: 90000 });
 step("assign");
 await side.getByRole("button", { name: "Add assignment" }).click();
 await side.getByPlaceholder("Assign to user").fill("Administrator");
-await page.getByRole("option", { name: /Administrator/ }).first().click();
+// the user named Administrator, not another account whose full name is "Administrator" (shown with its email)
+await page.getByRole("option", { name: /Administrator/ }).filter({ hasNotText: "@" }).first().click();
 await side.getByRole("button", { name: "Remove assignment Administrator" }).waitFor({ timeout: 20000 });
 check(String(await field("_assign")).includes("Administrator"), "assigned on the server");
 

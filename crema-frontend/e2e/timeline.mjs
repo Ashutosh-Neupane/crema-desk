@@ -37,8 +37,10 @@ step("comment with @mention");
 const box = activity.getByLabel("Add a comment");
 await box.click();
 await box.pressSequentially("Please check @Admin", { delay: 30 });
-await page.getByRole("listbox", { name: "Mention a user" }).getByRole("option").first().waitFor({ timeout: 15000 });
-await box.press("Enter");
+// the user Administrator, not another account whose full name is "Administrator" (listed with its email)
+const admin = page.getByRole("listbox", { name: "Mention a user" }).getByRole("option").filter({ hasNotText: "@" }).first();
+await admin.waitFor({ timeout: 15000 });
+await admin.dispatchEvent("mousedown");
 await box.pressSequentially("thanks");
 await activity.getByRole("button", { name: "Post comment" }).click();
 const comment = activity.getByLabel(/^Comment by /).first();
