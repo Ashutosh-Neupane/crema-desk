@@ -113,6 +113,8 @@ export default function GeolocationField({ field, value, onChange, disabled }: F
     }
   };
 
+  // map.on listeners belong to the map; the cleanup's map.remove() drops them with it
+  // react-doctor-disable-next-line effect-needs-cleanup
   useEffect(() => {
     let dead = false;
     const el = host.current;

@@ -189,9 +189,13 @@ Order of work: the milestones in § 0.1.
   for the saved mask. Color: empty stays empty (showed #000000), Desk's swatches, only #RRGGBB stored. Icon: every
   symbol in Desk's sprites (lucide + timeless, ~2,000; was 80 names) — "Emojis" option not ported. Signature: PNG
   data URL, as jSignature `getData` writes.
-- 🟡 Exist but not verified against Desk:
-  Small/Long Text, MultiSelect / MultiSelect Pills / MultiSelect List, MultiCheck, Button, Heading, Date Range,
-  Switch, Comment.
+- ✅ Dialog controls return what Desk's do (`multiselect.js`, `multiselect_pills.js`, `multiselect_list.js`,
+  `multicheck.js`, `date_range.js`, `switch.js`) — `e2e/controls3.mjs`: MultiSelect "a, b" (was an array),
+  MultiSelect Pills an array (wasn't routed), MultiSelect List an array with "N values selected", search, Select All /
+  Clear All, MultiCheck an array of values with `{label, value, checked}` options, sorting, `columns`, `select_all`
+  (it read only lines), Date Range [from, to] (was {from, to} behind an Apply button), Switch 0/1; options as lines,
+  JSON, items or `get_data(txt)`; no doubled labels.
+- 🟡 Exist but not verified against Desk: Small/Long Text, Button, Heading, Comment.
 - ✅ Code, HTML Editor, Markdown Editor, JSON (`controls/code.js`, `html_editor.js`, `markdown_editor.js`, `json.js`):
   one CodeMirror control with Desk's behaviour — Desk's language map (no options → plain text), 300px with
   Expand / Collapse unless `max_lines` / `min_lines` / `max_height`, `wrap`, Copy to Clipboard when read-only,
@@ -390,7 +394,7 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ Auto Email Report setup, Notification (doctype) preview, Newsletter send/schedule dialogs.
 
 ### 2.14 Hardening
-- ❌ React Doctor warnings (~110); split DocForm/ListView further.
+- 🟡 React Doctor: 0 errors, score 57 (2026-11-18; was 35 with 7 errors); ~235 warnings left (complexity, index keys, Set lookups). Split DocForm/ListView further.
 - ❌ Virtualized lists and report grids for large data.
 - ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
 - ✅ Mobile layouts (M6): fluid spacing tokens (`--space-*` with `clamp()`, Tailwind `p-gutter` / `gap-field` …), form

@@ -131,7 +131,7 @@ export function applyLinkFilters(doctype: string, filters: unknown, linkFilters:
       try {
         // site-defined expression, evaluated like Desk's frappe.utils.eval (same as depends_on in dependsOn.ts)
         // eslint-disable-next-line no-new-func
-        value = new Function("doc", "parent", "frappe", `"use strict"; return (${value.slice(5)});`)(doc ?? {}, doc?.parenttype ? (g.cur_frm?.doc ?? null) : null, g.frappe);
+        value = new Function("doc", "parent", "frappe", `"use strict"; return (${value.slice(5)});`)(doc ?? {}, doc?.parenttype ? (g.cur_frm?.doc ?? null) : null, g.frappe); // react-doctor-disable-line no-eval
       } catch (e) {
         console.error("link_filters eval failed:", value, e);
         value = undefined;

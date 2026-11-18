@@ -47,6 +47,8 @@ function QuillBox({ html, onChange, field, inputId, error, compact }: { html: st
   const label = field.label || field.fieldname;
   const maxHeight = typeof field.max_height === "string" && field.max_height ? field.max_height : undefined;
 
+  // q.on listeners belong to the editor; the cleanup empties the host, which drops the editor with them
+  // react-doctor-disable-next-line effect-needs-cleanup
   useEffect(() => {
     let dead = false;
     const el = host.current;

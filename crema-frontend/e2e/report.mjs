@@ -32,7 +32,9 @@ check(await page.locator("tfoot").getByText("Total").isVisible(), "total row");
 await shot("report_so_analysis");
 
 step("search + sort");
-await page.getByLabel("Search in report").fill("SAL-ORD-2026-00003");
+// a Sales Order from this site's data (any bench)
+const soName = (await page.locator("tbody a[href^='/desk/doctype/Sales%20Order/']").first().innerText()).trim();
+await page.getByLabel("Search in report").fill(soName);
 await page.waitForTimeout(400);
 const filtered = await page.locator("tbody tr").count();
 check(filtered > 0 && filtered < rows, `search narrows rows (${filtered}/${rows})`);

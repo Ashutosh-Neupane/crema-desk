@@ -139,16 +139,16 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
       /* private window: defaults */
     }
   }, [prefsKey]);
-  const setPref = (patch: Prefs) =>
-    setPrefs((p) => {
-      const next = { ...p, ...patch };
-      try {
-        localStorage.setItem(prefsKey, JSON.stringify(next));
-      } catch {
-        /* not persisted */
-      }
-      return next;
-    });
+  // the updater stays pure (React may run it twice); the write happens once, outside it
+  const setPref = (patch: Prefs) => {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    try {
+      localStorage.setItem(prefsKey, JSON.stringify(next));
+    } catch {
+      /* not persisted */
+    }
+  };
   const paper = PAPERS.find((x) => x.key === prefs.paper) ?? PAPERS[0];
   const doctype = b.doc ? String(b.doc.doc_type ?? "") : "";
   const readOnly = b.doc?.standard === "Yes";

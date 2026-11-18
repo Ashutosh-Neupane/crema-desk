@@ -91,22 +91,26 @@ export default function GanttView({ doctype }: { doctype: string }) {
   // drag: move (whole bar) or resize (right edge); preview locally, save on release
   const [drag, setDrag] = useState<{ id: string; mode: "move" | "resize"; startX: number; days: number } | null>(null);
   const dragRef = useRef(drag);
-  dragRef.current = drag;
+  // the pointer handlers read the ref; it is written only here, in event handlers (never during render)
+  const putDrag = (d: typeof drag) => {
+    dragRef.current = d;
+    setDrag(d);
+  };
   const begin = (e: React.PointerEvent, id: string, mode: "move" | "resize") => {
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDrag({ id, mode, startX: e.clientX, days: 0 });
+    putDrag({ id, mode, startX: e.clientX, days: 0 });
   };
   const moveDrag = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
     const days = Math.round((e.clientX - d.startX) / px);
-    if (days !== d.days) setDrag({ ...d, days });
+    if (days !== d.days) putDrag({ ...d, days });
   };
   const endDrag = async () => {
     const d = dragRef.current;
-    setDrag(null);
+    putDrag(null);
     if (!d || !d.days || !fm) return;
     const bar = bars.find((b) => b.id === d.id);
     if (!bar) return;
