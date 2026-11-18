@@ -8,8 +8,13 @@
  *  - select rows → Delete / Duplicate; per-row insert below, move up/down
  *  - every change goes through the FormController, so child events
  *    (item_code(frm, cdt, cdn), qty…) and fetch_from run exactly once
+ *  - keyboard like Desk (grid_row.js set_arrow_keys): ↑/↓ same column in the next row, Tab off the last cell goes
+ *    to the next row (adds one at the end), Ctrl/⌘+↓/↑ inserts below/above, Ctrl/⌘+Shift+↓/↑ adds at the end/start,
+ *    Shift+Alt+↓ duplicates, Esc drops a new empty row
+ *  - paste from a spreadsheet like Desk (controls/table.js): tab-separated rows fill down from the cell, adding rows;
+ *    a header row of labels / fieldnames picks the columns
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Download, GripVertical, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -23,11 +28,24 @@ import FormBody from "@/components/form/FormBody";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
+import { userToStr } from "@/lib/frappe/format";
 import { currencyFor } from "@/lib/crema-form/controls/NumberField";
 import { useIsPhone } from "@/lib/hooks/useIsPhone";
 
 const NO_VALUE = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading", "Image", "Table", "Table MultiSelect"]);
 const NUMERIC = new Set(["Int", "Float", "Currency", "Percent"]);
+/** Desk set_arrow_keys ignore_fieldtypes: ↑/↓ stay in the text unless Alt is held */
+const TEXTY = new Set(["Text", "Small Text", "Code", "Text Editor", "HTML Editor", "Long Text"]);
+const FOCUSABLE = "input:not([disabled]),select:not([disabled])";
+const isEmpty = (v: unknown) => v == null || v === "" || v === 0;
+/** Desk table.js value_formatter_map: pasted text → the field's value */
+function pastedValue(v: string, fieldtype: string): unknown {
+  const t = v.trim();
+  if (fieldtype === "Int" || fieldtype === "Check") return Math.trunc(Number(t.replace(/,/g, "")) || 0);
+  if (fieldtype === "Float" || fieldtype === "Currency" || fieldtype === "Percent") return Number(t.replace(/,/g, "")) || 0;
+  if (fieldtype === "Date") return !t || /^\d{4}-\d{2}-\d{2}/.test(t) ? t : userToStr(t);
+  return v;
+}
 
 /** Desk grid default widths (grid_row.js setup_columns) */
 const PAGE_SIZE = 50;
@@ -36,8 +54,8 @@ const csvCell = (v: unknown) => {
   const t = v == null ? "" : String(v);
   return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };
-/** Minimal RFC 4180 parser (quoted fields, escaped quotes, CRLF) */
-function parseCsv(text: string): string[][] {
+/** Minimal RFC 4180 parser (quoted fields, escaped quotes, CRLF); `sep` "\t" reads spreadsheet clipboard text */
+function parseCsv(text: string, sep = ","): string[][] {
   const out: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -51,7 +69,7 @@ function parseCsv(text: string): string[][] {
       } else if (ch === '"') q = false;
       else cell += ch;
     } else if (ch === '"') q = true;
-    else if (ch === ",") {
+    else if (ch === sep) {
       row.push(cell);
       cell = "";
     } else if (ch === "\n" || ch === "\r") {
@@ -163,22 +181,23 @@ function Cell({
   if (NUMERIC.has(df.fieldtype)) return <NumberCell df={df} value={value} display={display} onCommit={set} className={base} />;
   if (df.fieldtype === "Date") return <DatePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
   if (df.fieldtype === "Time") return <TimePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
-  return <TextCell value={String(value ?? "")} onCommit={set} className={base} />;
+  return <TextCell value={String(value ?? "")} onCommit={set} className={base} label={df.label ?? df.fieldname} />;
 }
 
 function NumberCell({ df, value, display, onCommit, className }: { df: DocField; value: unknown; display: string; onCommit: (v: unknown) => void; className: string }) {
-  const [editing, setEditing] = useState<string | null>(null);
+  // `typed` only once the user edits: a value set while the cell has focus (paste, scripts) isn't overwritten on blur
+  const [editing, setEditing] = useState<{ text: string; typed: boolean } | null>(null);
   const num = value == null || value === "" ? null : Number(value);
   return (
     <input
       inputMode="decimal"
-      value={editing ?? display}
+      value={editing?.typed ? editing.text : editing ? (num == null ? "" : String(num)) : display}
       aria-label={df.label ?? df.fieldname}
-      onFocus={() => setEditing(num == null ? "" : String(num))}
-      onChange={(e) => setEditing(e.target.value)}
+      onFocus={() => setEditing({ text: num == null ? "" : String(num), typed: false })}
+      onChange={(e) => setEditing({ text: e.target.value, typed: true })}
       onBlur={() => {
-        if (editing === null) return;
-        const raw = editing.replace(/,/g, "").trim();
+        if (!editing?.typed) return setEditing(null);
+        const raw = editing.text.replace(/,/g, "").trim();
         setEditing(null);
         const next = raw === "" ? null : Number(raw);
         if (next !== num && !(next !== null && Number.isNaN(next))) onCommit(next);
@@ -189,12 +208,12 @@ function NumberCell({ df, value, display, onCommit, className }: { df: DocField;
   );
 }
 
-function TextCell({ value, onCommit, className }: { value: string; onCommit: (v: unknown) => void; className: string }) {
+function TextCell({ value, onCommit, className, label }: { value: string; onCommit: (v: unknown) => void; className: string; label: string }) {
+  // null until the user types, so a value set while focused (paste, scripts) isn't overwritten on blur
   const [text, setText] = useState<string | null>(null);
   return (
-    <input aria-label="Value"
+    <input aria-label={label}
       value={text ?? value}
-      onFocus={() => setText(value)}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => {
         if (text !== null && text !== value) onCommit(text || null);
@@ -298,10 +317,137 @@ export default function Grid({
     setEditing(null);
   };
 
+  const copyOf = (r: Row) => Object.fromEntries(Object.entries(r).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k)));
   const insertAt = async (at: number, copyFrom?: Row) => {
-    const copy = copyFrom ? Object.fromEntries(Object.entries(copyFrom).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k))) : {};
-    const r = await ctl.add_child(table, copy, at);
+    const r = await ctl.add_child(table, copyFrom ? copyOf(copyFrom) : {}, at);
     setEditing(r.name);
+  };
+
+  // ---- keyboard and paste (cells carry data-cell="<row index>:<column index>") ----
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const cellAt = (el: EventTarget | null) => {
+    const c = (el as HTMLElement | null)?.closest<HTMLElement>("[data-cell]");
+    if (!c || !bodyRef.current?.contains(c)) return null;
+    const [r, col] = c.dataset.cell!.split(":").map(Number);
+    return { r, col };
+  };
+  /** columns of row `r` holding an enabled input, in order */
+  const editableCols = (r: number) =>
+    [...(bodyRef.current?.querySelectorAll<HTMLElement>(`[data-cell^="${r}:"]`) ?? [])].filter((c) => c.querySelector(FOCUSABLE)).map((c) => Number(c.dataset.cell!.split(":")[1]));
+  /** focus a cell once it renders (new rows, other pages); col "first" / "last" = first / last editable cell */
+  const focusCell = (r: number, col: number | "first" | "last") => {
+    const p = Math.floor(r / PAGE_SIZE);
+    if (p !== curPage) setPage(p);
+    let tries = 0;
+    const attempt = () => {
+      const editable = editableCols(r);
+      const c = col === "first" ? editable[0] : col === "last" ? editable[editable.length - 1] : col;
+      const input = c === undefined ? null : bodyRef.current?.querySelector<HTMLElement>(`[data-cell="${r}:${c}"]`)?.querySelector<HTMLInputElement>(FOCUSABLE);
+      if (input) {
+        input.focus();
+        if (input.type !== "checkbox") input.select?.();
+      } else if (tries++ < 20) setTimeout(attempt, 50);
+    };
+    // existing cells take focus at once (typing straight after ↓ must land in the new cell); new rows render first
+    attempt();
+  };
+  const onGridKeyDown = (e: React.KeyboardEvent) => {
+    if (tableReadOnly) return;
+    const at = cellAt(e.target);
+    if (!at) return;
+    const { r, col } = at;
+    const row = rows[r];
+    const input = e.target as HTMLInputElement;
+    const texty = TEXTY.has(cols[col]?.fieldtype ?? "");
+    const mod = e.metaKey || e.ctrlKey;
+    const vertical = e.key === "ArrowDown" || e.key === "ArrowUp";
+    const down = e.key === "ArrowDown";
+    if (vertical && mod && !texty) {
+      // Desk add_new_row_using_keys: Ctrl+↓/↑ insert below/above, Ctrl+Shift+↓/↑ add at the end/start
+      e.preventDefault();
+      if (cannotAdd) return;
+      const to = e.shiftKey ? (down ? rows.length : 0) : down ? r + 1 : r;
+      void ctl.add_child(table, {}, to).then(() => focusCell(to, "first"));
+      return;
+    }
+    if (down && e.shiftKey && e.altKey) {
+      // Desk duplicate_row_using_keys
+      e.preventDefault();
+      if (cannotAdd || !row) return;
+      void ctl.add_child(table, copyOf(row), r + 1).then(() => focusCell(r + 1, "first"));
+      return;
+    }
+    if (vertical) {
+      // an open suggestion list (Link) keeps the arrows; text fields need Alt
+      if (input.getAttribute("aria-expanded") === "true" || (texty && !e.altKey)) return;
+      const to = down ? r + 1 : r - 1;
+      if (to < 0 || to >= rows.length) return;
+      e.preventDefault();
+      focusCell(to, col);
+      return;
+    }
+    if (e.key === "Tab") {
+      const editable = editableCols(r);
+      if (!e.shiftKey && col === editable[editable.length - 1]) {
+        if (r < rows.length - 1) {
+          e.preventDefault();
+          focusCell(r + 1, "first");
+        } else if (!cannotAdd) {
+          e.preventDefault();
+          void ctl.add_child(table, {}).then(() => focusCell(r + 1, "first"));
+        }
+      } else if (e.shiftKey && col === editable[0] && r > 0) {
+        e.preventDefault();
+        focusCell(r - 1, "last");
+      }
+      return;
+    }
+    if (e.key === "Escape" && !e.shiftKey && row?.__islocal && !cannotDelete && !input.value && cols.every((c) => isEmpty(row[c.fieldname]))) {
+      // Desk: Esc on a new row nobody filled in removes it
+      e.preventDefault();
+      void ctl.remove_rows(table, [row.name]);
+      if (r > 0) focusCell(r - 1, col);
+    }
+  };
+  const fieldFor = (name: string) => {
+    const n = name.trim().toLowerCase();
+    return (meta.fields ?? []).find((f) => !NO_VALUE.has(f.fieldtype) && (f.fieldname.toLowerCase() === n || (f.label ?? "").toLowerCase() === n));
+  };
+  const onGridPaste = async (e: React.ClipboardEvent) => {
+    const input = e.target as HTMLInputElement;
+    const at = cellAt(input);
+    if (tableReadOnly || !at || input.tagName !== "INPUT" || input.type === "checkbox") return;
+    const data = parseCsv(e.clipboardData.getData("text/plain"), "\t");
+    // Excel adds a trailing newline to every copy
+    while (data.length && !data[data.length - 1].some((v) => v.trim())) data.pop();
+    // one value pastes into the cell as usual
+    if (!data.length || (data.length === 1 && data[0].length === 1)) return;
+    e.preventDefault();
+    // a header row of labels / fieldnames picks the columns; otherwise the visible columns from this one on
+    let fields: Array<DocField | undefined>;
+    if (data[0][0] && fieldFor(data[0][0])) fields = data.shift()!.map(fieldFor);
+    else fields = cols.slice(at.col);
+    const needed = at.r + data.length;
+    while (((ctl.getDoc()[table] as Row[]) ?? []).length < needed && !cannotAdd) {
+      // in order, each add fires <table>_add like Desk
+      // react-doctor-disable-next-line async-await-in-loop
+      await ctl.add_child(table, {});
+    }
+    let n = 0;
+    for (const [k, line] of data.entries()) {
+      const target = ((ctl.getDoc()[table] as Row[]) ?? [])[at.r + k];
+      if (!target || !line.some((v) => v.trim())) continue;
+      const values: Record<string, unknown> = {};
+      line.forEach((v, i) => {
+        const f = fields[i];
+        if (f && !f.read_only) values[f.fieldname] = pastedValue(v, f.fieldtype);
+      });
+      // one row at a time so each row's events (item_code → rate …) run like Desk's set_value
+      // react-doctor-disable-next-line async-await-in-loop
+      await ctl.set_child_value(target.doctype, target.name, values);
+      n++;
+    }
+    toast.success(`Pasted ${n} row${n === 1 ? "" : "s"} into ${df.label ?? table}`);
   };
 
   return (
@@ -356,7 +502,7 @@ export default function Grid({
         </ul>
       ) : (
         <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
+          <div ref={bodyRef} className="min-w-[640px]" onKeyDown={onGridKeyDown} onPaste={(e) => void onGridPaste(e)}>
             <div className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
               <div className="flex justify-center py-2">
                 {!tableReadOnly && (
@@ -405,8 +551,8 @@ export default function Grid({
                               </button>
                             )}
                           </div>
-                          {cols.map((c) => (
-                            <div key={c.fieldname} className="min-w-0 px-0.5 py-0.5">
+                          {cols.map((c, ci) => (
+                            <div key={c.fieldname} data-cell={`${i}:${ci}`} className="min-w-0 px-0.5 py-0.5">
                               <Cell
                                 df={{ ...c, ...(overrides[`${table}.${c.fieldname}`] as Partial<DocField>) }}
                                 row={row}
