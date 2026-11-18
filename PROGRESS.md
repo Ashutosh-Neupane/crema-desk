@@ -7,7 +7,10 @@ Newest entries on top. Each session: append what was done, what's verified, what
 - Button: Desk's colours, sizes and tooltip; stays visible and clickable on read-only / submitted documents (Crema hid
   it); without a form handler it runs the field's `options` method on the document (run_doc_method).
 - Heading is an <h4>; the dialog Comment control is a rich editor with Desk's Comment button, Ctrl+Enter, on_submit.
-- e2e: controls4 (new). Phase 1 status: M1–M6 done; left: fix 3 stale e2e suites, "day of work" suite, M7 minimum.
+- e2e: controls4 (new). Phase 1 status: M1–M6 done; left: "day of work" suite, M7 minimum.
+- e2e upkeep: reportsave, ledgerpreview and scripts.salesorder pass on any bench — customer / item read from the
+  site, dates compared in the site's date_format, Server Script steps only where server scripts are enabled
+  (frappe.core…server_script.enabled), cleanup in a finally block so nothing is left behind on a failure.
 
 ## 2026-11-18 — M5 done: ERPNext financial statements like Desk
 - ERPNext's own report helpers (utils.js, financial_statements.js, trends filters) load from the site's /assets and
