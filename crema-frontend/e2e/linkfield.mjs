@@ -36,7 +36,7 @@ let r = await post("frappe.client.insert", {
 check(r.ok(), `target DocType (${r.status()})`);
 const mk = async (title, active) => (await (await post("frappe.client.insert", { doc: { doctype: TARGET, title, active } })).json()).message.name;
 const alpha = await mk("Alpha Co", 1);
-const beta = await mk("Beta Co", 0);
+await mk("Beta Co", 0); // inactive: link_filters hide it
 const gamma = await mk("Gamma Co", 1);
 r = await post("frappe.client.insert", {
   doc: {
