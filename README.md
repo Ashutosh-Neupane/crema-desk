@@ -118,6 +118,11 @@ scripts/                 Demo data seed for an ERPNext site
 
 ## License
 
-MIT, except where noted in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md): Crema includes assets from Frappe Framework (MIT), and a few modules ported from ERPNext, which remain under ERPNext's GPL-3.0.
+Copyright (C) 2026 Ashutosh Neupane. Crema is free software under the [GNU General Public License v3.0](LICENSE)
+(GPL-3.0-only): you may use, change and share it, and anything you distribute that is built on it must be shared
+under the same licence, with its source.
+
+Crema ports behaviour from Frappe Framework (MIT) and ERPNext (GPL-3.0) and includes some Frappe assets; their
+notices are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 Crema is an independent project and is not affiliated with Frappe Technologies.
