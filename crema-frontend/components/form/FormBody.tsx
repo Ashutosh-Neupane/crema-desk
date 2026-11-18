@@ -114,7 +114,6 @@ export default function FormBody({
     if (!hidden && (ro || readOnly) && !KEEP_WHEN_EMPTY.has(merged.fieldtype) && isEmpty(values[df.fieldname]) && sysEnabled("hide_empty_read_only_fields", true)) {
       hidden = true;
     }
-    if (merged.fieldtype === "Button" && readOnly) hidden = true;
     // read-only / submitted tables with no rows have nothing to show either
     if (!hidden && (merged.fieldtype === "Table" || merged.fieldtype === "Table MultiSelect") && (ro || (readOnly && !merged.allow_on_submit)) && isEmpty(values[df.fieldname])) hidden = true;
     return { ...merged, read_only: ro ? 1 : 0, reqd: reqd ? 1 : 0, _hidden: hidden };
@@ -146,7 +145,8 @@ export default function FormBody({
         field={df as DocField}
         value={values[df.fieldname]}
         onChange={(v) => onChange(df.fieldname, v)}
-        disabled={readOnly || !!df.read_only}
+        // button.js can_write(): a Button is always clickable, also on a read-only / submitted document
+        disabled={df.fieldtype === "Button" ? false : readOnly || !!df.read_only}
         error={errors[df.fieldname]}
         doc={parent ? { ...parent, ...values } : values}
         getQuery={getQuery?.(df.fieldname)}
