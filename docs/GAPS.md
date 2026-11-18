@@ -243,9 +243,14 @@ Order of work: the milestones in § 0.1.
 - ✅ Row extras (`list_view.js` get_meta_html): assignee avatars (click filters to that user), comment count (99+,
   always shown unless disabled), a like heart per row (`toggle_like`) and the header's "liked by me" filter, unread
   rows bold for `track_seen` DocTypes (opening one clears it) — `e2e/listrowextras.mjs`.
-- ❌ `listview_settings` hooks verification: `onload`, `refresh`, `button`, `formatters`, `get_indicator`,
-  `add_fields`, `filters`, `hide_name_column`, `primary_action`, `selectable`, `right_column`,
-  `has_indicator_for_draft`, `get_form_link`; "Edit" inline for Check fields.
+- ✅ `listview_settings` hooks (`list_view.js`, `base_list.js`, `ui/page.js`): `onload(listview)`,
+  `before_render`, `refresh(listview)`, `filters` (default when nothing is saved), `button`, `dropdown_button`,
+  `formatters` (sanitised), `hide_name_column`, plus `get_indicator`, `add_fields`, `get_form_link`,
+  `primary_action` from before. The `listview` object: `page.add_action_item` / `add_menu_item` /
+  `add_inner_button` (groups) / `set_indicator` / `set_title`, `get_checked_items`, `call_for_selected_items`,
+  `refresh`, `get_filter_value`, `filter_area.*` — `e2e/listhooks.mjs` (ERPNext Task, Frappe ToDo, a List client
+  script). ❌ Not ported: `listview.page.page_form` / jQuery access to the list's DOM (`$result`), `me.on(...)`
+  events, `has_indicator_for_draft`, "Edit" inline for Check fields.
 - ❌ Restricted-by-user-permission banner (`list_view_permission_restrictions.html`).
 - ✅ Per-user list state (`lib/list/useUserListState.ts`, Desk `model/user_settings.js`): filters + sort saved under
   `List` (+ `last_view`) and restored on a bare list URL; URL filters win — `e2e/listsettings.mjs`.

@@ -14,7 +14,12 @@ Newest entries on top. Each session: append what was done, what's verified, what
   customers); the five suites that launch Chromium directly now honour PW_CHANNEL like e2e/lib.mjs.
 - Timeline for the rest of phase 1 (~12–14 h): M5 hooks + report group-by + M4 leftovers (~3.5 h), financial
   statements (~2.5 h, licensing choice pending), "day of work" suite (~2–3 h), M7 minimum (~2–3 h). M6 is done.
-- Next in M5: listview_settings hooks, report view group-by, ERPNext financial statements.
+- listview_settings hooks: apps' onload / refresh / before_render get a Desk-like `listview` (page buttons,
+  menu and Actions items, indicator, title, checked items, call_for_selected_items, filter_area); filters
+  defaults, per-row button / dropdown_button, formatters, hide_name_column. e2e: listhooks (new).
+- Fixed on the way: tree DocType lists lost ?view=list on any filter change; ?field=value filters were dropped
+  when ?filters= was also present; a dropdown trigger given an onClick never opened.
+- Next in M5: report view group-by, ERPNext financial statements.
 
 ## 2026-11-18 — M4: dialog controls like Desk; React Doctor back to 0 errors
 - MultiSelect, MultiSelect Pills, MultiSelect List, MultiCheck, Date Range return Desk's values from a dialog
