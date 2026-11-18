@@ -34,7 +34,8 @@ export function filtersFromParams(doctype: string, params: URLSearchParams): Fil
   // ?field=value pairs (simple equality) and ?filters=[…] (the rest) together — setFilters writes both
   const out: Filter[] = [];
   params.forEach((v, k) => {
-    if (["filters", "view", "sort", "q", "new"].includes(k)) return;
+    // view options, not filters; "_…" keys are route options such as Report view's _group_by
+    if (["filters", "view", "sort", "q", "new"].includes(k) || k.startsWith("_")) return;
     out.push([doctype, k, "=", v]);
   });
   const raw = params.get("filters");

@@ -28,22 +28,19 @@ import LinkInput from "@/components/list/LinkInput";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+import { aggregateDocfield, aggregateFields, groupableFields, groupFromParam, groupingError, groupQueryArgs, groupToParam, parseGroupBy, STD_GROUP_FIELDS, toSettings, type AggregateFn, type GroupBy, type GroupBySettings } from "@/lib/report/groupBy";
 
 /** [fieldname, doctype] — Desk's report view field tuple */
 type Col = [string, string];
 type Row = Record<string, unknown> & { name: string };
-interface GroupBySettings {
-  group_by: string;
-  aggregate_function: "count" | "sum" | "avg";
-  aggregate_on?: string;
-}
 interface ReportSettings {
   fields?: Col[];
   filters?: Filter[];
   order_by?: string;
   add_totals_row?: 0 | 1;
   page_length?: number;
-  group_by?: GroupBySettings | null;
+  /** Desk's format ("`tabX`.`field`"); older Crema settings hold plain field names */
+  group_by?: Partial<GroupBySettings> | null;
 }
 
 const enc = encodeURIComponent;
@@ -116,7 +113,8 @@ export default function ReportView({ doctype, reportName }: { doctype: string; r
         order_by: s.order_by || `\`tab${doctype}\`.\`${meta.sort_field || "modified"}\` ${String(meta.sort_order || "desc").toLowerCase()}`,
         add_totals_row: s.add_totals_row ? 1 : 0,
         page_length: s.page_length || 20,
-        group_by: s.group_by?.group_by && s.group_by.aggregate_function ? s.group_by : null,
+        // ?_group_by= (a shared link, report_view.js parse_filters_from_route_options) wins over what was saved
+        group_by: groupFromParam(params.get("_group_by")) ?? (s.group_by?.group_by && s.group_by.aggregate_function ? s.group_by : null),
       });
     })();
     return () => {
@@ -139,39 +137,41 @@ export default function ReportView({ doctype, reportName }: { doctype: string; r
 
   const fields = useMemo(() => settings?.fields ?? [], [settings]);
   const filters = useMemo(() => settings?.filters ?? [], [settings]);
-  const groupBy = settings?.group_by ?? null;
+  const children = useMemo(() => metas?.children ?? [], [metas]);
+  const groupBy = useMemo(() => (meta ? parseGroupBy(settings?.group_by, meta, children) : null), [meta, settings?.group_by, children]);
+  const groupKey = groupBy ? key([groupBy.field, groupBy.doctype], doctype) : "";
+  const setGroupBy = (g: GroupBy | null) => {
+    const next = toSettings(g);
+    update({ group_by: next });
+    // get_search_params: the grouping travels in the URL so the view can be shared
+    const sp = new URLSearchParams(params.toString());
+    if (next) sp.set("_group_by", groupToParam(next));
+    else sp.delete("_group_by");
+    router.replace(`${window.location.pathname}${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
+  };
   const childDts = useMemo(() => [...new Set(fields.filter((c) => c[1] !== doctype).map((c) => c[1]))], [fields, doctype]);
 
   // columns shown: group-by mode shows [group field, aggregate]
   const viewCols: Array<{ col: Col; df: DocField; k: string }> = useMemo(() => {
     if (!meta) return [];
     if (groupBy) {
-      const gb: Col = [groupBy.group_by, doctype];
-      const aggLabel = groupBy.aggregate_function === "count" ? "Count" : `${groupBy.aggregate_function === "sum" ? "Sum" : "Average"} of ${dfOf([groupBy.aggregate_on ?? "name", doctype]).label}`;
+      const gb: Col = [groupBy.field, groupBy.doctype];
+      // a standard field (Created By, Tags, Document Status…) has no docfield in the meta
+      const std = groupBy.doctype === doctype && !meta.fields?.some((f) => f.fieldname === groupBy.field) ? STD_GROUP_FIELDS.find((f) => f.fieldname === groupBy.field) : undefined;
+      const aggDf = groupBy.aggField ? dfOf([groupBy.aggField, groupBy.aggDoctype ?? doctype]) : undefined;
       return [
-        { col: gb, df: dfOf(gb), k: groupBy.group_by },
-        { col: ["_aggregate_column", doctype], df: { fieldname: "_aggregate_column", label: aggLabel, fieldtype: groupBy.aggregate_function === "count" ? "Int" : "Float" } as DocField, k: "_aggregate_column" },
+        { col: gb, df: std ?? dfOf(gb), k: groupKey },
+        { col: ["_aggregate_column", doctype], df: aggregateDocfield(groupBy, aggDf), k: "_aggregate_column" },
       ];
     }
     return fields.map((c) => ({ col: c, df: dfOf(c), k: key(c, doctype) }));
-  }, [meta, groupBy, fields, dfOf, doctype]);
+  }, [meta, groupBy, groupKey, fields, dfOf, doctype]);
 
   // ── data ──────────────────────────────────────────────────────────────────
   const queryArgs = useMemo(() => {
     if (!settings || !meta) return null;
     if (groupBy) {
-      return {
-        doctype,
-        fields: JSON.stringify([sqlCol([groupBy.group_by, doctype])]),
-        filters: JSON.stringify(filters),
-        group_by: sqlCol([groupBy.group_by, doctype]),
-        aggregate_on_field: groupBy.aggregate_on || "name",
-        aggregate_on_doctype: doctype,
-        aggregate_function: groupBy.aggregate_function,
-        order_by: "_aggregate_column desc",
-        page_length: settings.page_length,
-        view: "Report",
-      };
+      return { doctype, ...groupQueryArgs(groupBy, doctype), filters: JSON.stringify(filters), page_length: settings.page_length, view: "Report" };
     }
     const sel = fields.map((c) => (c[1] === doctype ? sqlCol(c) : `${sqlCol(c)} as '${c[1]}:${c[0]}'`));
     // fetch what editing needs: docstatus, child row names, currency fields for Currency columns
@@ -356,17 +356,16 @@ export default function ReportView({ doctype, reportName }: { doctype: string; r
         </Popover>
         <Popover open={groupOpen} onOpenChange={setGroupOpen}>
           <PopoverTrigger className={btn}>
-            <Layers className="h-3.5 w-3.5" aria-hidden /> {groupBy ? `Grouped by ${dfOf([groupBy.group_by, doctype]).label}` : "Group By"}
+            <Layers className="h-3.5 w-3.5" aria-hidden /> {groupBy ? (
+              <>
+                Grouped by <b>{viewCols[0]?.df.label ?? groupBy.field}</b>
+              </>
+            ) : (
+              "Add Group"
+            )}
           </PopoverTrigger>
           <PopoverContent className="w-80">
-            <GroupByEditor
-              meta={meta}
-              value={groupBy}
-              onChange={(g) => {
-                update({ group_by: g });
-                setGroupOpen(false);
-              }}
-            />
+            <GroupByEditor meta={meta} childMetas={children} value={groupBy} onChange={setGroupBy} />
           </PopoverContent>
         </Popover>
         <button type="button" className={btn} onClick={() => setPicker(true)}>
@@ -460,11 +459,15 @@ export default function ReportView({ doctype, reportName }: { doctype: string; r
                         <Link href={`/desk/doctype/${enc(doctype)}/${enc(r.name)}`} className="whitespace-nowrap font-medium text-zinc-900 hover:underline dark:text-zinc-100">
                           {String(v)}
                         </Link>
-                      ) : groupBy && k === groupBy.group_by ? (
+                      ) : groupBy && k === groupKey ? (
                         <button
                           type="button"
                           className="hover:underline"
-                          onClick={() => update({ group_by: null, filters: [...filters, [doctype, groupBy.group_by, v == null ? "is" : "=", v ?? "not set"]] })}
+                          onClick={() => {
+                            // drill down: the rows of this group, ungrouped
+                            update({ filters: [...filters, [groupBy.doctype, groupBy.field, v == null ? "is" : "=", v ?? "not set"]] });
+                            setGroupBy(null);
+                          }}
                         >
                           {text || "Not set"}
                         </button>
@@ -593,54 +596,89 @@ function CellEditor({ df, value, onCommit, onCancel }: { df: DocField; value: un
   }
 }
 
-function GroupByEditor({ meta, value, onChange }: { meta: DocTypeMeta; value: GroupBySettings | null; onChange: (g: GroupBySettings | null) => void }) {
-  const groupable = (meta.fields ?? []).filter((f) => ["Select", "Link", "Data", "Date", "Check"].includes(f.fieldtype) && !f.hidden);
-  const numeric = (meta.fields ?? []).filter((f) => NUMERIC.has(f.fieldtype) && !f.hidden);
-  const [g, setG] = useState<GroupBySettings>(value ?? { group_by: groupable.find((f) => f.fieldname === "status")?.fieldname ?? groupable[0]?.fieldname ?? "owner", aggregate_function: "count" });
+/** group_by.html: group field, aggregate function and (sum / avg) the field — applied as soon as it is complete */
+function GroupByEditor({ meta, childMetas, value, onChange }: { meta: DocTypeMeta; childMetas: DocTypeMeta[]; value: GroupBy | null; onChange: (g: GroupBy | null) => void }) {
+  const groups = useMemo(() => groupableFields(meta, childMetas), [meta, childMetas]);
+  const aggs = useMemo(() => aggregateFields(meta, childMetas), [meta, childMetas]);
+  // a choice not yet applied (sum / avg without a field, or refused); otherwise what is applied
+  const [pending, setPending] = useState<GroupBy | null>(null);
+  const draft = pending ?? value;
+  const [error, setError] = useState("");
+  const enc2 = (dt: string, f: string) => `${dt}::${f}`;
+  const dec = (v: string) => v.split("::") as [string, string];
+  const fn = draft?.fn ?? "count";
+  const apply = (g: GroupBy) => {
+    const err = g.field ? groupingError(g, meta.name) : null;
+    setError(err ?? "");
+    // apply_group_by: only once the group field and, for sum / avg, the field are chosen
+    const complete = !err && !!g.field && (g.fn === "count" || !!g.aggField);
+    setPending(complete ? null : g);
+    if (complete) onChange(g);
+  };
   const sel = "h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+  const label = (dt: string, f: DocField) => `${f.label || f.fieldname}${dt === meta.name ? "" : ` (${dt})`}`;
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Group By
-        <select aria-label="Group by field" className={`${sel} mt-1`} value={g.group_by} onChange={(e) => setG({ ...g, group_by: e.target.value })}>
-          <option value="owner">Created By</option>
-          {groupable.map((f) => (
-            <option key={f.fieldname} value={f.fieldname}>
-              {f.label ?? f.fieldname}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Aggregate
-        <select aria-label="Aggregate function" className={`${sel} mt-1`} value={g.aggregate_function} onChange={(e) => setG({ ...g, aggregate_function: e.target.value as GroupBySettings["aggregate_function"], aggregate_on: e.target.value === "count" ? undefined : (g.aggregate_on ?? numeric[0]?.fieldname) })}>
-          <option value="count">Count</option>
-          {numeric.length > 0 && <option value="sum">Sum</option>}
-          {numeric.length > 0 && <option value="avg">Average</option>}
-        </select>
-      </label>
-      {g.aggregate_function !== "count" && (
-        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Of
-          <select aria-label="Aggregate on" className={`${sel} mt-1`} value={g.aggregate_on} onChange={(e) => setG({ ...g, aggregate_on: e.target.value })}>
-            {numeric.map((f) => (
-              <option key={f.fieldname} value={f.fieldname}>
-                {f.label ?? f.fieldname}
+      <select aria-label="Group by field" className={sel} value={draft?.field ? enc2(draft.doctype, draft.field) : ""} onChange={(e) => {
+        const [doctype, field] = dec(e.target.value);
+        apply({ ...(draft ?? { fn: "count" }), field, doctype });
+      }}>
+        <option value="" disabled>
+          Select Group By...
+        </option>
+        {groups.map((g) => (
+          <optgroup key={g.doctype} label={g.doctype}>
+            {g.fields.map((f) => (
+              <option key={f.fieldname} value={enc2(g.doctype, f.fieldname)}>
+                {label(g.doctype, f)}
               </option>
             ))}
+          </optgroup>
+        ))}
+      </select>
+      <div className="flex gap-2">
+        <select aria-label="Aggregate function" className={sel} value={fn} onChange={(e) => {
+          const next = e.target.value as AggregateFn;
+          apply({ ...(draft ?? { field: "", doctype: meta.name }), fn: next, ...(next === "count" ? { aggField: undefined, aggDoctype: undefined } : {}) } as GroupBy);
+        }}>
+          <option value="count">Count</option>
+          <option value="sum">Sum</option>
+          <option value="avg">Average</option>
+        </select>
+        {fn !== "count" && (
+          <select aria-label="Aggregate on" className={sel} value={draft?.aggField ? enc2(draft.aggDoctype ?? meta.name, draft.aggField) : ""} onChange={(e) => {
+            const [aggDoctype, aggField] = dec(e.target.value);
+            apply({ ...(draft as GroupBy), aggField, aggDoctype });
+          }}>
+            <option value="" disabled>
+              Select Field...
+            </option>
+            {aggs.map((g) => (
+              <optgroup key={g.doctype} label={g.doctype}>
+                {g.fields.map((f) => (
+                  <option key={f.fieldname} value={enc2(g.doctype, f.fieldname)}>
+                    {label(g.doctype, f)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
-        </label>
-      )}
-      <div className="flex gap-2 pt-1">
-        <button type="button" onClick={() => onChange(g)} className="flex-1 rounded-md bg-zinc-900 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-          Apply
-        </button>
-        {value && (
-          <button type="button" onClick={() => onChange(null)} className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm dark:border-zinc-700">
-            Remove
-          </button>
         )}
       </div>
+      {error && (
+        <p role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
+      {value && (
+        <button type="button" onClick={() => {
+          setPending(null);
+          setError("");
+          onChange(null);
+        }} className="w-full rounded-md border border-zinc-200 py-1.5 text-sm dark:border-zinc-700">
+          Remove
+        </button>
+      )}
     </div>
   );
 }
