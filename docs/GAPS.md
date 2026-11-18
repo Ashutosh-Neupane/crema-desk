@@ -180,9 +180,18 @@ Order of work: the milestones in § 0.1.
   the JsBarcode 3.11 SVG with `data-barcode-value`, JSON options, EAN checked (`barcode.js`; was the raw text),
   Geolocation a GeoJSON FeatureCollection on Leaflet + OpenStreetMap with Leaflet.draw shapes, circle radius kept
   (`geolocation.js`; was {lat, lng} on Google Maps, which needed an API key) — `e2e/controls.mjs`.
+- ✅ Table MultiSelect, Autocomplete, Password, Color, Icon, Signature checked against Desk — `e2e/controls2.mjs`:
+  Table MultiSelect was a checkbox list over `options` (a DocType name) and forms drew it as a grid; now pills over
+  the child table's first Link field (`table_multiselect.js`: chosen values not offered, unknown refused, Backspace
+  removes the last, ✕, `_add` / `_remove` events; also in dialogs). Autocomplete took any text; now one of the
+  options unless `ignore_validation`, label shown / value stored, JSON or {label, value} options, "Installed
+  Applications", `set_query` methods (`autocomplete.js`). Password: strength meter (`test_password_strength`), no eye
+  for the saved mask. Color: empty stays empty (showed #000000), Desk's swatches, only #RRGGBB stored. Icon: every
+  symbol in Desk's sprites (lucide + timeless, ~2,000; was 80 names) — "Emojis" option not ported. Signature: PNG
+  data URL, as jSignature `getData` writes.
 - 🟡 Exist but not verified against Desk:
-  Small/Long Text, Color (`color_picker/`), Password (strength meter), Signature, Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
-  MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
+  Small/Long Text, MultiSelect / MultiSelect Pills / MultiSelect List, MultiCheck, Button, Heading, Date Range,
+  Switch, Comment.
 - ✅ Code, HTML Editor, Markdown Editor, JSON (`controls/code.js`, `html_editor.js`, `markdown_editor.js`, `json.js`):
   one CodeMirror control with Desk's behaviour — Desk's language map (no options → plain text), 300px with
   Expand / Collapse unless `max_lines` / `min_lines` / `max_height`, `wrap`, Copy to Clipboard when read-only,

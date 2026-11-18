@@ -2,6 +2,16 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4: Table MultiSelect, Autocomplete, Password, Color, Icon like Desk
+- Table MultiSelect was wrong in forms (a grid) and as a control (checkboxes over a DocType name): now Desk's pill
+  picker over the child table's Link field, in forms (row events fire) and dialogs. Autocomplete now refuses text
+  that isn't an option (Desk's validate) and supports label/value options, JSON lists, Installed Applications and
+  set_query methods. Password has the strength meter; Color Desk's swatches and no fake #000000; Icon lists Desk's
+  real icon sprites. LinkField gained `exclude` / `clearOnPick` for multi-value pickers.
+- e2e: controls2 (new). linkfield, dialogs, formsave, form.salesorder, controls green.
+- Left in M4: the dialog-only controls (MultiSelect family, MultiCheck, Date Range, Switch), Small/Long Text,
+  Button, Heading, Comment. Next: those, then M5.
+
 ## 2026-11-18 — M4: Rating, Duration, Phone, Barcode, Geolocation store Desk's values
 - Five controls wrote values Desk can't read; each is now ported from its Desk control: Rating a fraction with half
   stars (was the star count), Duration seconds with Desk's "1d 2h 3m 4s" text and picker (was "HH:MM:SS"), Phone

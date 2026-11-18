@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import FormBody from "@/components/form/FormBody";
 import HtmlHost from "@/components/form/HtmlHost";
 import DialogTable from "@/components/desk/DialogTable";
+import TableMultiSelectField from "@/lib/crema-form/controls/TableMultiSelectField";
 import { dialogStore, type DeskDialog, type DialogField } from "@/lib/desk-runtime/dialogs";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
@@ -56,7 +57,20 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
           {meta.fields.length > 0 && (
             <FormBody meta={meta} values={d.values} errors={d.errors} onChange={(f, v) => void d.set_value(f, v)}
               compact
-              renderTable={(df) => <DialogTable d={d} df={df as unknown as DialogField} />}
+              renderTable={(df) =>
+                df.fieldtype === "Table MultiSelect" ? (
+                  <TableMultiSelectField
+                    field={df}
+                    value={d.values[df.fieldname]}
+                    onChange={(v) => void d.set_value(df.fieldname, v)}
+                    error={d.errors[df.fieldname]}
+                    getQuery={() => d.fields_dict[df.fieldname]?.df.get_query?.call(d.fields_dict[df.fieldname])}
+                    doc={d.values}
+                  />
+                ) : (
+                  <DialogTable d={d} df={df as unknown as DialogField} />
+                )
+              }
               renderHtml={(df) => <HtmlHost el={d.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />}
               getQuery={(f) => () => d.fields_dict[f]?.df.get_query?.call(d.fields_dict[f])}
               onButton={(f) => void d.fields_dict[f]?.df.click?.call(d.fields_dict[f])}

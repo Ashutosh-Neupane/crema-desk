@@ -16,6 +16,10 @@ export interface FieldControlProps {
   getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
   /** Button fields: Desk triggers the form event named after the field */
   onClick?: () => void;
+  /** Link pickers for several values (Table MultiSelect): values already chosen are left out of the suggestions */
+  exclude?: string[];
+  /** Link pickers for several values: the box empties after each pick (Desk table_multiselect.js) */
+  clearOnPick?: boolean;
 }
 
 export { default as FormField } from "./FormField";

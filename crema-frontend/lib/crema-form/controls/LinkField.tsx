@@ -67,7 +67,7 @@ function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; 
   );
 }
 
-export default function LinkField({ field, inputId, value, onChange, disabled, error, getQuery, compact, doc }: FieldControlProps) {
+export default function LinkField({ field, inputId, value, onChange, disabled, error, getQuery, compact, doc, exclude, clearOnPick }: FieldControlProps) {
   const current = typeof value === "string" ? value : value == null ? "" : String(value);
   const doctype = String(field.options ?? "");
   const qc = useQueryClient();
@@ -114,7 +114,8 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
     timer.current = setTimeout(async () => {
       setLoading(true);
       try {
-        setResults(await searchLink(doctype, q, { ...query(), page_length: 10 }));
+        const found = await searchLink(doctype, q, { ...query(), page_length: 10 });
+        setResults(exclude?.length ? found.filter((r) => !exclude.includes(r.value)) : found);
       } catch {
         setResults([]);
       } finally {
@@ -126,7 +127,7 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
 
   const commit = (v: string, label?: string) => {
     if (isTitleLink && v && label) qc.setQueryData(["link-title", doctype, v], label);
-    setText(isTitleLink && v && label ? label : v);
+    setText(clearOnPick ? "" : isTitleLink && v && label ? label : v);
     setOpen(false);
     if (v !== current) onChange(v || null);
   };
