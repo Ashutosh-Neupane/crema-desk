@@ -232,8 +232,11 @@ Order of work: the milestones in § 0.1.
   toggle, counts follow filters, "Customize" saved to user settings `group_by_fields` — `e2e/listsidebar.mjs`
   (agent-built, judged). Shown as dropdowns in the filter row (layout is a phase-2 call); always shows the standard
   three, Desk shows them per settings.
-- ❌ Saved layouts / filters (v16 `list_filter/`: List Filter doctype — save, share globally, manage, duplicate,
-  layout field selector).
+- ✅ Saved layouts (v16 `list_filter/`, List Filter): menu (Default / Global / Your layouts), create / edit /
+  duplicate (name, for all users, standard + module in developer mode, filters, sort, columns with order and width),
+  manage (scope, delete), applied filters + sort + columns, remembered per user, matched from URL filters by route
+  signature; shared with Desk — `e2e/listlayouts.mjs`. Not ported: column widths saved by dragging (Crema's list has
+  no column resize).
 - ✅ List Settings dialog (`components/list/ListSettingsDialog.tsx`, Desk `list_settings.js`): columns add / remove /
   reorder / width, Disable Count / Comment Count / Sidebar Stats / Auto Refresh via `save_listview_settings`, honoured
   by the list — `e2e/listsettings.mjs` (agent-built, judged). ❌ allow_edit, disable_scrolling, show_tags, recency filters.
