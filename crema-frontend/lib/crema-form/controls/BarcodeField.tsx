@@ -43,8 +43,9 @@ export default function BarcodeField({ field, inputId, value, onChange, disabled
     }
   };
   // a stored plain value (written by an import or a script) is drawn as Desk does on load
+  const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
   let svg = stored.startsWith("<svg") ? stored : "";
-  if (!svg && stored && typeof document !== "undefined") {
+  if (!svg && stored && hydrated) {
     try {
       svg = barcodeSvg(stored, field.options);
     } catch {

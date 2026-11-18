@@ -1,87 +1,126 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+/**
+ * MultiSelect and MultiSelect Pills (Desk: form/controls/multiselect.js, multiselect_pills.js): pick several options
+ * (lines, a list, { label, value } items, or `get_data(txt)`). Values as Desk returns them: MultiSelect a
+ * comma-separated string of values ("a, b"); MultiSelect Pills an array. Picked values show as pills, the box
+ * suggests the rest (Enter takes the highlighted one, Backspace in the empty box removes the last).
+ */
+import { useRef, useState } from "react";
 import { X } from "lucide-react";
-import type { FieldControlProps } from "@/lib/crema-form/controls";
+import { useAnchoredPosition } from "@/lib/hooks/useAnchoredPosition";
+import type { FieldControlProps } from "./index";
+import { useMultiOptions } from "./multiOptions";
 
-export default function MultiselectField({ field, value, onChange, disabled }: FieldControlProps) {
+export function multiValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
+export default function MultiselectField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
+  const pills = field.fieldtype === "MultiSelect Pills";
+  const selected = multiValues(value);
+  const [txt, setTxt] = useState("");
   const [open, setOpen] = useState(false);
-  const options = (field.options ?? "").split("\n").filter(Boolean);
-  const selected = useMemo(() => Array.isArray(value) ? value : [], [value]);
-  const selectedSet = new Set<unknown>(selected);
+  const [active, setActive] = useState(0);
+  const options = useMultiOptions(field, txt);
+  const anchor = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const pos = useAnchoredPosition(anchor, list, open, { matchWidth: true });
+  const readOnly = disabled || !!field.read_only;
+  const label = field.label || field.fieldname;
+  const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
+  const q = txt.toLowerCase();
+  const picked = new Set(selected);
+  const offered = options.filter((o) => !picked.has(o.value) && (!q || `${o.label}${o.value}${o.description ?? ""}`.toLowerCase().includes(q)));
 
-  const toggle = useCallback(
-    (opt: string) => {
-      const next = selected.includes(opt)
-        ? selected.filter((v) => v !== opt)
-        : [...selected, opt];
-      onChange(next.length ? next : "");
-    },
-    [selected, onChange],
-  );
-
-  const remove = useCallback(
-    (opt: string) => {
-      onChange(selected.filter((v) => v !== opt));
-    },
-    [selected, onChange],
-  );
+  const emit = (vals: string[]) => onChange(pills ? vals : vals.length ? vals.join(", ") : null);
+  const add = (v: string) => {
+    setTxt("");
+    setActive(0);
+    if (v && !selected.includes(v)) emit([...selected, v]);
+  };
 
   return (
-    <div className="flex flex-col gap-1.5 relative">
-      {field.label && (
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {field.label}
-          {field.reqd && <span aria-hidden="true" className="ml-1 text-red-500">*</span>}
-        </span>
-      )}
-      <div
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-        onClick={() => !disabled && !field.read_only && setOpen((o) => !o)}
-      >
-        <div className="flex flex-wrap gap-1">
-          {selected.length === 0 && (
-            <span className="text-sm text-zinc-400">{String(field.placeholder || "Select options...")}</span>
+    <div
+      ref={anchor}
+      data-fieldname={field.fieldname}
+      className={`flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 ${readOnly ? "border-transparent bg-zinc-100 dark:bg-zinc-800/70" : error ? "border-red-500" : "border-zinc-300 focus-within:border-zinc-500 dark:border-zinc-700"} bg-white dark:bg-zinc-900`}
+    >
+      {selected.map((v) => (
+        <span key={v} data-pill={v} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+          {labelOf(v)}
+          {!readOnly && (
+            <button type="button" aria-label={`Remove ${labelOf(v)}`} onClick={() => emit(selected.filter((s) => s !== v))} className="rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700">
+              <X className="h-3 w-3" />
+            </button>
           )}
-          {selected.map((opt) => (
-            <span
-              key={opt}
-              className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
+        </span>
+      ))}
+      {readOnly && !selected.length && <span className="text-sm text-zinc-400">—</span>}
+      {!readOnly && (
+        <input
+          id={inputId ?? field.fieldname}
+          type="text"
+          role="combobox"
+          aria-label={label}
+          aria-expanded={open}
+          aria-controls={`${field.fieldname}-ms`}
+          aria-autocomplete="list"
+          aria-invalid={!!error}
+          autoComplete="off"
+          value={txt}
+          placeholder={selected.length ? "" : String(field.placeholder ?? "")}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          onChange={(e) => {
+            setTxt(e.target.value);
+            setOpen(true);
+            setActive(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((a) => Math.min(a + 1, offered.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((a) => Math.max(a - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              if (offered[active]) add(offered[active].value);
+            } else if (e.key === "Backspace" && !txt && selected.length) emit(selected.slice(0, -1));
+            else if (e.key === "Escape") setOpen(false);
+          }}
+          className="min-w-[8rem] flex-1 bg-transparent px-1 py-1 text-sm text-zinc-900 focus:outline-none dark:text-zinc-100"
+        />
+      )}
+      {open && !readOnly && offered.length > 0 && (
+        <ul
+          ref={list}
+          id={`${field.fieldname}-ms`}
+          role="listbox"
+          aria-label={`${label} options`}
+          style={{ position: "fixed", top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width }}
+          className="z-50 max-h-60 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          {offered.map((o, k) => (
+            // the input owns the keyboard; options are picked with the pointer
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+            <li
+              key={o.value}
+              role="option"
+              aria-selected={k === active}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setActive(k)}
+              onClick={() => add(o.value)}
+              className={`cursor-pointer px-3 py-1.5 text-sm ${k === active ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
             >
-              {String(opt)}
-              <button aria-label={`Remove ${String(opt)}`}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  remove(opt);
-                }}
-                disabled={disabled || !!field.read_only}
-                className="hover:text-red-500"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
+              <span className="text-zinc-900 dark:text-zinc-100">{o.label}</span>
+              {o.description && <span className="block text-xs text-zinc-500">{o.description}</span>}
+            </li>
           ))}
-        </div>
-      </div>
-      {open && (
-        <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-          {options.map((opt) => (
-            <label
-              key={opt}
-              className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
-            >
-              <input
-                type="checkbox"
-                checked={selectedSet.has(opt)}
-                onChange={() => toggle(opt)}
-                disabled={disabled || !!field.read_only}
-                className="rounded border-zinc-300"
-              />
-              <span className="text-zinc-700 dark:text-zinc-300">{opt}</span>
-            </label>
-          ))}
-        </div>
+        </ul>
       )}
     </div>
   );

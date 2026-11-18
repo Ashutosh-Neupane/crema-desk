@@ -2,6 +2,17 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4: dialog controls like Desk; React Doctor back to 0 errors
+- MultiSelect, MultiSelect Pills, MultiSelect List, MultiCheck, Date Range return Desk's values from a dialog
+  (string / arrays / [from, to]); options as lines, JSON, {label, value, checked} items or get_data(txt).
+- React Doctor (run with `npx react-doctor@0.9.23 . -y --no-supply-chain`): 7 errors → 0, score 35 → 57. Fixed a
+  hydration branch (Barcode), a side effect inside a state updater (Print Builder prefs), a ref written during render
+  (Gantt drag); marked the intended ones (Desk `eval:` filters, Custom HTML Block scripts, listeners owned by the
+  Leaflet / Quill instance). It will be run before every PR from now on.
+- e2e: controls3 (new); report.mjs made data-agnostic (searched a Sales Order name from the old bench). dialogs,
+  controls2, formsave, report, gantt, pfbuilder green.
+- M4 left: Small/Long Text, Button, Heading, Comment (render-only; low risk). Next: performance pass, then M5.
+
 ## 2026-11-18 — M4: Table MultiSelect, Autocomplete, Password, Color, Icon like Desk
 - Table MultiSelect was wrong in forms (a grid) and as a control (checkboxes over a DocType name): now Desk's pill
   picker over the child table's Link field, in forms (row events fire) and dialogs. Autocomplete now refuses text

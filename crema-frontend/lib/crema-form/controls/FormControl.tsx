@@ -61,6 +61,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
       case "Autocomplete":
         return <AutocompleteField {...props} />;
       case "MultiSelect":
+      case "MultiSelect Pills":
         return <MultiselectField {...props} />;
       case "Date":
         return <DateField {...props} />;

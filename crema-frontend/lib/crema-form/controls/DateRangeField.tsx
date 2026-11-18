@@ -1,81 +1,65 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { CalendarIcon, X } from "lucide-react";
-import { Button } from "@/components/shadcn/button";
-import { Card } from "@/components/shadcn/card";
+/**
+ * Date Range (Desk: form/controls/date_range.js): the value is [from, to] in system format (YYYY-MM-DD); a stored
+ * "from,to" string is read too (parse), as is Crema's old { from, to }. Set once both dates are picked; clearing
+ * both clears it.
+ */
+import { useState } from "react";
 import DatePicker from "@/components/form/DatePicker";
-import type { FieldControlProps } from "@/lib/crema-form/controls";
+import type { FieldControlProps } from "./index";
 
-/** Stored value is `{from, to}`, possibly JSON-encoded by the backend. */
-function parseRange(value: unknown): { from: string; to: string } {
-  let v = value;
-  if (typeof v === "string" && v.trim().startsWith("{")) {
-    try {
-      v = JSON.parse(v);
-    } catch {
-      v = null;
+export function parseDateRange(value: unknown): [string, string] {
+  let v: unknown = value;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t.startsWith("[") || t.startsWith("{")) {
+      try {
+        v = JSON.parse(t);
+      } catch {
+        v = t;
+      }
     }
+  }
+  if (Array.isArray(v)) return [String(v[0] ?? ""), String(v[1] ?? v[0] ?? "")];
+  if (typeof v === "string" && v) {
+    const [a, b] = v.split(",").map((s) => s.trim());
+    return [a, b ?? a];
   }
   if (v && typeof v === "object") {
     const r = v as Record<string, unknown>;
-    return { from: String(r.from ?? ""), to: String(r.to ?? "") };
+    return [String(r.from ?? ""), String(r.to ?? "")];
   }
-  return { from: "", to: "" };
+  return ["", ""];
 }
 
 export default function DateRangeField({ field, value, onChange, disabled }: FieldControlProps) {
-  const [from, setFrom] = useState<string>(() => parseRange(value).from);
-  const [to, setTo] = useState<string>(() => parseRange(value).to);
+  const stored = parseDateRange(value);
+  const [draft, setDraft] = useState<[string, string] | null>(null);
+  const [from, to] = draft ?? stored;
+  const readOnly = disabled || !!field.read_only;
+  const label = field.label || field.fieldname;
 
-  // Re-sync when the document reloads or another control/script sets the value
-  const valueKey = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  const [syncedKey, setSyncedKey] = useState(valueKey);
-  if (syncedKey !== valueKey) {
-    const r = parseRange(value);
-    setSyncedKey(valueKey);
-    setFrom(r.from);
-    setTo(r.to);
-  }
-
-  const applyRange = useCallback(() => {
-    const range: Record<string, string> = {};
-    if (from) range.from = from;
-    if (to) range.to = to;
-    onChange(Object.keys(range).length ? range : "");
-  }, [from, to, onChange]);
-
-  const clear = useCallback(() => {
-    setFrom("");
-    setTo("");
-    onChange("");
-  }, [onChange]);
+  const set = (next: [string, string]) => {
+    if (next[0] && next[1]) {
+      setDraft(null);
+      const ordered: [string, string] = next[0] <= next[1] ? next : [next[1], next[0]];
+      if (ordered[0] !== stored[0] || ordered[1] !== stored[1]) onChange(ordered);
+    } else if (!next[0] && !next[1]) {
+      setDraft(null);
+      if (stored[0] || stored[1]) onChange(null);
+    } else setDraft(next);
+  };
 
   return (
-    <Card className="p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <CalendarIcon className="h-4 w-4 text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {field.label || field.fieldname}
-        </span>
+    <div className="flex flex-wrap items-center gap-2" data-fieldname={field.fieldname}>
+      <div className="w-40">
+        <DatePicker ariaLabel={`${label} from`} value={from || null} onChange={(v) => set([v ?? "", to])} disabled={readOnly} />
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="w-40">
-          <DatePicker ariaLabel="From date" value={from || null} onChange={(v) => setFrom(v ?? "")} disabled={disabled} />
-        </div>
-        <span className="text-xs text-zinc-500">to</span>
-        <div className="w-40">
-          <DatePicker ariaLabel="To date" value={to || null} onChange={(v) => setTo(v ?? "")} disabled={disabled} />
-        </div>
-        <Button size="sm" onClick={applyRange} disabled={disabled || (!from && !to)}>
-          Apply
-        </Button>
-        {(from || to) && (
-          <Button size="sm" variant="ghost" onClick={clear} disabled={disabled}>
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+      <span className="text-xs text-zinc-500">to</span>
+      <div className="w-40">
+        <DatePicker ariaLabel={`${label} to`} value={to || null} onChange={(v) => set([from, v ?? ""])} disabled={readOnly} />
       </div>
-    </Card>
+    </div>
   );
 }

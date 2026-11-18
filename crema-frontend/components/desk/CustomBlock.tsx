@@ -50,7 +50,7 @@ export default function CustomBlock({ name }: { name: string }) {
       try {
         // site-authored script, same trust as Desk (frappe.create_shadow_element)
         // eslint-disable-next-line no-new-func
-        new Function("root_element", doc.script)(root);
+        new Function("root_element", doc.script)(root); // react-doctor-disable-line no-eval
       } catch (e) {
         console.error(`Custom HTML Block "${name}" script failed`, e);
       }
