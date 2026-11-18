@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { usePathname } from "next/navigation";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 
 export interface ErrorDetailsInfo {
@@ -34,7 +35,9 @@ export function showErrorDetails(info: ErrorDetailsInfo) {
 export function ErrorDetailsHost() {
   const [info, setInfo] = useState<ErrorDetailsInfo | null>(null);
   const [copied, setCopied] = useState(false);
-  const { data: ctx } = useDeskContext();
+  // mounted app-wide (providers.tsx): only signed-in Desk pages have a context to load; /login has no session
+  const inDesk = usePathname()?.startsWith("/desk") ?? false;
+  const { data: ctx } = useDeskContext({ enabled: inDesk });
   useEffect(() => {
     systemManager = !!ctx?.roles?.includes("System Manager");
   }, [ctx]);

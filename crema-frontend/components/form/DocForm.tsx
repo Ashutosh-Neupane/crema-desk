@@ -33,7 +33,8 @@ import { getHtmlWidget } from "@/components/form/widgets";
 import HtmlHost from "@/components/form/HtmlHost";
 import FormDashboard, { FormHeadlines } from "@/components/form/FormDashboard";
 import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
-import { applyWorkflow, defaultState, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, type Transition } from "@/lib/form/workflow";
+import { applyWorkflow, defaultState, editableBy, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, workflowStatus, type Transition } from "@/lib/form/workflow";
+import WorkflowBar from "@/components/form/WorkflowBar";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { addRecentDoc } from "@/lib/utils/recentDocs";
 import { loadUserSettings, userSettingsKey } from "@/lib/list/useUserListState";
@@ -219,7 +220,11 @@ export default function DocForm({ doctype, name }: Props) {
 
   // workflow: active Workflow from the meta, transitions for the saved + clean doc
   const workflow = useMemo(() => getWorkflow(metas?.meta), [metas]);
-  const { data: transitions = [] } = useTransitions(workflow, snap?.doc ?? null, !!snap?.dirty, ctx?.user, ctx?.roles ?? []);
+  const { data: serverTransitions } = useTransitions(workflow, snap?.doc ?? null, !!snap?.dirty);
+  const wfDoc = snap?.doc;
+  const wfStatus = workflow && wfDoc && !isNewDoc(wfDoc) ? workflowStatus(workflow, wfDoc, serverTransitions ?? [], ctx?.user, ctx?.roles ?? []) : null;
+  const transitions = wfStatus?.mine ?? [];
+  const [wfHelp, setWfHelp] = useState(false);
   const { data: stateStyles } = useQuery({
     queryKey: ["workflow-state-styles"],
     enabled: !!workflow,
@@ -565,6 +570,9 @@ export default function DocForm({ doctype, name }: Props) {
                 {t.action}
               </DropdownMenuItem>
             ))}
+            {/* Desk FormStates.setup_help */}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setWfHelp(true)}>Help</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -684,6 +692,43 @@ export default function DocForm({ doctype, name }: Props) {
         // Desk show_submit_message: a saved, clean draft of a submittable doctype without a workflow
         extra={meta.is_submittable && can("submit") && !snap.dirty && !isNew && !workflow && docstatus === 0 ? [{ key: "submit", html: "Submit this document to confirm", color: "blue" }] : undefined}
       />
+      {workflow && wfStatus && (
+        <WorkflowBar
+          workflow={workflow}
+          doc={doc}
+          status={wfStatus}
+          docinfo={loaded?.docinfo}
+          styles={stateStyles}
+          user={ctx?.user}
+          dirty={snap.dirty}
+          busy={wfBusy}
+          defaultState={defaultState(workflow, docstatus)}
+          onRun={(t) => void runTransition(t)}
+          onSetDefault={() => void ctl.set_value(workflow.workflow_state_field, defaultState(workflow, docstatus))}
+          onHelp={() => setWfHelp(true)}
+        />
+      )}
+      {workflow && wfStatus && (
+        <Dialog open={wfHelp} onOpenChange={setWfHelp}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Workflow: {workflow.name}</DialogTitle>
+              <DialogDescription>Who can do what in this document&apos;s current state.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <p>Current status: <strong>{wfStatus.state ?? "not set"}</strong></p>
+              <p>Document is only editable by users with role: <strong>{wfStatus.state ? editableBy(workflow, wfStatus.state).join(", ") || "nobody" : "-"}</strong></p>
+              <p>
+                Next actions:{" "}
+                {wfStatus.next.length ? wfStatus.next.map((t, i) => (
+                  <span key={`${t.action}|${t.allowed}|${i}`}>{i > 0 && ", "}<strong>{t.action}</strong> by role {t.allowed}</span>
+                )) : <strong>None: End of Workflow</strong>}
+              </p>
+              <p className="text-zinc-500"><strong>Note:</strong> Other permission rules may also apply.</p>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       <FormDashboard state={snap.dashboard} />
       {docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
 
