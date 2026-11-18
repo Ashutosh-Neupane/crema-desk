@@ -31,21 +31,22 @@ export function fieldLabel(meta: DocTypeMeta, fieldname: string): string {
 
 /** ?status=Draft&customer=X or ?filters=[[…]] → filter tuples */
 export function filtersFromParams(doctype: string, params: URLSearchParams): Filter[] {
-  const raw = params.get("filters");
-  if (raw) {
-    try {
-      const arr = JSON.parse(raw) as unknown[][];
-      // accept [field, op, value] as well as [doctype, field, op, value]
-      if (Array.isArray(arr)) return arr.map((f) => (f.length === 3 ? [doctype, f[0], f[1], f[2]] : f) as Filter);
-    } catch {
-      /* ignore */
-    }
-  }
+  // ?field=value pairs (simple equality) and ?filters=[…] (the rest) together — setFilters writes both
   const out: Filter[] = [];
   params.forEach((v, k) => {
     if (["filters", "view", "sort", "q", "new"].includes(k)) return;
     out.push([doctype, k, "=", v]);
   });
+  const raw = params.get("filters");
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw) as unknown[][];
+      // accept [field, op, value] as well as [doctype, field, op, value]
+      if (Array.isArray(arr)) out.push(...arr.filter(Array.isArray).map((f) => (f.length === 3 ? [doctype, f[0], f[1], f[2]] : f) as Filter));
+    } catch {
+      /* ignore */
+    }
+  }
   return out;
 }
 

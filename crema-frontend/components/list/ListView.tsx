@@ -147,13 +147,15 @@ export default function ListView({ doctype }: { doctype: string }) {
       }
       if (complex.length) sp.set("filters", JSON.stringify(complex));
       if (search.trim()) sp.set("q", search.trim());
+      // keep ?view=list: without it a tree DocType's list goes back to Tree view
+      if (params.get("view")) sp.set("view", params.get("view") as string);
       setSelected(new Set());
       router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
     },
-    [pathname, router, search],
+    [pathname, router, search, params],
   );
   useEffect(() => {
-    if (restoredFor === doctype || !meta || !usQuery.isFetchedAfterMount) return;
+    if (restoredFor === doctype || !meta || !usQuery.isFetchedAfterMount || settings === undefined) return;
     const saved = usQuery.data ?? {};
     userSettings.current = saved;
     const cur = saved.List ?? {};
