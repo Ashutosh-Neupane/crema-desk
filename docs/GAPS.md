@@ -173,10 +173,15 @@ Order of work: the milestones in § 0.1.
 - ✅ Time and the time part of Datetime: Crema's TimePicker (hour / minute / second columns, Now, Clear, typed
   "2:30 pm"), the site's `time_format`, no native `<input type="time">`; also in grids, bulk edit, report view and
   report filters — `e2e/timepicker.mjs`.
+- ✅ Rating, Duration, Phone, Barcode, Geolocation store what Desk stores (they didn't): Rating a fraction of
+  `options` stars with half stars (`rating.js`; was the star count), Duration seconds shown "1d 2h 3m 4s", typed or
+  picked, `hide_days` / `hide_seconds` (`duration.js`; was "HH:MM:SS"), Phone "+isd-number" with every country from
+  `get_country_timezone_info` and the site's country preselected (`phone.js`; was a space and 14 countries), Barcode
+  the JsBarcode 3.11 SVG with `data-barcode-value`, JSON options, EAN checked (`barcode.js`; was the raw text),
+  Geolocation a GeoJSON FeatureCollection on Leaflet + OpenStreetMap with Leaflet.draw shapes, circle radius kept
+  (`geolocation.js`; was {lat, lng} on Google Maps, which needed an API key) — `e2e/controls.mjs`.
 - 🟡 Exist but not verified against Desk:
-  Small/Long Text, Duration, Rating, Color (`color_picker/`), Phone
-  (`phone_picker/`, country codes), Password (strength meter), Signature, Barcode (+ camera scanner), Geolocation (map
-  draw), Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
+  Small/Long Text, Color (`color_picker/`), Password (strength meter), Signature, Icon (`icon_picker/`), Autocomplete (method options), Table MultiSelect, MultiSelect / MultiSelect Pills /
   MultiSelect List, MultiCheck, Button, Heading, Date Range, Switch, Comment.
 - ✅ Code, HTML Editor, Markdown Editor, JSON (`controls/code.js`, `html_editor.js`, `markdown_editor.js`, `json.js`):
   one CodeMirror control with Desk's behaviour — Desk's language map (no options → plain text), 300px with
@@ -204,7 +209,7 @@ Order of work: the milestones in § 0.1.
   Lists, reports, grid, kanban, number inputs, `frappe.format`, `format_currency`, `format_number`, `precision()`,
   `frappe.datetime.*` — `e2e/formats.mjs`.
 - ❌ Number systems for words / `number_systems.js` short forms (lakh/crore abbreviations in charts), Time and
-  Date inputs typed in the user's format (DatePicker shows it; free-typing in other orders), Duration input.
+  Date inputs typed in the user's format (DatePicker shows it; free-typing in other orders).
 
 ### 2.4 Lists (`list/list_view.js`, `base_list.js`, `bulk_operations.js`, `list_settings.js`, `list_filter/`)
 - ✅ Filters, standard filters, group-by, sort, paging, count, bulk edit/delete/submit/cancel/print/assign/tags/export,

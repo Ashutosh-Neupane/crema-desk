@@ -35,7 +35,7 @@ export function setFormatSettings(s: FormatSettings) {
 export const getFormatSettings = () => settings;
 
 const cstr = (v: unknown) => (v == null ? "" : String(v));
-const cint = (v: unknown) => {
+export const cint = (v: unknown) => {
   const n = parseInt(cstr(v), 10);
   return Number.isFinite(n) ? n : 0;
 };
