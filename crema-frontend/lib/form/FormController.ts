@@ -94,7 +94,22 @@ export class FormController {
   constructor(meta: DocTypeMeta, childMetas: DocTypeMeta[], doc: Doc, ctx: RuntimeContext) {
     this.meta = meta;
     this.metas = Object.fromEntries([meta, ...childMetas].map((m) => [m.name, m]));
-    this.ctx = { ...ctx, metas: this.metas };
+    this.ctx = {
+      ...ctx,
+      metas: this.metas,
+      // frappe.call({ doc: frm.doc, … }) returns this doc updated by the server method → show it (Desk syncs locals)
+      onDocs: (docs) => {
+        const updated = docs.find((d) => d.doctype === this.meta.name && d.name === this.doc.name);
+        if (!updated) return;
+        // the server changed values the user hasn't saved: the form stays (or becomes) unsaved
+        const changed = this.dirty || JSON.stringify(this.normalize(updated as Doc)) !== JSON.stringify(this.doc);
+        this.load(updated as Doc);
+        if (changed) {
+          this.dirty = true;
+          this.emit();
+        }
+      },
+    };
     this.doc = this.normalize(doc);
     this.runtime = createRuntime(this.ctx);
     // Desk create_mandatory_children: a new doc gets one empty row in each mandatory table
@@ -667,6 +682,13 @@ export class FormController {
               },
               add_custom_button: () => {},
               refresh: () => {},
+              /** grid.js get_selected(): names of the checked rows (sales_order.js make_delivery_note reads it) */
+              get_selected: () => [...(self.gridSelection[f.fieldname] ?? [])],
+              /** grid.js get_selected_children(): the checked rows themselves */
+              get_selected_children: () => {
+                const names = new Set(self.gridSelection[f.fieldname] ?? []);
+                return ((self.doc[f.fieldname] as Row[] | undefined) ?? []).filter((r) => names.has(String(r.name)));
+              },
               cannot_add_rows: false,
             }, false)
           : undefined,
@@ -856,7 +878,11 @@ export class FormController {
     model.set_value = (cdt: string, cdn: string, f: string | Record<string, unknown>, v?: unknown) =>
       cdt === self.meta.name ? self.set_value(f, v) : self.set_child_value(cdt, cdn, f, v);
     model.get_value = (cdt: string, cdn: string, f: string) => (cdt === self.meta.name ? self.doc[f] : self.findRow(cdn)?.row[f]);
-    model.get_doc = (cdt: string, cdn: string) => (cdt === self.meta.name ? self.doc : self.findRow(cdn)?.row);
+    // model.js get_doc: locals[doctype][name] — the open doc and its rows, else what scripts cached (with_doc)
+    model.get_doc = (cdt: string, cdn: string) => {
+      if (cdt === self.meta.name && (cdn === undefined || cdn === self.doc.name)) return self.doc;
+      return self.findRow(cdn)?.row ?? ((self.runtime.globals.locals as Record<string, Record<string, unknown>> | undefined)?.[cdt]?.[cdn]);
+    };
     model.add_child = (doc: unknown, cdtOrTable: string, table?: string) => {
       const t = table ?? this.tableFor(cdtOrTable)?.fieldname ?? cdtOrTable;
       return (frm.add_child as (t: string) => Row)(t);
@@ -865,6 +891,11 @@ export class FormController {
     model.with_doc = async (dt: string, dn: string, cb?: (name: string, r: unknown) => unknown) => {
       const { env } = await deskCall("frappe.desk.form.load.getdoc", { doctype: dt, name: dn }, { get: true });
       const d = (env.docs as Doc[] | undefined)?.[0];
+      // model.js with_doc syncs the doc into locals, where the callback reads it back (frappe.model.get_doc)
+      if (d) {
+        const locals = (self.runtime.globals.locals ??= {}) as Record<string, Record<string, unknown>>;
+        (locals[dt] ??= {})[dn] = d;
+      }
       cb?.(dn, d);
       return d;
     };
@@ -886,6 +917,12 @@ export class FormController {
 
   onSave?: (action?: string) => Promise<unknown>;
   onReload?: () => Promise<unknown>;
+
+  /** rows checked in each table's grid (Grid reports them) — Desk grid.get_selected() */
+  private gridSelection: Record<string, string[]> = {};
+  setGridSelection(table: string, names: string[]) {
+    this.gridSelection[table] = names;
+  }
 
   private addButton(b: CustomButton) {
     if (this.buttons.some((x) => x.label === b.label && (x.group ?? "") === (b.group ?? ""))) return;

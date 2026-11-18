@@ -38,6 +38,13 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
 | M7 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
 
+✅ **A day of work** — `e2e/dayofwork.mjs` does it through Crema's UI and checks the server after every step: buy
+(Purchase Order → Create → Purchase Receipt → Purchase Invoice → Payment), stock (a Stock Entry typed into a new
+form), sell (Quotation → Sales Order → Delivery Note → Sales Invoice → Payment), then the reports (stock balance =
+the warehouse, General Ledger balances, Accounts Receivable drops the paid invoice). Data from the site; everything
+it creates is cancelled and deleted. Stock Balance is a prepared report: on a bench without background workers it
+stays queued (in Desk too), so the suite checks the live Stock Ledger there.
+
 Left for later (not needed to call phase 1 done): builders (2.9), workspace editing and the v16 dock (2.7), Map /
 Kanban v2 (2.5), telephony, BOM configurator, Bank Reconciliation (2.11, via L4 meanwhile), translations / RTL (2.8).
 
@@ -376,6 +383,12 @@ Order of work: the milestones in § 0.1.
 
 ### 2.11 ERPNext scripted UIs inside forms (L3 candidates — today NOOP or broken)
 Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-use ERPNext.
+- ✅ Daily document chain (found by `e2e/dayofwork.mjs`): Create → Payment on invoices and orders
+  (`transaction.js` make_payment_entry / make_mapped_payment_entry / get_method_for_payment, `frappe.model.sync` of
+  an unsaved doc + `set_route` to it → pre-filled new form); Sales Order → Delivery Note (`grid.get_selected` /
+  `get_selected_children` from the grid's checked rows); Stock Entry item rows (`frappe.call({ doc, method })` →
+  run_doc_method, the returned doc shown and kept unsaved); Purchase Invoice refresh (`model.with_doc` puts the doc
+  in `locals` so `model.get_doc` finds it).
 - ✅ Address & Contact cards for any doctype with `address_html` / `contact_html` (`components/form/widgets/
   AddressContact.tsx`, Desk `address_and_contact.js` + templates): cards from `__onload`, Edit, Primary badge, Set /
   Unset Primary, Unlink (`remove_link`), New Address / Contact pre-linked via the form prefill, hidden on new docs —

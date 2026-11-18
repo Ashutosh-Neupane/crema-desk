@@ -2,6 +2,15 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — A day of work through Crema (phase 1 proof)
+- e2e/dayofwork (new): buy → stock → sell → pay → reports through the UI, each step verified on the server, green
+  twice in a row; cleans up after itself.
+- It found four things a user would hit, all fixed from ERPNext / Frappe source: Create → Payment did nothing
+  (TransactionController payment helpers, frappe.model.sync, set_route to an unsaved doc); Sales Order → Delivery
+  Note did nothing (grid.get_selected); Stock Entry rows never got item details (frappe.call with `doc` →
+  run_doc_method); a page error on every Purchase Invoice (model.with_doc didn't fill locals).
+- Phase 1 left: M7 minimum (large lists, run-all green twice).
+
 ## 2026-11-18 — M4 done: text, button, heading and comment controls like Desk
 - Text / Small Text / Long Text at Desk's heights with max_height; read-only text keeps line breaks and indentation.
 - Button: Desk's colours, sizes and tooltip; stays visible and clickable on read-only / submitted documents (Crema hid
