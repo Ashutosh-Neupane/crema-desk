@@ -2,6 +2,22 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M5 done: ERPNext financial statements like Desk
+- ERPNext's own report helpers (utils.js, financial_statements.js, trends filters) load from the site's /assets and
+  run unchanged before the report script; Balance Sheet, P&L, Cash Flow, Trial Balance, GL, Stock Ledger, Gross
+  Profit, AR render row for row like Desk (checked side by side: labels, figures, bold rows, summary cards).
+- Account → General Ledger drill-down (column link_onclick + route options as report filters); summary cards
+  formatted like Desk (currency symbol, separators); Item link titles; report decimals.
+- Fixed: jQuery objects passed back into jQuery broke inside the lenient wrapper (all formatters using `$()` fell
+  back silently); `frappe.set_route` from report JS did nothing; `frappe.after_ajax` added (dimension filters).
+- e2e: financials (new) checks every rendered row against the query_report.run response.
+- Left in reports: DataTable checkbox column + onCheckRow (analytics charts from checked rows) — see GAPS 2.6.
+- Regressions green: report, reportview, reportgroupby, scriptdom, dialogs, itemdashboard, formsave, listhooks.
+  Failing on main too (e2e upkeep, not this change): reportsave (From Date not shown after Save As),
+  ledgerpreview and scripts.salesorder (hardcode the old bench's customers/items; scripts.salesorder also leaves
+  its Server Scripts behind when it crashes, which blocks every Sales Order save on a bench without server scripts).
+- Next: M4 leftovers (Small/Long Text, Button, Heading, Comment), "day of work" e2e suite, M7 minimum.
+
 ## 2026-11-18 — M5 started: saved list layouts
 - Saved layouts (Desk v16 List Filter) on every list: menu next to the view switcher, create / edit / duplicate /
   delete, global or personal, applied filters + sort + columns, remembered per user, picked from URL filters by

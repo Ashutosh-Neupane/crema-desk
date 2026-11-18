@@ -1,5 +1,6 @@
 /** Query report helpers (Desk: frappe/public/js/frappe/views/reports/query_report.js). */
 import { formatCell } from "@/lib/list/format";
+import { formatValue } from "@/lib/frappe/format";
 import type { ChartResult } from "@/lib/hooks/useDashboardChart";
 
 export interface ReportColumn {
@@ -53,12 +54,41 @@ export function normalizeRows(raw: unknown[], columns: ReportColumn[]): ReportRo
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 
 /** Desk default_formatter → HTML (Link columns become form links) */
-export function defaultFormatter(value: unknown, column: ReportColumn, data: ReportRow | undefined, ctx: { currency?: string; dateFormat?: string }) {
+export type LinkFormatters = Record<string, (value: unknown, doc: unknown, df: unknown) => unknown>;
+
+/**
+ * query_report.js format_cell → frappe.format(value, column, { always_show_decimals: true }, row); `linkFormatters`
+ * are frappe.form.link_formatters from the report's runtime
+ */
+export function defaultFormatter(
+  value: unknown,
+  column: ReportColumn,
+  data: ReportRow | undefined,
+  ctx: { currency?: string; dateFormat?: string; linkFormatters?: LinkFormatters },
+) {
+  // formatters.js Currency: only null is blank; a missing value (a section heading's period) formats as 0
+  if (column.fieldtype === "Currency" && (value === undefined || value === "")) value = 0;
   if (value == null || value === "") return "";
-  // ERPNext summary rows ('Opening', 'Total') — its financial formatter unquotes and bolds them
-  if (typeof value === "string" && /^'.+'$/.test(value)) return `<b>${esc(value.slice(1, -1))}</b>`;
+  // formatters.js Link: a quoted value ('Opening', 'Profit for the year') is a label — unquoted, no link
+  if (column.fieldtype === "Link" && typeof value === "string" && value.length > 1 && value.startsWith("'") && value.endsWith("'")) return esc(value.slice(1, -1));
+  // formatters.js Link: a column's link_onclick (e.g. erpnext.financial_statements.open_general_ledger(row)) replaces
+  // the record link; QueryReport runs it in the report's runtime on click
+  if (column.fieldtype === "Link" && typeof column.link_onclick === "string" && column.link_onclick) {
+    return `<a href="#" data-link-onclick="${esc(column.link_onclick)}">${esc(String(value))}</a>`;
+  }
   if (column.fieldtype === "Link" && column.options) {
     const v = String(value);
+    // formatters.js Link: frappe.form.link_formatters[doctype] when the row isn't itself that doctype
+    const lf = ctx.linkFormatters?.[column.options];
+    let label = v;
+    if (typeof lf === "function" && data && data.doctype !== column.options) {
+      try {
+        label = String(lf(value, data, column) ?? v);
+      } catch {
+        /* keep the value */
+      }
+    }
+    if (label !== v) return `<a href="/desk/doctype/${encodeURIComponent(column.options)}/${encodeURIComponent(v)}">${esc(label)}</a>`;
     return `<a href="/desk/doctype/${encodeURIComponent(column.options)}/${encodeURIComponent(v)}">${esc(v)}</a>`;
   }
   if (column.fieldtype === "Dynamic Link" && column.options && data?.[column.options]) {
@@ -70,7 +100,7 @@ export function defaultFormatter(value: unknown, column: ReportColumn, data: Rep
     return esc(formatCell(value, { ...column, options: "" }, data ?? {}, ctx));
   }
   if (column.fieldtype === "HTML") return String(value);
-  return esc(formatCell(value, column as never, data ?? {}, ctx));
+  return esc(formatValue(value, column as never, data ?? {}, { currency: ctx.currency, always_show_decimals: true }));
 }
 
 /** Formatter output comes from site JS; keep markup, drop anything executable */
