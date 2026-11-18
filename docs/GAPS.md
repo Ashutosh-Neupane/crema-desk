@@ -164,8 +164,12 @@ Order of work: the milestones in § 0.1.
 ### 2.3 Field controls (`form/controls/*`)
 - ✅ Data, Int, Float, Currency, Percent, Check, Select, Link, Dynamic Link, Date, Datetime, Table, Attach,
   Attach Image, HTML, Code.
-- ✅ Text Editor read-only values render as HTML (addresses, terms, tax breakup); editable is a rich-text box.
-  🟡 still to match Quill: images, @mentions (`quill-mention`), tables, paste cleanup.
+- ✅ Text Editor (`controls/text_editor.js`): Quill 2.0.3 (Frappe's pinned version) with Desk's toolbar, blots and
+  value format (`.ql-editor.read-mode` wrapper, bullets saved as `<ul>`, `table table-bordered`, `<pre>` code
+  blocks, font-size whitelist); images inline until Frappe extracts them to a File on save; paste through Quill's
+  clipboard (Word markup cleaned, `<script>` / `<style>` dropped); no toolbar in a grid; opening a saved value leaves
+  the form clean; read-only renders the HTML — `e2e/texteditor.mjs`. @mentions: Desk enables them only in the comment
+  box (`enable_mentions`), which Crema's timeline has. Not ported: image resize handles, magic URLs.
 - ✅ Time and the time part of Datetime: Crema's TimePicker (hour / minute / second columns, Now, Clear, typed
   "2:30 pm"), the site's `time_format`, no native `<input type="time">`; also in grids, bulk edit, report view and
   report filters — `e2e/timepicker.mjs`.
