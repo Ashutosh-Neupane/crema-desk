@@ -667,6 +667,13 @@ export class FormController {
               },
               add_custom_button: () => {},
               refresh: () => {},
+              /** grid.js get_selected(): names of the checked rows (sales_order.js make_delivery_note reads it) */
+              get_selected: () => [...(self.gridSelection[f.fieldname] ?? [])],
+              /** grid.js get_selected_children(): the checked rows themselves */
+              get_selected_children: () => {
+                const names = new Set(self.gridSelection[f.fieldname] ?? []);
+                return ((self.doc[f.fieldname] as Row[] | undefined) ?? []).filter((r) => names.has(String(r.name)));
+              },
               cannot_add_rows: false,
             }, false)
           : undefined,
@@ -886,6 +893,12 @@ export class FormController {
 
   onSave?: (action?: string) => Promise<unknown>;
   onReload?: () => Promise<unknown>;
+
+  /** rows checked in each table's grid (Grid reports them) — Desk grid.get_selected() */
+  private gridSelection: Record<string, string[]> = {};
+  setGridSelection(table: string, names: string[]) {
+    this.gridSelection[table] = names;
+  }
 
   private addButton(b: CustomButton) {
     if (this.buttons.some((x) => x.label === b.label && (x.group ?? "") === (b.group ?? ""))) return;

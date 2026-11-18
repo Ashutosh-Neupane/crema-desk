@@ -289,7 +289,12 @@ export default function Grid({
     await deskCall("frappe.model.utils.user_settings.save", { doctype: parentDt, user_settings: JSON.stringify({ GridView: merged }) });
     qc.setQueryData<UserSettings>(userSettingsKey(parentDt), (s) => ({ ...(s ?? {}), GridView: merged }));
   };
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelectedState] = useState<Set<string>>(new Set());
+  // the form's scripts see the checked rows too (grid.get_selected(), e.g. Sales Order → Delivery Note)
+  const setSelected = (next: Set<string>) => {
+    setSelectedState(next);
+    ctl.setGridSelection(table, [...next]);
+  };
   const [editing, setEditing] = useState<string | null>(null);
   const phone = useIsPhone();
   // Desk grid_row.move(): "Move To" prompt for the row number (value kept as typed)
