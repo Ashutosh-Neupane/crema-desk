@@ -5,6 +5,8 @@
  * frappe/public/js/frappe/form/link_selector.js). Search the Link field's doctype with the grid's set_query
  * filters; picking a value asks for a quantity inline (Desk opens a second "Set Quantity" prompt) and either
  * updates the row that already has it or adds a row — so the row's events (ERPNext item_code → rate) run.
+ * `single`: a Link field's "Advanced Search" (link.js open_advanced_search) — the same dialog; picking sets the
+ * field and closes.
  */
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
@@ -19,16 +21,23 @@ export default function AddMultipleDialog({
   getQuery,
   onPick,
   onClose,
+  single,
+  initialTxt = "",
 }: {
   doctype: string;
+  /** pick one value and close (Advanced Search) */
+  single?: boolean;
+  /** Desk opens the selector with what was typed in the field */
+  initialTxt?: string;
   /** set when the table has a quantity field: picking asks for it */
   qtyLabel?: string;
   getQuery: () => Record<string, unknown> | undefined;
-  onPick: (value: string, qty?: number) => Promise<void>;
+  /** label: the result's title (search_link `label`), for title-link DocTypes */
+  onPick: (value: string, qty?: number, label?: string) => Promise<void>;
   onClose: () => void;
 }) {
   const PAGE = 10;
-  const [txt, setTxt] = useState("");
+  const [txt, setTxt] = useState(initialTxt);
   const [results, setResults] = useState<Result[]>([]);
   const [length, setLength] = useState(PAGE);
   const [loading, setLoading] = useState(true);
@@ -80,7 +89,14 @@ export default function AddMultipleDialog({
       setBusy(false);
     }
   };
-  const choose = (value: string) => (qtyLabel ? setPicked({ value, qty: "1" }) : void add(value));
+  const choose = (value: string) => {
+    if (single) {
+      void onPick(value, undefined, results.find((r) => r.value === value)?.label).then(onClose);
+      return;
+    }
+    if (qtyLabel) setPicked({ value, qty: "1" });
+    else void add(value);
+  };
   const confirmQty = () => {
     if (!picked) return;
     const n = Number(picked.qty);
@@ -94,7 +110,7 @@ export default function AddMultipleDialog({
         <DialogHeader>
           <DialogTitle>Select {doctype}</DialogTitle>
           <DialogDescription>
-            {qtyLabel ? `Pick a ${doctype}, enter the ${qtyLabel.toLowerCase()}, press Enter. Repeat for more.` : `Pick each ${doctype} to add a row.`}
+            {single ? `Search ${doctype} and pick one.` : qtyLabel ? `Pick a ${doctype}, enter the ${qtyLabel.toLowerCase()}, press Enter. Repeat for more.` : `Pick each ${doctype} to add a row.`}
           </DialogDescription>
         </DialogHeader>
         <input
@@ -139,8 +155,12 @@ export default function AddMultipleDialog({
                 </div>
               ) : (
                 <button type="button" disabled={busy} onClick={() => choose(r.value)} className="flex w-full items-baseline gap-3 text-left">
-                  <span className="shrink-0 text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-100">{r.value}</span>
-                  {(r.label || r.description) && <span className="min-w-0 truncate text-xs text-zinc-500">{[r.label !== r.value ? r.label : "", r.description].filter(Boolean).join(", ")}</span>}
+                  {/* a title-link DocType leads with its title; the name follows once */}
+                  <span className="shrink-0 text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-100">{r.label || r.value}</span>
+                  {(() => {
+                    const rest = [r.label && r.label !== r.value ? r.value : "", ...(r.description ?? "").split(", ")].filter((x, k, all) => x && x !== (r.label || r.value) && all.indexOf(x) === k);
+                    return rest.length > 0 && <span className="min-w-0 truncate text-xs text-zinc-500">{rest.join(", ")}</span>;
+                  })()}
                 </button>
               )}
             </li>
@@ -155,7 +175,7 @@ export default function AddMultipleDialog({
             </button>
           )}
           {added.length > 0 && <span aria-live="polite" className="min-w-0 truncate">Added: {added.join(", ")}</span>}
-          <button type="button" onClick={onClose} className="ml-auto rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
+          <button type="button" onClick={onClose} className={`ml-auto ${single ? "hidden" : ""} rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900`}>
             Done
           </button>
         </div>

@@ -5,18 +5,27 @@
  *  - value commits on select / Enter / blur (not per keystroke), so fetch_from
  *    and script events fire once; re-syncs when a script sets the value
  *  - suggestions on focus (search_link with the field's set_query filters)
- *  - "+ Create a new <DocType>" at the end → quick entry (or full form)
+ *  - "Filtered by: …" (set_query / link_filters in words), "+ Create a new <DocType>" (only with create permission,
+ *    not for only_select fields) → quick entry (or full form), "Advanced Search" → the link selector dialog
+ *  - link_filters (Customize Form → Filters) applied to the search (apply_link_field_filters)
+ *  - DocTypes with "Show Title in Link Fields" (boot.link_title_doctypes) show the title, store the name
+ *    (set_link_title / title_value_map, frappe.desk.search.get_link_title)
  *  - arrow to open the linked document
  */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPosition } from "@/lib/hooks/useAnchoredPosition";
 import Link from "next/link";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight, Plus, Search } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FieldControlProps } from "./index";
 import { searchLink } from "@/lib/frappe/search";
+import { frappeMethod } from "@/lib/frappe/client";
+import { applyLinkFilters, describeFilters } from "@/lib/frappe/filterDescription";
 import { useDoctype } from "@/lib/hooks/useDoctype";
+import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
+import AddMultipleDialog from "@/components/form/AddMultipleDialog";
 
 function safeQuery(getQuery: FieldControlProps["getQuery"]) {
   try {
@@ -24,6 +33,14 @@ function safeQuery(getQuery: FieldControlProps["getQuery"]) {
   } catch {
     return undefined;
   }
+}
+
+/** the "Filtered by: …" line; mounted only while the list is open (it loads the linked DocType's labels) */
+function FilterNote({ doctype, filters, text }: { doctype: string; filters: unknown; text?: string }) {
+  const { data: meta } = useDoctype(text ? "" : doctype);
+  const note = text || describeFilters(doctype, filters, meta);
+  if (!note) return null;
+  return <li role="note" className="border-t border-zinc-100 px-3 py-1.5 text-xs leading-relaxed text-zinc-500 dark:border-zinc-800">{note}</li>;
 }
 
 function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; initial: string; onDone: (name: string) => void; onClose: () => void }) {
@@ -50,36 +67,54 @@ function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; 
   );
 }
 
-export default function LinkField({ field, inputId, value, onChange, disabled, error, getQuery, compact }: FieldControlProps) {
+export default function LinkField({ field, inputId, value, onChange, disabled, error, getQuery, compact, doc }: FieldControlProps) {
   const current = typeof value === "string" ? value : value == null ? "" : String(value);
-  const [text, setText] = useState(current);
-  const [prev, setPrev] = useState(current);
-  if (prev !== current) {
-    setPrev(current);
-    setText(current);
+  const doctype = String(field.options ?? "");
+  const qc = useQueryClient();
+  const { data: ctx } = useDeskContext();
+  const isTitleLink = ((ctx?.boot?.link_title_doctypes as string[] | undefined) ?? []).includes(doctype);
+  const { data: title } = useQuery({
+    queryKey: ["link-title", doctype, current],
+    queryFn: () => frappeMethod<string>("frappe.desk.search.get_link_title", { doctype, docname: current }).catch(() => current),
+    enabled: isTitleLink && !!current,
+    staleTime: 5 * 60 * 1000,
+  });
+  // what the box shows for the stored value: the title for title-link DocTypes, else the name
+  const display = isTitleLink && current ? title || current : current;
+  const [text, setText] = useState(display);
+  const [prev, setPrev] = useState(display);
+  if (prev !== display) {
+    setPrev(display);
+    setText(display);
   }
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<Array<{ value: string; description?: string; label?: string }>>([]);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const pos = useAnchoredPosition(anchorRef, listRef, open, { matchWidth: true });
-  const doctype = String(field.options ?? "");
   const isDisabled = disabled || !!field.read_only;
 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
+  // set_query plus the field's link_filters (Desk set_custom_query)
+  const query = () => {
+    const q = safeQuery(getQuery);
+    const filters = applyLinkFilters(doctype, q?.filters, field.link_filters, doc);
+    return filters ? { ...q, filters } : q;
+  };
   const search = (q: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setLoading(true);
       try {
-        setResults(await searchLink(doctype, q, { ...safeQuery(getQuery), page_length: 10 }));
+        setResults(await searchLink(doctype, q, { ...query(), page_length: 10 }));
       } catch {
         setResults([]);
       } finally {
@@ -89,18 +124,33 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
     }, 150);
   };
 
-  const commit = (v: string) => {
-    setText(v);
+  const commit = (v: string, label?: string) => {
+    if (isTitleLink && v && label) qc.setQueryData(["link-title", doctype, v], label);
+    setText(isTitleLink && v && label ? label : v);
     setOpen(false);
     if (v !== current) onChange(v || null);
   };
+  // typed text → value: unchanged title keeps the value; a title from the results maps to its name (title_value_map)
+  const commitTyped = (t: string) => {
+    if (t === display) return commit(current);
+    const hit = isTitleLink ? results.find((r) => r.label === t) : undefined;
+    commit(hit ? hit.value : t, hit?.label);
+  };
+  const onlySelect = !!field.only_select;
+  const canCreate = !onlySelect && (ctx?.perms?.can_create ?? []).includes(doctype);
+  const extras: Array<{ key: string; label: string; icon: typeof Plus; run: () => void }> = onlySelect
+    ? []
+    : [
+        ...(canCreate ? [{ key: "create", label: `Create a new ${doctype}`, icon: Plus, run: () => setCreating(true) }] : []),
+        { key: "advanced", label: "Advanced Search", icon: Search, run: () => (setOpen(false), setAdvanced(true)) },
+      ];
 
   if (isDisabled) {
     return (
       <div className="flex min-h-[38px] items-center gap-1 rounded-lg border border-transparent bg-zinc-100 px-3 py-2 text-sm text-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-200">
         {current ? (
-          <Link href={`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(current)}`} className="truncate hover:underline">
-            {current}
+          <Link href={`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(current)}`} title={display !== current ? current : undefined} className="truncate hover:underline">
+            {display}
           </Link>
         ) : (
           <span className="text-zinc-400">—</span>
@@ -132,9 +182,9 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
           setOpen(true);
           search(e.target.value);
         }}
-        onBlur={() => setTimeout(() => (setOpen(false), text !== current && commit(text.trim())), 150)}
+        onBlur={() => setTimeout(() => (setOpen(false), text !== display && commitTyped(text.trim())), 150)}
         onKeyDown={(e) => {
-          const n = results.length + 1; // + create row
+          const n = results.length + extras.length;
           if (e.key === "ArrowDown") {
             e.preventDefault();
             setOpen(true);
@@ -144,10 +194,11 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
             setActive((a) => (a <= 0 ? n - 1 : a - 1));
           } else if (e.key === "Enter") {
             e.preventDefault();
-            if (active === results.length) setCreating(true);
-            else commit(active >= 0 ? results[active].value : text.trim());
+            if (active >= results.length) extras[active - results.length]?.run();
+            else if (active >= 0) commit(results[active].value, results[active].label);
+            else commitTyped(text.trim());
           } else if (e.key === "Escape") {
-            setText(current);
+            setText(display);
             setOpen(false);
           }
         }}
@@ -182,7 +233,7 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => commit(r.value)}
+                onClick={() => commit(r.value, r.label)}
                 className={`block w-full px-3 py-1.5 text-left text-sm ${i === active ? "bg-zinc-100 dark:bg-zinc-800" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
               >
                 <span className="block truncate font-medium text-zinc-900 dark:text-zinc-100">{r.label || r.value}</span>
@@ -191,20 +242,37 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
             </li>
           ))}
           {!loading && results.length === 0 && <li className="px-3 py-1.5 text-sm text-zinc-400">No {doctype} found</li>}
-          <li role="option" aria-selected={active === results.length} className="border-t border-zinc-100 dark:border-zinc-800">
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setCreating(true)}
-              className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-zinc-700 dark:text-zinc-200 ${active === results.length ? "bg-zinc-100 dark:bg-zinc-800" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
-            >
-              <Plus className="h-3.5 w-3.5" /> Create a new {doctype}
-            </button>
-          </li>
+          <FilterNote doctype={doctype} filters={query()?.filters} text={typeof field.filter_description === "string" ? field.filter_description : undefined} />
+          {extras.map((x, k) => {
+            const on = active === results.length + k;
+            const Icon = x.icon;
+            return (
+              <li key={x.key} role="option" aria-selected={on} className={k === 0 ? "border-t border-zinc-100 dark:border-zinc-800" : ""}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={x.run}
+                  className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-zinc-700 dark:text-zinc-200 ${on ? "bg-zinc-100 dark:bg-zinc-800" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"}`}
+                >
+                  <Icon className="h-3.5 w-3.5" /> {x.label}
+                </button>
+              </li>
+            );
+          })}
         </ul>,
         document.body,
       )}
 
+      {advanced && (
+        <AddMultipleDialog
+          single
+          doctype={doctype}
+          initialTxt={text.trim() === display ? "" : text.trim()}
+          getQuery={() => query() as Record<string, unknown> | undefined}
+          onPick={async (v, _qty, label) => commit(v, label)}
+          onClose={() => setAdvanced(false)}
+        />
+      )}
       {creating && (
         <CreateLinked
           doctype={doctype}
