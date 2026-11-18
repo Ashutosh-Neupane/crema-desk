@@ -9,7 +9,7 @@
  *  - sort, group-by counts, page size + load more, bulk actions (components/list/BulkActions)
  *  - only the views that make sense for the DocType; quick entry for New when allowed
  */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,9 @@ import {
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { AssigneeAvatars, CommentCount, LikeButton } from "@/components/list/RowExtras";
+import { RowButtons, ToolbarButtons } from "@/components/list/ListHooksUI";
+import { createListview, EMPTY_PAGE_STATE, runHook, type ListviewHandle } from "@/lib/list/listviewShim";
+import { sanitizeHtml } from "@/lib/report/columns";
 import { isUnread, jsonList } from "@/lib/list/rowMeta";
 import { DEFAULT_LAYOUT, fetchLayouts, findBySignature, layoutColumns, layoutFilters, type ListLayout } from "@/lib/list/layouts";
 import { LayoutDialog, LayoutMenu, ManageLayoutsDialog } from "@/components/list/Layouts";
@@ -41,7 +44,7 @@ import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
 import { getIndicator, INDICATOR_PILL, indicatorFilters } from "@/lib/list/indicator";
 import { formatCell, timeAgo } from "@/lib/list/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
 import LinkInput from "@/components/list/LinkInput";
 import { FilterEditor, GroupBy, NO_VALUE, OPERATORS, describeValue, fieldLabel, filtersFromParams } from "@/components/list/filters";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
@@ -56,6 +59,9 @@ import type { DocField } from "@/lib/frappe/types";
 
 const enc = encodeURIComponent;
 type Sort = { field: string; order: "asc" | "desc" };
+
+const noSubscribe = () => () => {};
+const emptyPageState = () => EMPTY_PAGE_STATE;
 
 // ── Main ───────────────────────────────────────────────────────────────────
 export default function ListView({ doctype }: { doctype: string }) {
@@ -168,9 +174,14 @@ export default function ListView({ doctype }: { doctype: string }) {
         setAwaitFrom(filters);
         setFilters(valid);
       }
+    } else if (filters.length === 0 && !Array.isArray(cur.filters) && Array.isArray(settings.filters) && settings.filters.length) {
+      // list_view.js set_fields priority 2: the app's listview_settings.filters ([field, op, value] or 4-tuples)
+      const defaults = (settings.filters as unknown[][]).filter(Array.isArray).map((f) => (f.length === 3 ? [doctype, ...f] : f.slice(0, 4)) as Filter);
+      setAwaitFrom(filters);
+      setFilters(defaults);
     }
     setRestoredFor(doctype);
-  }, [restoredFor, doctype, meta, usQuery.isFetchedAfterMount, usQuery.data, filters, setFilters]);
+  }, [restoredFor, doctype, meta, usQuery.isFetchedAfterMount, usQuery.data, filters, setFilters, settings]);
   const stateReady = restoredFor === doctype && !(awaitFrom !== null && awaitFrom === filters);
 
   const addFilter = (f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]);
@@ -249,6 +260,34 @@ export default function ListView({ doctype }: { doctype: string }) {
     qc.invalidateQueries({ queryKey: ["list", doctype] });
     qc.invalidateQueries({ queryKey: ["list-count", doctype] });
   };
+
+  // the `listview` an app's listview_settings hooks receive (onload / refresh / before_render); it reads this render's
+  // state through hostRef, and the buttons it adds come back through useSyncExternalStore
+  const lvHandle = useMemo(() => (meta && settings ? createListview(doctype, meta, settings) : null), [meta, settings, doctype]);
+  useEffect(() => {
+    lvHandle?.setHost({
+      rows: () => rows,
+      selected: () => [...selected],
+      clearSelected: () => setSelected(new Set()),
+      filters: () => filters,
+      setFilters,
+      refresh,
+    });
+  });
+  const pageState = useSyncExternalStore(lvHandle?.subscribe ?? noSubscribe, lvHandle?.getState ?? emptyPageState, emptyPageState);
+  // list_view.js setup_view: settings.onload(listview), once per list
+  const onloadFor = useRef<ListviewHandle | null>(null);
+  useEffect(() => {
+    if (!lvHandle || !stateReady || onloadFor.current === lvHandle) return;
+    onloadFor.current = lvHandle;
+    runHook(settings, "onload", lvHandle.listview);
+  }, [lvHandle, stateReady, settings]);
+  // base_list.js refresh: before_render(), then settings.refresh(listview) after each load
+  useEffect(() => {
+    if (!lvHandle || !rowsQuery.isSuccess || !rowsQuery.dataUpdatedAt) return;
+    runHook(settings, "before_render");
+    runHook(settings, "refresh", lvHandle.listview);
+  }, [lvHandle, rowsQuery.isSuccess, rowsQuery.dataUpdatedAt, settings]);
 
   // Desk refreshes the list when anyone creates/changes/deletes a document (list_update); bursts coalesce
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -384,6 +423,28 @@ export default function ListView({ doctype }: { doctype: string }) {
     if (canQuickEntry(meta)) setQuickEntry(true);
     else router.push(`/desk/doctype/${enc(doctype)}/new`);
   };
+  // listview_settings: per-row button / dropdown_button, column formatters, hide_name_column
+  const hasRowButtons = !!settings?.button || !!settings?.dropdown_button;
+  const hideName = !!settings?.hide_name_column;
+  const formatter = (fieldname: string) => {
+    const fn = (settings?.formatters as Record<string, unknown> | undefined)?.[fieldname];
+    return typeof fn === "function" ? (fn as (v: unknown, df: unknown, doc: unknown) => unknown) : null;
+  };
+  const formatted = (f: DocField, r: Record<string, unknown>) => {
+    try {
+      return sanitizeHtml(String(formatter(f.fieldname)?.(r[f.fieldname], f, r) ?? ""));
+    } catch (e) {
+      console.warn(`listview_settings.formatters.${f.fieldname}:`, e);
+      return sanitizeHtml(String(r[f.fieldname] ?? ""));
+    }
+  };
+  const runItem = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (e) {
+      console.warn("listview_settings:", e);
+    }
+  };
   const me = ctx?.user ?? "";
   const unread = (r: Record<string, unknown>) => !!meta.track_seen && !!me && isUnread(r._seen, me);
   // avatar_group filterable: an assignee avatar filters the list to that user's assignments
@@ -399,7 +460,9 @@ export default function ListView({ doctype }: { doctype: string }) {
     <div className="space-y-3">
       {/* Title row */}
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{doctype}</h1>
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{pageState.title || doctype}</h1>
+        {/* page.set_indicator from an app's onload / refresh */}
+        {pageState.indicator && <span data-page-indicator className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[pageState.indicator.color] ?? INDICATOR_PILL.gray}`}>{pageState.indicator.label}</span>}
         {layoutsQuery.isSuccess && (
           <LayoutMenu
             layouts={layouts}
@@ -420,6 +483,7 @@ export default function ListView({ doctype }: { doctype: string }) {
           </nav>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <ToolbarButtons items={pageState.inner} />
           <button type="button" onClick={refresh} aria-label="Refresh" className="rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
             <RefreshCw className={`h-4 w-4 ${rowsQuery.isFetching ? "animate-spin" : ""}`} />
           </button>
@@ -436,11 +500,19 @@ export default function ListView({ doctype }: { doctype: string }) {
               {/* Desk list_view.js: System Manager only */}
               {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/User%20Permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
               {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/page/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
+              {/* page.add_menu_item from the app's listview_settings */}
+              {pageState.menu.length > 0 && <DropdownMenuSeparator />}
+              {pageState.menu.map((m) => (
+                <DropdownMenuItem key={m.label} onClick={() => runItem(m.action)}>
+                  {m.label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
           {selected.size > 0 ? (
             <BulkActions
               meta={meta}
+              extraActions={pageState.actions}
               rows={rows.filter((r) => selected.has(r.name))}
               columns={listFields.map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname, fieldtype: f.fieldtype }))}
               onDone={() => {
@@ -618,7 +690,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                       {ind && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}>{ind[0]}</span>}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
-                      {subject !== r.name && <span className="truncate">{r.name}</span>}
+                      {subject !== r.name && !hideName && <span className="truncate">{r.name}</span>}
                       <span className="ml-auto inline-flex shrink-0 items-center gap-2">
                         <AssigneeAvatars users={jsonList(r._assign)} onFilter={filterAssigned} />
                         {!disableCommentCount && <CommentCount count={r._comment_count} />}
@@ -665,6 +737,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                   {listFields.map((f) => (
                     <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
                   ))}
+                  {hasRowButtons && <th className="px-3 py-2.5" />}
                   <th className="w-24 px-3 py-2.5 text-right">
                     <span className="inline-flex items-center gap-2">
                       {!disableCount && `${rows.length} of ${total}`}
@@ -685,7 +758,8 @@ export default function ListView({ doctype }: { doctype: string }) {
                     <tr
                       key={r.name}
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).closest("a,button,input")) return;
+                        // controls inside the row (links, buttons, an app's row dropdown menu) don't open the record
+                        if ((e.target as HTMLElement).closest("a,button,input,[role=menu],[role=menuitem]")) return;
                         if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
                         else router.push(href);
                       }}
@@ -707,7 +781,7 @@ export default function ListView({ doctype }: { doctype: string }) {
                       </td>
                       <td className="max-w-[18rem] px-3 py-2.5">
                         <Link href={href} data-unread={unread(r) || undefined} className={`block truncate text-zinc-900 hover:underline dark:text-zinc-100 ${unread(r) ? "font-bold" : "font-medium"}`}>{subject}</Link>
-                        {subject !== r.name && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
+                        {subject !== r.name && !hideName && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
                       </td>
                       {hasIndicator && (
                         <td className="whitespace-nowrap px-3 py-2.5">
@@ -728,7 +802,9 @@ export default function ListView({ doctype }: { doctype: string }) {
                         const numeric = ["Currency", "Float", "Int", "Percent"].includes(f.fieldtype);
                         return (
                           <td key={f.fieldname} className={`max-w-[16rem] truncate whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-300 ${numeric ? "text-right tabular-nums" : ""}`}>
-                            {f.fieldtype === "Link" && text ? (
+                            {formatter(f.fieldname) ? (
+                              <span data-formatted={f.fieldname} dangerouslySetInnerHTML={{ __html: formatted(f, r) }} />
+                            ) : f.fieldtype === "Link" && text ? (
                               <button type="button" onClick={() => addFilter([doctype, f.fieldname, "=", r[f.fieldname]])} className="truncate hover:underline" title={`Filter by ${text}`}>
                                 {text}
                               </button>
@@ -738,6 +814,11 @@ export default function ListView({ doctype }: { doctype: string }) {
                           </td>
                         );
                       })}
+                      {hasRowButtons && settings && (
+                        <td className="whitespace-nowrap px-3 py-2.5">
+                          <RowButtons settings={settings} doc={r} />
+                        </td>
+                      )}
                       <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
                         {/* get_meta_html: assignees · modified · comments · like */}
                         <span className="inline-flex items-center gap-2">

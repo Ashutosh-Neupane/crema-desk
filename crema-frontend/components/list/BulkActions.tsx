@@ -31,6 +31,7 @@ export default function BulkActions({
   rows,
   columns,
   onDone,
+  extraActions = [],
 }: {
   meta: DocTypeMeta;
   /** selected rows (as loaded in the list) */
@@ -38,6 +39,8 @@ export default function BulkActions({
   /** fields shown in the list, for Export */
   columns: Array<{ fieldname: string; label: string; fieldtype: string }>;
   onDone: () => void;
+  /** page.add_action_item from the app's listview_settings (Desk adds them to the same Actions menu) */
+  extraActions?: Array<{ label: string; action: () => unknown }>;
 }) {
   const doctype = meta.name;
   const names = rows.map((r) => r.name);
@@ -95,6 +98,21 @@ export default function BulkActions({
           <DropdownMenuItem onClick={() => setOpen("assign")}>Assign To</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setOpen("tags")}>Add Tags</DropdownMenuItem>
           <DropdownMenuItem onClick={exportCsv}>Export</DropdownMenuItem>
+          {extraActions.length > 0 && <DropdownMenuSeparator />}
+          {extraActions.map((a) => (
+            <DropdownMenuItem
+              key={a.label}
+              onClick={() => {
+                try {
+                  a.action();
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : String(e));
+                }
+              }}
+            >
+              {a.label}
+            </DropdownMenuItem>
+          ))}
           {wfActions.length > 0 && <DropdownMenuSeparator />}
           {wfActions.map((a) => (
             <DropdownMenuItem key={a} onClick={() => setOpen({ workflow: a })}>
