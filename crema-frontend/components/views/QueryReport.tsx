@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { BarChart3, ChevronDown, ChevronRight, Download, FileText, Loader2, RefreshCw, Save, Search, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createRuntime, lenient } from "@/lib/desk-runtime";
+import { reportHelpers, type HelperScript } from "@/lib/desk-runtime/appHelpers";
 import { deskCall } from "@/lib/frappe/form";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { evalDependsOn } from "@/lib/crema-form/dependsOn";
@@ -28,11 +29,12 @@ import {
   sanitizeHtml,
   toChartResult,
   toCsv,
+  type LinkFormatters,
   type ReportColumn,
   type ReportRow,
 } from "@/lib/report/columns";
 import { buildReportHtml, downloadReportPdf } from "@/lib/report/printGrid";
-import { formatValue } from "@/lib/utils/formatNumber";
+import { formatCell } from "@/lib/list/format";
 import { PdfSettingsDialog, SaveReportDialog, type PdfSettings } from "@/components/views/ReportDialogs";
 
 interface ReportFilter {
@@ -57,13 +59,17 @@ type Settings = Record<string, unknown> & {
   tree?: boolean;
   initial_depth?: number;
   __report?: unknown;
+  /** runs a formatter's link_onclick in the report's runtime */
+  __eval?: (code: string) => unknown;
+  /** frappe.form.link_formatters registered by the app's helpers */
+  __linkFormatters?: LinkFormatters;
 };
 
 interface RunResult {
   columns: ReportColumn[];
   rows: ReportRow[];
   chart: ReturnType<typeof toChartResult>;
-  summary: Array<{ label: string; value: unknown; datatype?: string; indicator?: string; currency?: string }>;
+  summary: Array<{ label: string; value: unknown; datatype?: string; indicator?: string; color?: string; currency?: string; type?: string }>;
   message?: string;
   totals: ReportRow | null;
 }
@@ -114,9 +120,12 @@ export default function QueryReport({ name }: { name: string }) {
       deskCall("frappe.desk.query_report.get_script", { report_name: name }),
       deskCall("frappe.client.get_value", { doctype: "Report", filters: { name }, fieldname: ["report_type", "ref_doctype", "reference_report", "is_standard"] }).catch(() => null),
     ])
-      .then(([s, meta]) => {
+      .then(async ([s, meta]) => {
         if (cancelled) return;
         const m = (s.env.message ?? {}) as { script?: string; filters?: ReportFilter[] };
+        // the app's shared report JS the script builds on (erpnext.financial_statements, erpnext.utils, …)
+        const helpers = await reportHelpers(m.script ?? "");
+        if (cancelled) return;
         const info = (meta?.env.message ?? {}) as { report_type?: string; ref_doctype?: string; reference_report?: string; is_standard?: string };
         if (info.report_type === "Report Builder" && info.ref_doctype) {
           router.replace(`/desk/doctype/${enc(info.ref_doctype)}/view/report/${enc(name)}`);
@@ -124,11 +133,29 @@ export default function QueryReport({ name }: { name: string }) {
         }
         // Desk get_local_report_settings: a Custom Report runs the script of its reference report
         const scriptName = info.report_type === "Custom Report" && info.reference_report ? info.reference_report : name;
-        const qs = buildSettings(name, scriptName, m, ctx, { valuesRef, resultRef, setFilterValues, setRunToken, setInnerButtons });
+        const qs = await buildSettings(name, scriptName, m, ctx, { valuesRef, resultRef, setFilterValues, setRunToken, setInnerButtons, navigate: (url) => router.push(url) }, helpers);
+        if (cancelled) return;
         const init: Record<string, unknown> = {};
         for (const f of qs.filters ?? []) {
           if (f.default != null && f.default !== "" && typeof f.default !== "function") init[f.fieldname] = f.default;
           else if (f.fieldtype === "Check") init[f.fieldname] = 0;
+        }
+        // query_report.js set_route_filters: ?field=value from frappe.route_options (e.g. Balance Sheet → General
+        // Ledger for one account); "[…]" is a multi-select list
+        const route = new URLSearchParams(window.location.search);
+        for (const f of qs.filters ?? []) {
+          const raw = route.get(f.fieldname);
+          if (raw == null) continue;
+          let v: unknown = raw;
+          if (raw.startsWith("[")) {
+            try {
+              v = JSON.parse(raw);
+            } catch {
+              /* keep the text */
+            }
+          }
+          if (f.fieldtype === "MultiSelectList" && !Array.isArray(v)) v = [v];
+          init[f.fieldname] = v;
         }
         valuesRef.current = init;
         setValues(init);
@@ -326,7 +353,7 @@ export default function QueryReport({ name }: { name: string }) {
   }, [result]);
 
   const render = (value: unknown, column: ReportColumn, row: ReportRow, plain = false) => {
-    const fmtCtx = { currency, dateFormat };
+    const fmtCtx = { currency, dateFormat, linkFormatters: settings?.__linkFormatters };
     const base = (v: unknown, _r?: unknown, c?: ReportColumn, d?: ReportRow) => defaultFormatter(v, c ?? column, d ?? row, fmtCtx);
     if (plain) return sanitizeHtml(String(value ?? ""));
     let html: string;
@@ -342,6 +369,13 @@ export default function QueryReport({ name }: { name: string }) {
 
   // in-app navigation for links produced by formatters
   const onTableClick = (e: React.MouseEvent) => {
+    // a column's link_onclick (Desk formatters.js: <a onclick="…; return false">) runs in the report's runtime
+    const onclick = (e.target as HTMLElement).closest("a[data-link-onclick]")?.getAttribute("data-link-onclick");
+    if (onclick) {
+      e.preventDefault();
+      settings?.__eval?.(onclick);
+      return;
+    }
     const a = (e.target as HTMLElement).closest("a");
     const href = a?.getAttribute("href");
     if (!a || !href || e.metaKey || e.ctrlKey) return;
@@ -525,14 +559,21 @@ export default function QueryReport({ name }: { name: string }) {
 
         {shown && shown.summary.length > 0 && (
           <div className="flex flex-wrap gap-3">
-            {shown.summary.map((s) => (
-              <div key={s.label} className="min-w-40 flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="text-xs text-zinc-500">{String(s.label).replace(/<[^>]+>/g, "")}</div>
-                <div className={`mt-1 text-lg font-semibold tabular-nums ${SUMMARY_TONE[String(s.indicator ?? "").toLowerCase()] ?? "text-zinc-900 dark:text-zinc-100"}`}>
-                  {typeof s.value === "number" ? formatValue(s.value, s.datatype, s.currency ?? currency) : String(s.value ?? "")}
+            {/* utils.js build_summary_item: separators ("-", "=") between figures; values formatted like cells */}
+            {shown.summary.map((s, i, all) =>
+              s.type === "separator" ? (
+                <div key={`after-${String(all[i - 1]?.label ?? "start")}`} data-summary-separator className={`self-center text-lg font-semibold ${SUMMARY_TONE[String(s.color ?? "").toLowerCase()] ?? "text-zinc-400"}`}>
+                  {String(s.value ?? "")}
                 </div>
-              </div>
-            ))}
+              ) : (
+                <div key={String(s.label)} data-summary-item className="min-w-40 flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="text-xs text-zinc-500">{String(s.label).replace(/<[^>]+>/g, "")}</div>
+                  <div className={`mt-1 text-lg font-semibold tabular-nums ${SUMMARY_TONE[String(s.indicator ?? s.color ?? "").toLowerCase()] ?? "text-zinc-900 dark:text-zinc-100"}`}>
+                    {summaryValue(s, currency, dateFormat)}
+                  </div>
+                </div>
+              ),
+            )}
           </div>
         )}
 
@@ -873,19 +914,26 @@ interface ReportBridge {
   setFilterValues: (patch: Record<string, unknown>) => void;
   setRunToken: React.Dispatch<React.SetStateAction<number>>;
   setInnerButtons: React.Dispatch<React.SetStateAction<Array<{ label: string; group?: string; action: () => void }>>>;
+  /** frappe.set_route from the report's JS (open_general_ledger → General Ledger) */
+  navigate: (url: string) => void;
 }
 
 /** Evaluate the report JS with a frappe.query_report object wired to this page */
-function buildSettings(
+async function buildSettings(
   name: string,
   scriptName: string,
   m: { script?: string; filters?: ReportFilter[] },
-  ctx: { user: string; full_name: string; roles: string[]; defaults: Record<string, unknown>; sysdefaults: Record<string, unknown>; perms: Record<string, string[]>; developer_mode: boolean; boot?: Record<string, unknown> },
+  ctx: { user: string; full_name: string; roles: string[]; defaults: Record<string, unknown>; sysdefaults: Record<string, unknown>; perms: Record<string, string[]>; developer_mode: boolean; boot?: Record<string, unknown>; docs?: Record<string, Record<string, Record<string, unknown>>> },
   b: ReportBridge,
-): Settings {
-  const rt = createRuntime({ user: ctx.user, full_name: ctx.full_name, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, developer_mode: ctx.developer_mode, boot: ctx.boot });
+  helpers: HelperScript[] = [],
+): Promise<Settings> {
+  const rt = createRuntime({ user: ctx.user, full_name: ctx.full_name, roles: ctx.roles, defaults: ctx.defaults, sysdefaults: ctx.sysdefaults, perms: ctx.perms, developer_mode: ctx.developer_mode, boot: ctx.boot, docs: ctx.docs, navigate: b.navigate });
   const bump = () => b.setRunToken((t) => t + 1);
+  let controls: Array<{ df: ReportFilter; get_value: () => unknown; set_value: (v: unknown) => Promise<void> }> = [];
   const report = lenient({
+    get filters() {
+      return controls;
+    },
     report_name: name,
     get_filter_value: (fn: string) => b.valuesRef.current[fn],
     get_filter_values: () => ({ ...b.valuesRef.current }),
@@ -916,8 +964,34 @@ function buildSettings(
     }),
   });
   (rt.frappe as Record<string, unknown>).query_report = report;
+  // keep Crema's boot-based get_fiscal_year: ERPNext's utils.js falls back to a synchronous request
+  const utils = (rt.globals.erpnext as { utils?: Record<string, unknown> } | undefined)?.utils;
+  const fiscalYear = utils?.get_fiscal_year;
+  for (const h of helpers) rt.evalScript(h.code, h.label);
+  if (utils && fiscalYear) utils.get_fiscal_year = fiscalYear;
   rt.evalScript(m.script ?? "", `${name} report js`);
+  // query_report.js get_report_settings: frappe.after_ajax before the filters are read
+  await Promise.race([rt.afterAjax(), new Promise((r) => setTimeout(r, 8000))]);
   const qr = (rt.frappe as unknown as { query_reports: Record<string, Settings> }).query_reports[scriptName] ?? {};
   const filters = [...(qr.filters ?? []), ...(m.filters ?? [])].filter((f) => f?.fieldname);
-  return { ...qr, filters, __report: report };
+  // frappe.query_report.filters: the filter controls (open_general_ledger reads f.df.fieldname / f.get_value())
+  controls = filters.map((df) => ({
+    df,
+    get_value: () => b.valuesRef.current[df.fieldname],
+    set_value: (v: unknown) => {
+      b.setFilterValues({ [df.fieldname]: v });
+      return Promise.resolve();
+    },
+  }));
+  return { ...qr, filters, __report: report, __eval: (code: string) => rt.evalExpr(code, `${name} link_onclick`),
+    __linkFormatters: (rt.frappe as unknown as { form: { link_formatters: LinkFormatters } }).form.link_formatters,
+  };
+}
+
+/** utils.js build_summary_item: frappe.format(value, { fieldtype: datatype, options: "currency" }, …, { currency }) */
+function summaryValue(s: RunResult["summary"][number], currency: string | undefined, dateFormat: string): string {
+  if (s.value == null || s.value === "") return "";
+  if (!s.datatype) return String(s.value);
+  const df = { fieldtype: s.datatype, options: s.datatype === "Currency" ? "currency" : undefined };
+  return formatCell(s.value, df as never, { currency: s.currency ?? currency }, { currency, dateFormat });
 }
