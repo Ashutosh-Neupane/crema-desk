@@ -21,12 +21,9 @@ import SignatureField from "./SignatureField";
 import RatingField from "./RatingField";
 import BarcodeField from "./BarcodeField";
 import DurationField from "./DurationField";
-import JSONField from "./JSONField";
 import TableMultiSelectField from "./TableMultiSelectField";
 import ColorField from "./ColorField";
 import IconField from "./IconField";
-import MarkdownField from "./MarkdownField";
-import HTMLEditorField from "./HTMLEditorField";
 import PhoneField from "./PhoneField";
 import AutocompleteField from "./AutocompleteField";
 import MultiselectField from "./MultiselectField";
@@ -108,7 +105,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
       case "Duration":
         return <DurationField {...props} />;
       case "JSON":
-        return <JSONField {...props} />;
+        return <CodeField {...props} />;
       case "Table MultiSelect":
         return <TableMultiSelectField {...props} />;
       case "Color":
@@ -116,9 +113,9 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
       case "Icon":
         return <IconField {...props} />;
       case "Markdown Editor":
-        return <MarkdownField {...props} />;
+        return <CodeField {...props} />;
       case "HTML Editor":
-        return <HTMLEditorField {...props} />;
+        return <CodeField {...props} />;
       case "Phone":
         return <PhoneField {...props} />;
       case "Address":

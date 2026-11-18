@@ -2,6 +2,17 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4: code editors like Desk; phase-1 plan for today
+- Code / HTML Editor / Markdown Editor / JSON are one CodeMirror control ported from Desk's `code.js` family. Fixed
+  on the way: HTML Editor was a WYSIWYG box (Desk edits HTML as code with a preview); Markdown preview used a regex
+  renderer (now showdown 2.1.0 + Desk's sanitizer, as `frappe.markdown`, which app scripts can now call); a Code
+  field without options was highlighted as JavaScript (Desk: plain text); JSON saved a parsed object (Desk: the text).
+- e2e: editors (new); print made data-agnostic (any Sales Order / format / letter head; a format whose PDF
+  generator the site lacks shows the server's reason). pfbuilder, pfnative, printformat, formsave, dialogs,
+  texteditor green.
+- Plan to close phase 1 (definition in GAPS § 0.1): rest of M4 → M5 (saved filters, row extras, listview hooks,
+  group-by, ERPNext financial statements) → a "day of work" suite (sell, buy, stock, pay, report) → M7 minimum.
+
 ## 2026-11-18 — M4: Text Editor is Quill, like Desk
 - The contentEditable box (execCommand, `window.prompt` for links) is replaced by Quill 2.0.3, set up from Desk's
   `text_editor.js` (`lib/crema-form/quill.ts`), so HTML written in Crema and in Desk is the same. Loaded on demand.

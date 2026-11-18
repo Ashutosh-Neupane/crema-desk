@@ -4,8 +4,17 @@ import fs from "node:fs";
 import { start, BASE } from "./lib.mjs";
 
 const t = await start();
-const { page, check, step, shot } = t;
-const SO = "SAL-ORD-2026-00003";
+const { page, check, step, shot, api } = t;
+// any Sales Order and Letter Head on the site; skipped when there is none
+const SO = (await api("api/resource/Sales%20Order?limit_page_length=1&order_by=creation%20desc")).data?.[0]?.name;
+const LH = (await api("api/resource/Letter%20Head?limit_page_length=1")).data?.[0]?.name;
+const formats = ((await api(`api/resource/Print%20Format?filters=${encodeURIComponent(JSON.stringify([["doc_type", "=", "Sales Order"], ["disabled", "=", 0]]))}&limit_page_length=20`)).data ?? []).map((f) => f.name);
+if (!SO) {
+  console.log("SKIPPED: no Sales Order on this site");
+  await t.finish();
+  process.exit(0);
+}
+console.log(`  data: ${SO}, formats ${JSON.stringify(formats)}, letter head ${LH}`);
 
 step("form → Print");
 await page.goto(`${BASE}/desk/doctype/Sales%20Order/${SO}`, { waitUntil: "domcontentloaded", timeout: 180000 });
@@ -19,17 +28,23 @@ check((await body.innerText()).includes(SO), "standard print shows the document"
 const styled = await page.evaluate(() => [...(document.querySelector("iframe")?.contentDocument?.styleSheets ?? [])].some((s) => { try { return s.href?.includes("/assets/") && s.cssRules.length > 0; } catch { return false; } }));
 check(styled, "Frappe print CSS loaded through /assets");
 
-step("switch format + letterhead");
-await page.getByLabel("Print format").selectOption("Sales Order Classic");
-await page.getByLabel("Letter head").selectOption("Company Letterhead");
+const FMT = formats[0];
+step(`switch format (${FMT ?? "none"}) + letterhead (${LH ?? "none"})`);
+if (FMT) await page.getByLabel("Print format").selectOption(FMT);
+if (LH) await page.getByLabel("Letter head").selectOption(LH);
 await page.waitForTimeout(3000);
-check((await body.innerText()).includes(SO), "Classic format renders");
+check((await body.innerText()).includes(SO), `${FMT ?? "Standard"} format renders`);
 await shot("print_view", false);
 
-step("PDF: a format whose generator is missing shows the server error");
-await page.getByRole("button", { name: "PDF" }).click();
-await page.getByText(/PDF failed:/).first().waitFor({ timeout: 60000 });
-check(true, `error shown: ${(await page.getByText(/PDF failed:/).first().innerText()).slice(0, 80)}`);
+if (FMT) {
+  step(`PDF of ${FMT}: a file, or the server's error shown (a format may need a PDF generator the site lacks)`);
+  const outcome = await Promise.race([
+    page.waitForEvent("download", { timeout: 90000 }).then(async (d) => `pdf:${fs.readFileSync(await d.path()).subarray(0, 5).toString()}`),
+    page.getByText(/PDF failed:/).first().waitFor({ timeout: 90000 }).then(async () => `error:${(await page.getByText(/PDF failed:/).first().innerText()).slice(0, 80)}`),
+    page.getByRole("button", { name: "PDF" }).click().then(() => new Promise(() => {})),
+  ]);
+  check(outcome === "pdf:%PDF-" || outcome.startsWith("error:PDF failed:"), `outcome ${outcome}`);
+}
 
 step("PDF download (Standard + letterhead)");
 await page.getByLabel("Print format").selectOption("Standard");
