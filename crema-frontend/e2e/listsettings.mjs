@@ -22,6 +22,9 @@ async function restore() {
   if (origLVS) console.log("  (note: ToDo had List View Settings before the test; deleted)");
 }
 await restore();
+// the list needs at least one row; a fresh site may have no ToDo at all
+let seeded = null;
+if (!(await post("frappe.client.get_count", { doctype: "ToDo" }))) seeded = (await post("frappe.client.insert", { doc: { doctype: "ToDo", description: "Crema list settings seed" } }))?.name;
 
 const headers = async () => (await page.locator("table thead th").allInnerTexts()).map((s) => s.trim());
 
@@ -129,5 +132,6 @@ for (let i = 0; i < 30; i++) {
 check(JSON.stringify(us?.filters ?? []).includes("Cancelled"), "the URL filter becomes the saved filter (Desk saves current filters)");
 
 await restore();
+if (seeded) await post("frappe.client.delete", { doctype: "ToDo", name: seeded });
 check(JSON.stringify((await getUS()).List ?? null) === JSON.stringify(origUS.List ?? null) || (await getUS()).List === null, "user settings restored");
 await t.finish();

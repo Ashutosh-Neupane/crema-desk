@@ -13,7 +13,7 @@ import { deskCall } from "@/lib/frappe/form";
 import type { DocTypeMeta, DocField } from "@/lib/frappe/types";
 import { MultiSelectDialog } from "./multiSelect";
 import { makeLenientJQuery } from "./jquery";
-import { deskRouteToUrl } from "@/lib/navigation/deskRoute";
+import { deskRouteToUrl, deskSlug } from "@/lib/navigation/deskRoute";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 import * as fmt from "@/lib/frappe/format";
 
@@ -398,6 +398,8 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     },
     new_doc: (dt: string) => ctx.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`),
     get_route: () => [],
+    // frappe.router.slug: listview_settings.get_form_link (Workflow Action) builds Desk paths with it
+    router: { slug: (name: unknown) => deskSlug(cstr(name)) },
     realtime: { on() {}, off() {} },
     /** frappe.require(files, callback): bundles are Crema's own, so it resolves at once — and calls the callback (item.js builds its dashboard there) */
     require: (_files?: unknown, callback?: () => unknown) => {

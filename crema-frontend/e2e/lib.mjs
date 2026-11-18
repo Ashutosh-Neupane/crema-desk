@@ -7,7 +7,8 @@ export const OUT = process.env.OUT ?? "./smoke-shots";
 
 export async function start() {
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  // PW_CHANNEL=chrome uses the installed Google Chrome when Playwright's own Chromium isn't downloaded
+  const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message.slice(0, 300)}`));

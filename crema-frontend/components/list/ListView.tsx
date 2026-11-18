@@ -66,6 +66,20 @@ export default function ListView({ doctype }: { doctype: string }) {
   }, [meta?.issingle, doctype, router]);
   const { data: ctx } = useDeskContext();
   const settings = useListSettings(meta);
+  // Desk list_view.js get_form_link: listview_settings.get_form_link may send a row elsewhere (Workflow Action → the
+  // document waiting on you); its Desk path (/desk/<slug>/<name>) is resolved by the /desk/[slug] route
+  const rowHref = (r: Record<string, unknown> & { name: string }) => {
+    const fn = settings?.get_form_link;
+    if (typeof fn === "function") {
+      try {
+        const p = fn.call(settings, r);
+        if (typeof p === "string" && p.startsWith("/")) return p.replace(/^\/app\//, "/desk/");
+      } catch {
+        /* a broken app script falls back to the record's own form */
+      }
+    }
+    return `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+  };
   // Desk base_list.js get_list_view_settings: the List View Settings doc (columns, disable_count, …)
   const lvsQuery = useListViewSettings(doctype);
   const lvs = lvsQuery.data;
@@ -498,7 +512,7 @@ export default function ListView({ doctype }: { doctype: string }) {
           <ul aria-label={`${doctype} list`} className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
             {rows.map((r) => {
               const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
-              const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+              const href = rowHref(r);
               const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
               return (
                 <li key={r.name} className={`relative flex gap-3 px-3 py-3 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}>
@@ -578,7 +592,7 @@ export default function ListView({ doctype }: { doctype: string }) {
               <tbody>
                 {rows.map((r) => {
                   const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
-                  const href = `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
+                  const href = rowHref(r);
                   const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
                   return (
                     <tr
