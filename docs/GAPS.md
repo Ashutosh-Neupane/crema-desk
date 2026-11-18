@@ -31,8 +31,8 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | # | Milestone | Items (§) | Desk source | Proof | Cloud |
 |---|---|---|---|---|---|
 | M1 ✅ | **Form feels like Desk** | Save rules (2.17), timeline wording (2.17), visibility rules audit (2.15), previous / next doc, title editing, Jump to field verify (2.1), "Not permitted" + "shared with you" messages (2.1) | `form/save.js`, `form/form.js`, `form/toolbar.js`, `form/footer/version_timeline_content_builder.js` | `e2e/formsave.mjs`, `form.salesorder.mjs` | partly |
-| M2 | **Workflow you can follow** | workflow stepper, "waiting on me", Workflow Action list, self-approval and condition messages (2.16) | `form/workflow.js`, `model/workflow.js`, `frappe/workflow/doctype/workflow_action` | `e2e/workflow.mjs` extended | yes |
-| M3 | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
+| M2 ✅ | **Workflow you can follow** | workflow stepper, "waiting on me", Workflow Action list, self-approval and condition messages (2.16) | `form/workflow.js`, `model/workflow.js`, `frappe/workflow/doctype/workflow_action` | `e2e/workflow.mjs` extended | yes |
+| M3 ✅ | **Grid you can type in** | keyboard navigation, paste from a spreadsheet, column settings, Add Multiple, row hover menu (2.2) | `form/grid.js`, `grid_row.js`, `grid_row_form.js` | `e2e/grid*.mjs` | yes |
 | M4 | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
 | M5 | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs` | partly |
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
@@ -145,11 +145,19 @@ Order of work: the milestones in § 0.1.
   (agent-built, judged; judge removed a parent-level extra trigger).
 - ✅ Move To (row number, clamped) and "Delete all N rows" (Desk `frappe.confirm`, then `<table>_delete` once) —
   `e2e/gridmove.mjs` (agent-built, judged). Duplicate copies `no_copy` fields exactly as Desk's grid duplicate does.
-- ❌ Per-row hover menu, "Add Multiple" (Link selector).
-- ❌ Per-user column settings (`Configure Columns` dialog, `in_list_view` override, column widths) — saved to user
-  settings / `GridView`.
-- ❌ Grid keyboard navigation (arrows between cells, Enter opens row, Ctrl+Shift+Up/Down).
-- ❌ Paste multiple rows from a spreadsheet (TSV paste into grid).
+- ✅ Keyboard like Desk (`grid_row.js` set_arrow_keys): ↑/↓ same column, Tab off the last cell → next row (adds one at
+  the end), Shift+Tab back, Ctrl/⌘+↓/↑ insert, Ctrl/⌘+Shift+↓/↑ add at end/start, Shift+Alt+↓ duplicate, Esc drops an
+  `__unedited` row; an open Link suggestion list keeps the arrows — `e2e/gridkeys.mjs`.
+- ✅ Paste from a spreadsheet (`controls/table.js`): TSV fills down from the cell, adds rows, header row of labels /
+  fieldnames picks columns, dates and numbers parsed — `e2e/gridkeys.mjs`.
+- ✅ "Add Multiple" (`grid.set_multiple_add` → `link_selector.js`): search with the grid's set_query, quantity inline,
+  an existing value gets the new quantity, a new form's blank row is filled first; ERPNext transactions get it via
+  Crema's TransactionController stub (`transaction.js` onload_post_render) — `e2e/gridmulti.mjs`, checked on Sales Order.
+- ✅ Per-user column settings (header gear; `grid_row.js` configure_columns): pick, order, width in px; stored as
+  Desk v16's `GridView[<child>]` user setting (legacy `columns` units read); Reset drops only that table (Desk drops
+  all) — `e2e/gridcols.mjs`.
+- ✅ Row menu (⋯ on hover, Crema): Insert Above / Below, Duplicate, Move Up / Down, Delete without opening the row form.
+- ❌ Sticky columns and drag-to-resize column edges (Desk v16).
 - ❌ Grid row `form_render` events, `frm.fields_dict.items.grid.get_field().get_query`, `grid.update_docfield_property`,
   `grid.toggle_enable/display/reqd`, `cannot_add_rows`, `cannot_delete_rows` — verify each via ERPNext scripts.
 
@@ -395,17 +403,21 @@ system-computed changes (totals, HTML breakups) under "and N calculated fields".
 ### 2.16 Workflow: show me what's mine
 Today: the form shows the workflow state pill and an **Actions** menu with transitions from
 `frappe.model.workflow.get_transitions` (server checks the role and `condition`), filtered for self-approval; the
-action runs `apply_workflow`; read-only states lock the form.
-To do:
-- ❌ **Stepper** under the title: all states of the workflow in order, done / current / next, with who can move it on
-  (`Workflow.transitions[].allowed`). The user sees at a glance whether the next step is theirs.
-- ❌ **"Waiting on you"**: when the current user has a transition, a highlighted banner with the action buttons
-  (Approve / Reject) instead of a menu; when nobody in your roles can act, say who can.
-- ❌ **Workflow Action list** (`frappe/workflow/doctype/workflow_action`): Desk's "documents waiting for my action" list
-  and the email action links; a workspace number card "Pending approvals".
-- ❌ Messages Desk gives: transition blocked by `condition`, self-approval not allowed, "Workflow State not set".
+action runs `apply_workflow`; read-only states lock the form. On top of Desk (`components/form/WorkflowBar.tsx`):
+- ✅ **Stepper** under the title: states passed through (docinfo `workflow_logs`, who and when; the starting state from
+  the doc), the current state, the next states; "End of workflow" at the end.
+- ✅ **"Waiting on you"**: the user's transitions as buttons (the Actions menu stays); otherwise "Waiting on <roles>".
+- ✅ Messages Desk keeps hidden: self-approval off for the owner, transition held back by its `condition`,
+  "Workflow State not set" (docs older than the workflow) with a "Set to <default>, then save" fix.
+- ✅ Desk's **Help** (Actions → Help, or the workflow name in the bar): current state, editable-by roles, next actions.
+- ✅ **Workflow Action list**: open rows open the document waiting on you (`listview_settings.get_form_link`, now
+  honoured by every list; `frappe.router.slug` shim).
+- ❌ Workspace number card "Pending approvals" (Workflow Action, status Open) and the email action links page.
 - ❌ Workflow builder parity (`workflow_builder/`, 2.9).
-Source: `frappe/public/js/frappe/form/workflow.js`, `frappe/model/workflow.py`. Proof: `e2e/workflow.mjs`.
+Source: `frappe/public/js/frappe/form/workflow.js`, `frappe/model/workflow.py`,
+`frappe/workflow/doctype/workflow_action/`. Proof: `e2e/workflow.mjs` (incl. a second user without every role).
+Frappe quirk: deleting a doc removes its Workflow Actions but not their permitted-role rows, so a role used in a
+workflow can't be deleted afterwards.
 
 ### 2.17 Save, refresh and the timeline (`form/save.js`, `form/form.js`)
 - ✅ Save of an unchanged saved doc sends no request and shows "No changes in document"

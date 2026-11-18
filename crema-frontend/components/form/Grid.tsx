@@ -8,9 +8,16 @@
  *  - select rows → Delete / Duplicate; per-row insert below, move up/down
  *  - every change goes through the FormController, so child events
  *    (item_code(frm, cdt, cdn), qty…) and fetch_from run exactly once
+ *  - keyboard like Desk (grid_row.js set_arrow_keys): ↑/↓ same column in the next row, Tab off the last cell goes
+ *    to the next row (adds one at the end), Ctrl/⌘+↓/↑ inserts below/above, Ctrl/⌘+Shift+↓/↑ adds at the end/start,
+ *    Shift+Alt+↓ duplicates, Esc drops a new empty row
+ *  - paste from a spreadsheet like Desk (controls/table.js): tab-separated rows fill down from the cell, adding rows;
+ *    a header row of labels / fieldnames picks the columns
  */
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Download, GripVertical, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Copy, Download, GripVertical, ListPlus, MoreHorizontal, Pencil, Plus, Settings2, Trash2, Upload, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -20,14 +27,31 @@ import type { FormController, Row } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import LinkField from "@/lib/crema-form/controls/LinkField";
 import FormBody from "@/components/form/FormBody";
+import AddMultipleDialog from "@/components/form/AddMultipleDialog";
+import GridColumnsDialog, { clampWidth, type GridViewColumn } from "@/components/form/GridColumnsDialog";
+import { loadUserSettings, userSettingsKey, type UserSettings } from "@/lib/list/useUserListState";
+import { deskCall } from "@/lib/frappe/form";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import { formatCell } from "@/lib/list/format";
+import { userToStr } from "@/lib/frappe/format";
 import { currencyFor } from "@/lib/crema-form/controls/NumberField";
 import { useIsPhone } from "@/lib/hooks/useIsPhone";
 
 const NO_VALUE = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading", "Image", "Table", "Table MultiSelect"]);
 const NUMERIC = new Set(["Int", "Float", "Currency", "Percent"]);
+/** Desk set_arrow_keys ignore_fieldtypes: ↑/↓ stay in the text unless Alt is held */
+const TEXTY = new Set(["Text", "Small Text", "Code", "Text Editor", "HTML Editor", "Long Text"]);
+const FOCUSABLE = "input:not([disabled]),select:not([disabled])";
+const isEmpty = (v: unknown) => v == null || v === "" || v === 0;
+/** Desk table.js value_formatter_map: pasted text → the field's value */
+function pastedValue(v: string, fieldtype: string): unknown {
+  const t = v.trim();
+  if (fieldtype === "Int" || fieldtype === "Check") return Math.trunc(Number(t.replace(/,/g, "")) || 0);
+  if (fieldtype === "Float" || fieldtype === "Currency" || fieldtype === "Percent") return Number(t.replace(/,/g, "")) || 0;
+  if (fieldtype === "Date") return !t || /^\d{4}-\d{2}-\d{2}/.test(t) ? t : userToStr(t);
+  return v;
+}
 
 /** Desk grid default widths (grid_row.js setup_columns) */
 const PAGE_SIZE = 50;
@@ -36,8 +60,8 @@ const csvCell = (v: unknown) => {
   const t = v == null ? "" : String(v);
   return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };
-/** Minimal RFC 4180 parser (quoted fields, escaped quotes, CRLF) */
-function parseCsv(text: string): string[][] {
+/** Minimal RFC 4180 parser (quoted fields, escaped quotes, CRLF); `sep` "\t" reads spreadsheet clipboard text */
+function parseCsv(text: string, sep = ","): string[][] {
   const out: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -51,7 +75,7 @@ function parseCsv(text: string): string[][] {
       } else if (ch === '"') q = false;
       else cell += ch;
     } else if (ch === '"') q = true;
-    else if (ch === ",") {
+    else if (ch === sep) {
       row.push(cell);
       cell = "";
     } else if (ch === "\n" || ch === "\r") {
@@ -82,6 +106,9 @@ function SortableGridRow({ id, disabled, template, selected, children }: { id: s
   );
 }
 
+/** Desk grid.js LEGACY_COLSIZE_TO_PX: the 1–12 `columns` units → px */
+const UNITS_TO_PX: Record<number, number> = { 1: 60, 2: 100, 3: 140, 4: 200, 5: 250, 6: 300, 7: 350, 8: 400, 9: 450, 10: 500, 11: 550, 12: 600 };
+
 function defaultWidth(df: DocField): number {
   if (df.columns) return Number(df.columns);
   if (df.fieldtype === "Check") return 1;
@@ -90,8 +117,31 @@ function defaultWidth(df: DocField): number {
   return 2;
 }
 
-export function gridColumns(meta: DocTypeMeta, overrides: Record<string, Record<string, unknown>>, table: string): Array<DocField & { width: number }> {
-  const visible = (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !(overrides[`${table}.${f.fieldname}`]?.hidden ?? f.hidden));
+/** fields that can be grid columns (Desk: not a layout field, not hidden) */
+const columnFields = (meta: DocTypeMeta, overrides: Record<string, Record<string, unknown>>, table: string) =>
+  (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !(overrides[`${table}.${f.fieldname}`]?.hidden ?? f.hidden));
+
+/**
+ * Grid columns with their width in px. The user's own columns (GridView user setting, Desk setup_user_defined_columns)
+ * win; otherwise in_list_view fields up to 10 units, Desk's default.
+ */
+export function gridColumns(
+  meta: DocTypeMeta,
+  overrides: Record<string, Record<string, unknown>>,
+  table: string,
+  userCols?: Array<{ fieldname?: string; width?: number | string; columns?: number | string }>,
+): Array<DocField & { width: number }> {
+  const visible = columnFields(meta, overrides, table);
+  if (userCols?.length) {
+    const mine = userCols
+      .map((u) => {
+        const f = visible.find((x) => x.fieldname === u.fieldname);
+        // Desk migrates legacy `columns` (1–12) to px
+        return f ? { ...f, width: clampWidth(Number(u.width) || UNITS_TO_PX[Number(u.columns)] || 140) } : null;
+      })
+      .filter((x): x is DocField & { width: number } => !!x);
+    if (mine.length) return mine;
+  }
   let cols = visible.filter((f) => f.in_list_view);
   if (!cols.length) cols = visible.filter((f) => f.reqd).concat(visible.filter((f) => !f.reqd)).slice(0, 4);
   const out: Array<DocField & { width: number }> = [];
@@ -100,7 +150,7 @@ export function gridColumns(meta: DocTypeMeta, overrides: Record<string, Record<
     const w = defaultWidth(f);
     if (total + w > 10) break;
     total += w;
-    out.push({ ...f, width: w });
+    out.push({ ...f, width: UNITS_TO_PX[w] ?? 100 });
   }
   return out;
 }
@@ -163,22 +213,23 @@ function Cell({
   if (NUMERIC.has(df.fieldtype)) return <NumberCell df={df} value={value} display={display} onCommit={set} className={base} />;
   if (df.fieldtype === "Date") return <DatePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
   if (df.fieldtype === "Time") return <TimePicker value={typeof value === "string" ? value : null} onChange={(v) => set(v)} compact error={!!error} ariaLabel={df.label ?? df.fieldname} />;
-  return <TextCell value={String(value ?? "")} onCommit={set} className={base} />;
+  return <TextCell value={String(value ?? "")} onCommit={set} className={base} label={df.label ?? df.fieldname} />;
 }
 
 function NumberCell({ df, value, display, onCommit, className }: { df: DocField; value: unknown; display: string; onCommit: (v: unknown) => void; className: string }) {
-  const [editing, setEditing] = useState<string | null>(null);
+  // `typed` only once the user edits: a value set while the cell has focus (paste, scripts) isn't overwritten on blur
+  const [editing, setEditing] = useState<{ text: string; typed: boolean } | null>(null);
   const num = value == null || value === "" ? null : Number(value);
   return (
     <input
       inputMode="decimal"
-      value={editing ?? display}
+      value={editing?.typed ? editing.text : editing ? (num == null ? "" : String(num)) : display}
       aria-label={df.label ?? df.fieldname}
-      onFocus={() => setEditing(num == null ? "" : String(num))}
-      onChange={(e) => setEditing(e.target.value)}
+      onFocus={() => setEditing({ text: num == null ? "" : String(num), typed: false })}
+      onChange={(e) => setEditing({ text: e.target.value, typed: true })}
       onBlur={() => {
-        if (editing === null) return;
-        const raw = editing.replace(/,/g, "").trim();
+        if (!editing?.typed) return setEditing(null);
+        const raw = editing.text.replace(/,/g, "").trim();
         setEditing(null);
         const next = raw === "" ? null : Number(raw);
         if (next !== num && !(next !== null && Number.isNaN(next))) onCommit(next);
@@ -189,12 +240,12 @@ function NumberCell({ df, value, display, onCommit, className }: { df: DocField;
   );
 }
 
-function TextCell({ value, onCommit, className }: { value: string; onCommit: (v: unknown) => void; className: string }) {
+function TextCell({ value, onCommit, className, label }: { value: string; onCommit: (v: unknown) => void; className: string; label: string }) {
+  // null until the user types, so a value set while focused (paste, scripts) isn't overwritten on blur
   const [text, setText] = useState<string | null>(null);
   return (
-    <input aria-label="Value"
+    <input aria-label={label}
       value={text ?? value}
-      onFocus={() => setText(value)}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => {
         if (text !== null && text !== value) onCommit(text || null);
@@ -223,7 +274,21 @@ export default function Grid({
 }) {
   const table = df.fieldname;
   const rows = (ctl.getDoc()[table] as Row[]) ?? [];
-  const cols = useMemo(() => gridColumns(meta, overrides, table), [meta, overrides, table]);
+  // the user's column settings for this child table: GridView in the parent DocType's user settings
+  const qc = useQueryClient();
+  const parentDt = ctl.meta.name;
+  const { data: userSettings } = useQuery({ queryKey: userSettingsKey(parentDt), queryFn: () => loadUserSettings(parentDt), staleTime: 60_000 });
+  const gridView = (userSettings?.GridView ?? {}) as Record<string, GridViewColumn[] | undefined>;
+  const userCols = gridView[meta.name];
+  const cols = useMemo(() => gridColumns(meta, overrides, table, userCols), [meta, overrides, table, userCols]);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  /** merge per child table: Desk's server merges user settings only at the top level, so GridView goes whole */
+  const saveGridView = async (next: GridViewColumn[] | null) => {
+    const merged: Record<string, GridViewColumn[] | undefined> = { ...gridView, [meta.name]: next ?? undefined };
+    if (!next) delete merged[meta.name];
+    await deskCall("frappe.model.utils.user_settings.save", { doctype: parentDt, user_settings: JSON.stringify({ GridView: merged }) });
+    qc.setQueryData<UserSettings>(userSettingsKey(parentDt), (s) => ({ ...(s ?? {}), GridView: merged }));
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const phone = useIsPhone();
@@ -232,7 +297,7 @@ export default function Grid({
   const tableReadOnly = readOnly || !!(overrides[table]?.read_only ?? df.read_only);
   const cannotAdd = !!(df as { cannot_add_rows?: unknown }).cannot_add_rows || !!overrides[table]?.cannot_add_rows;
   const cannotDelete = !!(df as { cannot_delete_rows?: unknown }).cannot_delete_rows;
-  const template = `2.25rem 2.5rem ${cols.map((c) => `minmax(0,${c.width}fr)`).join(" ")} 2.5rem`;
+  const template = `2.25rem 2.5rem ${cols.map((c) => `minmax(0,${c.width}fr)`).join(" ")} ${tableReadOnly ? "2.5rem" : "4rem"}`;
   const editRow = rows.find((r) => r.name === editing);
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
   // Desk grid_pagination: 50 rows per page
@@ -298,10 +363,161 @@ export default function Grid({
     setEditing(null);
   };
 
+  const copyOf = (r: Row) => Object.fromEntries(Object.entries(r).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k)));
+  // Desk grid.set_multiple_add(link, qty) from the app's script → "Add Multiple"
+  const multiple = overrides[table]?.multiple_add as { link: string; qty?: string } | undefined;
+  const multipleLink = multiple ? meta.fields?.find((f) => f.fieldname === multiple.link && f.fieldtype === "Link") : undefined;
+  const multipleQty = multiple?.qty ? meta.fields?.find((f) => f.fieldname === multiple.qty) : undefined;
+  const [multipleOpen, setMultipleOpen] = useState(false);
+  // Desk link_selector.js set_in_grid: a row that already has the value gets the new quantity, else a new row
+  const pickMultiple = async (value: string, qty?: number) => {
+    if (!multipleLink) return;
+    const current = (ctl.getDoc()[table] as Row[]) ?? [];
+    const existing = multipleQty ? current.find((r) => r[multipleLink.fieldname] === value) : undefined;
+    if (existing && multipleQty) {
+      await ctl.set_child_value(existing.doctype, existing.name, multipleQty.fieldname, qty);
+    } else {
+      // a new form's blank row (Sales Order starts with one) is filled first instead of left above the picks
+      const last = current[current.length - 1];
+      // (Desk __unedited: added and not touched since; defaults such as a user's currency don't count as edits)
+      const blank = !!last?.__islocal && (!!last.__unedited || cols.every((c) => isEmpty(last[c.fieldname])));
+      const row = blank ? last : await ctl.add_child(table, {});
+      await ctl.set_child_value(row.doctype, row.name, multipleQty && qty !== undefined ? { [multipleLink.fieldname]: value, [multipleQty.fieldname]: qty } : { [multipleLink.fieldname]: value });
+    }
+    setPage(Math.floor((((ctl.getDoc()[table] as Row[]) ?? []).length - 1) / PAGE_SIZE));
+    toast.success(qty === undefined ? `${value} added` : `Added ${value} (${qty})`);
+  };
+
   const insertAt = async (at: number, copyFrom?: Row) => {
-    const copy = copyFrom ? Object.fromEntries(Object.entries(copyFrom).filter(([k]) => !["name", "idx", "__islocal", "creation", "modified", "owner", "modified_by"].includes(k))) : {};
-    const r = await ctl.add_child(table, copy, at);
+    const r = await ctl.add_child(table, copyFrom ? copyOf(copyFrom) : {}, at);
     setEditing(r.name);
+  };
+
+  // ---- keyboard and paste (cells carry data-cell="<row index>:<column index>") ----
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const cellAt = (el: EventTarget | null) => {
+    const c = (el as HTMLElement | null)?.closest<HTMLElement>("[data-cell]");
+    if (!c || !bodyRef.current?.contains(c)) return null;
+    const [r, col] = c.dataset.cell!.split(":").map(Number);
+    return { r, col };
+  };
+  /** columns of row `r` holding an enabled input, in order */
+  const editableCols = (r: number) =>
+    [...(bodyRef.current?.querySelectorAll<HTMLElement>(`[data-cell^="${r}:"]`) ?? [])].filter((c) => c.querySelector(FOCUSABLE)).map((c) => Number(c.dataset.cell!.split(":")[1]));
+  /** focus a cell once it renders (new rows, other pages); col "first" / "last" = first / last editable cell */
+  const focusCell = (r: number, col: number | "first" | "last") => {
+    const p = Math.floor(r / PAGE_SIZE);
+    if (p !== curPage) setPage(p);
+    let tries = 0;
+    const attempt = () => {
+      const editable = editableCols(r);
+      const c = col === "first" ? editable[0] : col === "last" ? editable[editable.length - 1] : col;
+      const input = c === undefined ? null : bodyRef.current?.querySelector<HTMLElement>(`[data-cell="${r}:${c}"]`)?.querySelector<HTMLInputElement>(FOCUSABLE);
+      if (input) {
+        input.focus();
+        if (input.type !== "checkbox") input.select?.();
+      } else if (tries++ < 20) setTimeout(attempt, 50);
+    };
+    // existing cells take focus at once (typing straight after ↓ must land in the new cell); new rows render first
+    attempt();
+  };
+  const onGridKeyDown = (e: React.KeyboardEvent) => {
+    if (tableReadOnly) return;
+    const at = cellAt(e.target);
+    if (!at) return;
+    const { r, col } = at;
+    const row = rows[r];
+    const input = e.target as HTMLInputElement;
+    const texty = TEXTY.has(cols[col]?.fieldtype ?? "");
+    const mod = e.metaKey || e.ctrlKey;
+    const vertical = e.key === "ArrowDown" || e.key === "ArrowUp";
+    const down = e.key === "ArrowDown";
+    if (vertical && mod && !texty) {
+      // Desk add_new_row_using_keys: Ctrl+↓/↑ insert below/above, Ctrl+Shift+↓/↑ add at the end/start
+      e.preventDefault();
+      if (cannotAdd) return;
+      const to = e.shiftKey ? (down ? rows.length : 0) : down ? r + 1 : r;
+      void ctl.add_child(table, {}, to).then(() => focusCell(to, "first"));
+      return;
+    }
+    if (down && e.shiftKey && e.altKey) {
+      // Desk duplicate_row_using_keys
+      e.preventDefault();
+      if (cannotAdd || !row) return;
+      void ctl.add_child(table, copyOf(row), r + 1).then(() => focusCell(r + 1, "first"));
+      return;
+    }
+    if (vertical) {
+      // an open suggestion list (Link) keeps the arrows; text fields need Alt
+      if (input.getAttribute("aria-expanded") === "true" || (texty && !e.altKey)) return;
+      const to = down ? r + 1 : r - 1;
+      if (to < 0 || to >= rows.length) return;
+      e.preventDefault();
+      focusCell(to, col);
+      return;
+    }
+    if (e.key === "Tab") {
+      const editable = editableCols(r);
+      if (!e.shiftKey && col === editable[editable.length - 1]) {
+        if (r < rows.length - 1) {
+          e.preventDefault();
+          focusCell(r + 1, "first");
+        } else if (!cannotAdd) {
+          e.preventDefault();
+          void ctl.add_child(table, {}).then(() => focusCell(r + 1, "first"));
+        }
+      } else if (e.shiftKey && col === editable[0] && r > 0) {
+        e.preventDefault();
+        focusCell(r - 1, "last");
+      }
+      return;
+    }
+    if (e.key === "Escape" && !e.shiftKey && row?.__islocal && !cannotDelete && !input.value && (!!row.__unedited || cols.every((c) => isEmpty(row[c.fieldname])))) {
+      // Desk: Esc on a new row nobody filled in (__unedited; defaults don't count) removes it
+      e.preventDefault();
+      void ctl.remove_rows(table, [row.name]);
+      if (r > 0) focusCell(r - 1, col);
+    }
+  };
+  const fieldFor = (name: string) => {
+    const n = name.trim().toLowerCase();
+    return (meta.fields ?? []).find((f) => !NO_VALUE.has(f.fieldtype) && (f.fieldname.toLowerCase() === n || (f.label ?? "").toLowerCase() === n));
+  };
+  const onGridPaste = async (e: React.ClipboardEvent) => {
+    const input = e.target as HTMLInputElement;
+    const at = cellAt(input);
+    if (tableReadOnly || !at || input.tagName !== "INPUT" || input.type === "checkbox") return;
+    const data = parseCsv(e.clipboardData.getData("text/plain"), "\t");
+    // Excel adds a trailing newline to every copy
+    while (data.length && !data[data.length - 1].some((v) => v.trim())) data.pop();
+    // one value pastes into the cell as usual
+    if (!data.length || (data.length === 1 && data[0].length === 1)) return;
+    e.preventDefault();
+    // a header row of labels / fieldnames picks the columns; otherwise the visible columns from this one on
+    let fields: Array<DocField | undefined>;
+    if (data[0][0] && fieldFor(data[0][0])) fields = data.shift()!.map(fieldFor);
+    else fields = cols.slice(at.col);
+    const needed = at.r + data.length;
+    while (((ctl.getDoc()[table] as Row[]) ?? []).length < needed && !cannotAdd) {
+      // in order, each add fires <table>_add like Desk
+      // react-doctor-disable-next-line async-await-in-loop
+      await ctl.add_child(table, {});
+    }
+    let n = 0;
+    for (const [k, line] of data.entries()) {
+      const target = ((ctl.getDoc()[table] as Row[]) ?? [])[at.r + k];
+      if (!target || !line.some((v) => v.trim())) continue;
+      const values: Record<string, unknown> = {};
+      line.forEach((v, i) => {
+        const f = fields[i];
+        if (f && !f.read_only) values[f.fieldname] = pastedValue(v, f.fieldtype);
+      });
+      // one row at a time so each row's events (item_code → rate …) run like Desk's set_value
+      // react-doctor-disable-next-line async-await-in-loop
+      await ctl.set_child_value(target.doctype, target.name, values);
+      n++;
+    }
+    toast.success(`Pasted ${n} row${n === 1 ? "" : "s"} into ${df.label ?? table}`);
   };
 
   return (
@@ -356,7 +572,7 @@ export default function Grid({
         </ul>
       ) : (
         <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
+          <div ref={bodyRef} className="min-w-[640px]" onKeyDown={onGridKeyDown} onPaste={(e) => void onGridPaste(e)}>
             <div className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
               <div className="flex justify-center py-2">
                 {!tableReadOnly && (
@@ -365,12 +581,17 @@ export default function Grid({
               </div>
               <div className="py-2 text-center">No.</div>
               {cols.map((c) => (
-                <div key={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
+                <div key={c.fieldname} role="columnheader" data-fieldname={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
                   {c.label}
                   {!!(overrides[`${table}.${c.fieldname}`]?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
                 </div>
               ))}
-              <div />
+              <div className="flex justify-center">
+                {/* Desk grid_row.js configure_columns: the gear in the header row */}
+                <button type="button" onClick={() => setColumnsOpen(true)} aria-label={`Configure columns of ${df.label ?? table}`} title="Column settings" className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                  <Settings2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -405,8 +626,8 @@ export default function Grid({
                               </button>
                             )}
                           </div>
-                          {cols.map((c) => (
-                            <div key={c.fieldname} className="min-w-0 px-0.5 py-0.5">
+                          {cols.map((c, ci) => (
+                            <div key={c.fieldname} data-cell={`${i}:${ci}`} className="min-w-0 px-0.5 py-0.5">
                               <Cell
                                 df={{ ...c, ...(overrides[`${table}.${c.fieldname}`] as Partial<DocField>) }}
                                 row={row}
@@ -417,7 +638,32 @@ export default function Grid({
                               />
                             </div>
                           ))}
-                          <div className="flex justify-center">
+                          <div className="flex items-center justify-center gap-0.5">
+                            {!tableReadOnly && (
+                              // Crema: the row form's actions (Desk grid_row_form.js) straight from the row
+                              <DropdownMenu>
+                                <DropdownMenuTrigger aria-label={`Row ${i + 1} actions`} className="rounded p-1 text-zinc-400 opacity-0 hover:bg-zinc-100 hover:text-zinc-700 focus:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  {!cannotAdd && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, {}, i).then(() => focusCell(i, "first"))}>Insert Above</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, {}, i + 1).then(() => focusCell(i + 1, "first"))}>Insert Below</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => void ctl.add_child(table, copyOf(row), i + 1).then(() => focusCell(i + 1, "first"))}>Duplicate</DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {i > 0 && <DropdownMenuItem onClick={() => ctl.move_row(table, row.name, -1)}>Move Up</DropdownMenuItem>}
+                                  {i < rows.length - 1 && <DropdownMenuItem onClick={() => ctl.move_row(table, row.name, 1)}>Move Down</DropdownMenuItem>}
+                                  {!cannotDelete && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => void ctl.remove_rows(table, [row.name])} className="text-red-600 dark:text-red-400">Delete</DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                             <button type="button" onClick={() => setEditing(row.name)} aria-label={`Edit row ${i + 1}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -521,12 +767,40 @@ export default function Grid({
             </>
           ) : (
             !cannotAdd && (
-              <button type="button" onClick={() => void add()} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                <Plus className="h-3.5 w-3.5" /> Add row
-              </button>
+              <>
+                <button type="button" onClick={() => void add()} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                  <Plus className="h-3.5 w-3.5" /> Add row
+                </button>
+                {multipleLink && (
+                  <button type="button" onClick={() => setMultipleOpen(true)} className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                    <ListPlus className="h-3.5 w-3.5" /> Add Multiple
+                  </button>
+                )}
+              </>
             )
           )}
         </div>
+      )}
+
+      {columnsOpen && (
+        <GridColumnsDialog
+          title={df.label ?? table}
+          current={cols.map((c) => ({ fieldname: c.fieldname, width: c.width, sticky: userCols?.find((u) => u.fieldname === c.fieldname)?.sticky ?? 0 }))}
+          available={columnFields(meta, overrides, table)}
+          onSave={(next) => saveGridView(next)}
+          onReset={() => saveGridView(null)}
+          onClose={() => setColumnsOpen(false)}
+        />
+      )}
+
+      {multipleOpen && multipleLink && (
+        <AddMultipleDialog
+          doctype={String(multipleLink.options)}
+          qtyLabel={multipleQty ? (multipleQty.label ?? multipleQty.fieldname) : undefined}
+          getQuery={() => ctl.getQuery(multipleLink.fieldname, table)?.(ctl.getDoc(), meta.name, "") as Record<string, unknown> | undefined}
+          onPick={pickMultiple}
+          onClose={() => setMultipleOpen(false)}
+        />
       )}
 
       {editRow && (

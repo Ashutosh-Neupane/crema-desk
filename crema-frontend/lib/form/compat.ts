@@ -48,7 +48,14 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   provide("erpnext.stock");
   provide("erpnext.accounts");
   provide("erpnext.taxes");
-  class TransactionController extends Controller {}
+  class TransactionController extends Controller {
+    /** erpnext/public/js/controllers/transaction.js onload_post_render: item rows get "Add Multiple" (item, qty) */
+    onload_post_render() {
+      const frm = this.frm as { doc?: { doctype?: string }; get_field?: (f: string) => { grid?: { set_multiple_add?: (l: string, q: string) => void } } } | undefined;
+      const meta = rt.frappe.meta as { get_docfield: (dt: string, fn: string) => unknown };
+      if (frm?.doc?.doctype && meta.get_docfield(`${frm.doc.doctype} Item`, "item_code")) frm.get_field?.("items")?.grid?.set_multiple_add?.("item_code", "qty");
+    }
+  }
   erpnext.TransactionController = TransactionController;
   erpnext.taxes_and_totals = TransactionController;
   erpnext.payments = TransactionController;

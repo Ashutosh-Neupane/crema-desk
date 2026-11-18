@@ -2,6 +2,37 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M3: a grid you can type in
+- Keyboard and spreadsheet paste like Desk; Add Multiple (also on ERPNext transactions: Sales Order line gets its rate
+  from ERPNext's own item events); per-user column settings in Desk's GridView format; a ⋯ row menu.
+- Fixes found on the way: ⌘S while still in a grid cell lost that edit (now blurred and committed first); a cell
+  wrote its old value back on blur when a paste / script changed it meanwhile; the shared Dialog re-ran its focus
+  effect on every render when given an inline onOpenChange — focus jumped on each keystroke and an input with onBlur
+  state looped ("Maximum update depth exceeded"); dropdown triggers now expose aria-expanded.
+- e2e: gridkeys, gridmulti, gridcols (new, key-by-key typing in dialogs); grid, gridrows, gridmove, formsave, mobile,
+  formnav green. On this bench formmenu, sidebar, timeline fail the same way on `main` (bench data / no email
+  account): follow-up, like form.salesorder's hard-coded customer.
+
+Next: M4 controls (Text Editor first, then Link extras), then M5.
+
+## 2026-11-18 — M2: workflow you can follow; CI; repo protection
+- Workflow bar under the form title (`components/form/WorkflowBar.tsx`, `lib/form/workflow.ts`): stepper from
+  `workflow_logs` (who, when), "Waiting on you" with the actions as buttons, "Waiting on <roles>", self-approval and
+  `condition` explanations, "Workflow State not set" fix, Desk's Help dialog (Actions → Help).
+- Lists honour `listview_settings.get_form_link` (Workflow Action rows open the waiting document); `frappe.router.slug` shim.
+- Fix: `ErrorDetailsHost` (mounted app-wide) loaded the desk context on /login → a 401 on every visit; now /desk only.
+- e2e: workflow extended (second user without every role); bulk and listsettings no longer depend on bench data
+  (a second "Administrator"-named user; a site with no ToDo). `PW_CHANNEL=chrome` runs suites on the installed Chrome.
+  Verified green: workflow, bulk, listsettings, formnav, mobile. bulk/listsettings failed the same way on `main`
+  before the fix (test data, not the app).
+- CI (`.github/workflows/ci.yml`, PR #13): npm ci, tsc, lint, build, `node --check` e2e — required on `main` by the
+  "Protect main" ruleset (no force-push / deletion, PR required, admin bypass; fork PRs need approval to run Actions).
+  Pushing workflow files needs the `workflow` token scope: push over SSH (`git@github.com:…`) or `gh auth refresh -s workflow`.
+- Bench: the old stack is gone; suites now run against another local v16 + ERPNext bench (see CLAUDE.local.md).
+  `npm ci` on a slow link can silently skip `@next/swc-darwin-arm64` (optional dep) → install it explicitly.
+
+Next: M3 grid (keyboard navigation, paste from a spreadsheet, Add Multiple, column settings, row menu).
+
 ## 2026-10-28 — Print Format Builder, step B2
 - Table blocks: pick, order and size their columns. Duplicate a field (⌘D). Preview bar: sample record, letter head,
   paper (A4 / A5 / Letter / Legal / 80 mm receipt; the edit sheet follows), Download PDF of the unsaved draft.

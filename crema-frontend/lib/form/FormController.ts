@@ -255,7 +255,9 @@ export class FormController {
     const v = this.coerce(df, value);
     if (this.same(hit.row[fieldname], v)) return;
     const rows = [...((this.doc[hit.table] as Row[]) ?? [])];
-    rows[hit.index] = { ...hit.row, [fieldname]: v };
+    const row: Row = { ...hit.row, [fieldname]: v };
+    delete row.__unedited;
+    rows[hit.index] = row;
     this.doc = { ...this.doc, [hit.table]: rows };
     this.dirty = true;
     delete this.errors[`${hit.table}.${hit.index}.${fieldname}`];
@@ -403,6 +405,8 @@ export class FormController {
       doctype: cdt,
       name: typeof values.name === "string" && values.name ? values.name : `new-${cdt.toLowerCase().replace(/\s+/g, "-")}-${++rowSeq}${Date.now().toString(36)}`,
       __islocal: values.name ? values.__islocal : 1,
+      // Desk grid add_new_row: a row added with no values is "unedited" until the first set_value
+      ...(Object.keys(values).length ? {} : { __unedited: 1 }),
       parentfield: table,
       parenttype: this.meta.name,
       idx: 0,
@@ -616,7 +620,7 @@ export class FormController {
         // Autocomplete / Select options from scripts (Desk: control.set_data)
         set_data: (data: unknown) => self.setDf(f.fieldname, "options", Array.isArray(data) ? data.map((x) => (x && typeof x === "object" ? (x as { value?: unknown }).value : x)).join("\n") : data),
         get_query: undefined as unknown,
-        // grid API for tables; Desk grid methods Crema doesn't model (toggle_checkboxes, set_multiple_add, …) are no-ops
+        // grid API for tables; Desk grid methods Crema doesn't model (toggle_checkboxes, …) are no-ops
         grid: TABLE_TYPES.has(f.fieldtype)
           ? lenient({
               get_field: (child: string) => ({
@@ -631,6 +635,11 @@ export class FormController {
               /** Desk grid.set_column_disp(fieldname | fieldnames, show) */
               set_column_disp: (child: string | string[], show: boolean) => {
                 for (const c of Array.isArray(child) ? child : [child]) self.setDf(`${f.fieldname}.${c}`, "hidden", show ? 0 : 1);
+              },
+              /** Desk grid.set_multiple_add(link, qty): the grid shows "Add Multiple" (components/form/AddMultipleDialog) */
+              set_multiple_add: (link: string, qty?: string) => {
+                const cur = self.overrides[f.fieldname]?.multiple_add as { link?: string; qty?: string } | undefined;
+                if (cur?.link !== link || cur?.qty !== qty) self.setDf(f.fieldname, "multiple_add", { link, qty });
               },
               add_custom_button: () => {},
               refresh: () => {},
