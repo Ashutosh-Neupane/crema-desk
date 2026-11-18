@@ -49,11 +49,11 @@ check(so?.po_no === stamp, `po_no saved on ${firstName} (${so?.po_no})`);
 await shot("reportview_edit");
 
 step("group by customer, sum of grand total");
-await page.getByRole("button", { name: /Group By/ }).click();
-await page.getByLabel("Group by field").selectOption("customer");
+await page.getByRole("button", { name: /Add Group/ }).click();
+await page.getByLabel("Group by field").selectOption("Sales Order::customer");
 await page.getByLabel("Aggregate function").selectOption("sum");
-await page.getByLabel("Aggregate on").selectOption("grand_total");
-await page.getByRole("button", { name: "Apply" }).click();
+await page.getByLabel("Aggregate on").selectOption("Sales Order::grand_total");
+await page.keyboard.press("Escape");
 await page.waitForTimeout(2500);
 check(await grid.getByRole("columnheader", { name: /Sum of Grand Total/ }).isVisible(), "aggregate column");
 await page.getByRole("button", { name: /Grouped by/ }).click();
