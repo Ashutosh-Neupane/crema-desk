@@ -41,13 +41,23 @@ await page.waitForTimeout(2000);
 const rem = await post("frappe.client.get_list", { doctype: "Reminder", filters: { reminder_doctype: DT, reminder_docname: "NEW-1" }, fields: ["name", "description"] });
 check(rem?.length === 1 && rem[0].description === "follow up", "Reminder created");
 
-step("Links on a customer");
-await page.goto(`${BASE}/desk/doctype/Customer/Everest%20Foods`, { waitUntil: "domcontentloaded" });
-await page.getByRole("button", { name: "More actions" }).click({ timeout: 90000 });
-await page.getByRole("menuitem", { name: "Links" }).click();
-await page.getByRole("dialog").getByText(/^Sales Order/).first().waitFor({ timeout: 30000 });
-check(await page.getByRole("dialog").getByRole("link", { name: /SAL-ORD-2026-00003/ }).isVisible(), "linked Sales Orders listed");
-await page.keyboard.press("Escape");
+// any customer with a Sales Order on this site (needs ERPNext and some data; skipped otherwise)
+const so = (await post("frappe.client.get_list", { doctype: "Sales Order", fields: ["name", "customer"], limit_page_length: 1 }))?.[0];
+const customer = so?.customer ?? (await post("frappe.client.get_list", { doctype: "Customer", fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
+step(`Links on a customer (${customer ?? "none on this site"})`);
+if (customer) {
+  await page.goto(`${BASE}/desk/doctype/Customer/${encodeURIComponent(customer)}`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "More actions" }).click({ timeout: 90000 });
+  await page.getByRole("menuitem", { name: "Links" }).click();
+  if (so) {
+    await page.getByRole("dialog").getByText(/^Sales Order/).first().waitFor({ timeout: 30000 });
+    check(await page.getByRole("dialog").getByRole("link", { name: so.name }).isVisible(), `linked Sales Order ${so.name} listed`);
+  } else {
+    await page.getByRole("dialog").waitFor({ timeout: 30000 });
+    check(true, "Links dialog opens (no Sales Orders on this site)");
+  }
+  await page.keyboard.press("Escape");
+}
 
 step("Customize opens Customize Form for this DocType");
 await page.getByRole("button", { name: "More actions" }).click();

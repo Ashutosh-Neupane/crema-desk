@@ -10,6 +10,22 @@ const warnings = [];
 page.on("console", (m) => m.type() === "warning" && /\[form\]|\[erpnext|desk-runtime/.test(m.text()) && warnings.push(m.text().slice(0, 240)));
 const SO = `${BASE}/desk/doctype/Sales%20Order`;
 const field = (label) => page.getByLabel(label, { exact: true }).first();
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const money = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+// test data from this site: any enabled customer, and an item priced in the default selling price list
+const priceList = (await api("api/method/frappe.client.get_single_value?doctype=Selling%20Settings&field=selling_price_list")).message;
+const q = (o) => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(typeof v === "string" ? v : JSON.stringify(v))}`).join("&");
+const CUSTOMER = (await api(`api/resource/Customer?${q({ filters: [["disabled", "=", 0]], limit_page_length: 1 })}`)).data?.[0]?.name;
+const price = (await api(`api/resource/Item%20Price?${q({ fields: ["item_code", "price_list_rate"], filters: [["price_list", "=", priceList]], limit_page_length: 1 })}`)).data?.[0];
+if (!CUSTOMER || !price) {
+  console.log(`SKIPPED: needs an enabled Customer and an Item Price in "${priceList}" (customer ${CUSTOMER}, price ${JSON.stringify(price)})`);
+  await t.finish();
+  process.exit(0);
+}
+const ITEM = price.item_code;
+const RATE = price.price_list_rate;
+console.log(`  data: customer ${CUSTOMER}, item ${ITEM} at ${RATE} (${priceList})`);
 
 step("new Sales Order");
 await page.goto(`${SO}/new`, { waitUntil: "domcontentloaded" });
@@ -25,8 +41,8 @@ await page.getByRole("button", { name: "OK" }).click();
 
 step("customer → party details");
 await field("Customer").click();
-await field("Customer").fill("Everest");
-await page.getByRole("option", { name: /Everest Foods/ }).first().click();
+await field("Customer").fill(CUSTOMER);
+await page.getByRole("option", { name: new RegExp(esc(CUSTOMER)) }).first().click();
 await page.waitForTimeout(2500);
 check((await field("Customer Name").textContent().catch(() => "")) !== null, "customer set");
 
@@ -51,12 +67,12 @@ check((await row1.inputValue()) === "", "invalid Item Code cleared");
 step("item → get_item_details fills rate");
 const itemCell = page.locator("[aria-label^='Select row']").first().locator("xpath=ancestor::div[contains(@class,'grid')][1]").locator("input").nth(1);
 await itemCell.click();
-await itemCell.fill("RICE");
+await itemCell.fill(ITEM);
 await page.waitForTimeout(800);
-await page.getByRole("button", { name: /RICE-25/ }).first().click();
+await page.getByRole("button", { name: new RegExp(esc(ITEM)) }).first().click();
 await page.waitForTimeout(3000);
 const rateText = await page.getByLabel("Rate", { exact: true }).first().inputValue().catch(() => "");
-check(/3,200/.test(rateText), `rate fetched from price list (${rateText})`);
+check(rateText.includes(money(RATE)), `rate ${money(RATE)} fetched from the price list (${rateText})`);
 
 step("qty 3 → amount and totals recalc live");
 const qty = page.getByLabel("Quantity", { exact: true }).first();
@@ -65,7 +81,7 @@ await qty.fill("3");
 await qty.press("Enter");
 await page.waitForTimeout(800);
 const body = await page.locator("main").innerText();
-check(/9,600/.test(body), "amount / grand total 9,600 shown before save");
+check(body.includes(money(RATE * 3)), `amount ${money(RATE * 3)} shown before save`);
 await shot("so_new_filled");
 
 step("save → server totals");
@@ -73,8 +89,9 @@ await page.getByRole("button", { name: /^Save$/ }).click();
 await page.waitForURL(/Sales%20Order\/SAL-ORD-/, { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const saved = (await api(`api/resource/Sales Order/${encodeURIComponent(name)}`)).data;
-check(saved?.customer === "Everest Foods", `saved ${name} for Everest Foods`);
-check(saved?.grand_total === 9600 && saved?.items?.[0]?.rate === 3200, `server grand_total ${saved?.grand_total}, rate ${saved?.items?.[0]?.rate}`);
+check(saved?.customer === CUSTOMER, `saved ${name} for ${CUSTOMER}`);
+// net total, not grand total: the site may add taxes from a default template
+check(saved?.net_total === RATE * 3 && saved?.items?.[0]?.rate === RATE, `server net_total ${saved?.net_total}, rate ${saved?.items?.[0]?.rate}`);
 await page.getByRole("button", { name: /^Submit$/ }).waitFor({ timeout: 20000 });
 
 step("submit");
