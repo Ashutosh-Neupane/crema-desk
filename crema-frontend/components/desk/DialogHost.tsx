@@ -73,7 +73,12 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
               }
               renderHtml={(df) => <HtmlHost el={d.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />}
               getQuery={(f) => () => d.fields_dict[f]?.df.get_query?.call(d.fields_dict[f])}
-              onButton={(f) => void d.fields_dict[f]?.df.click?.call(d.fields_dict[f])}
+              onButton={(f) => {
+                const c = d.fields_dict[f] as (typeof d.fields_dict)[string] & { on_submit?: (v: unknown) => unknown };
+                // comment.js submit(): on_submit(value); button.js: df.click
+                if (c?.df.fieldtype === "Comment") void c.on_submit?.(c.get_value());
+                else void c?.df.click?.call(c);
+              }}
             />
           )}
         </div>

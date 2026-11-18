@@ -28,7 +28,7 @@ function dataInputType(option: string): string {
  * Default text input — fallback for all field types without a specialized control.
  * Supports text, data, password, email, url, phone, etc.
  */
-export default function FormField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
+export default function FormField({ field, inputId, value, onChange, disabled, error, compact }: FieldControlProps) {
   const id = inputId ?? field.fieldname;
   const messageId = `${useId()}-${field.fieldname}-invalid`;
   const dataOption = field.fieldtype === "Data" && typeof field.options === "string" ? field.options : "";
@@ -57,16 +57,32 @@ export default function FormField({ field, inputId, value, onChange, disabled, e
   };
 
   if (TEXTAREA_TYPES.has(field.fieldtype)) {
+    // text.js: Text / Long Text 300px, Small Text 150px, both capped by df.max_height; read-only shows the text
+    // in a box that keeps line breaks and indentation (white-space-collapse: preserve), also capped by max_height
+    const maxHeight = (field as { max_height?: string }).max_height || undefined;
+    if (disabled || !!field.read_only) {
+      return (
+        <div
+          id={id}
+          data-text-display
+          role="document"
+          aria-label={field.label || field.fieldname}
+          style={{ maxHeight }}
+          className={`whitespace-pre-wrap break-words rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 ${maxHeight ? "overflow-auto" : ""}`}
+        >
+          {current}
+        </div>
+      );
+    }
     return (
       <textarea
         id={id}
         value={current}
         onChange={(e) => onChange(e.target.value || null)}
-        readOnly={!!field.read_only}
-        disabled={disabled || !!field.read_only}
         placeholder={String(field.placeholder ?? "")}
         maxLength={field.length ? Number(field.length) : undefined}
-        rows={field.fieldtype === "Small Text" ? 3 : 5}
+        rows={compact ? 3 : undefined}
+        style={compact ? undefined : { height: field.fieldtype === "Small Text" ? 150 : 300, maxHeight }}
         className={`${sharedClassName} resize-y`}
       />
     );

@@ -488,6 +488,30 @@ export class FormController {
    * (frm); child events (registered on the child doctype) get (frm, cdt, cdn).
    * Returns false if a handler aborted (frappe.throw / validated = false).
    */
+  /**
+   * A Button field was clicked (Desk button.js onclick): the form event named after the field when a script handles
+   * it, else the method in the field's `options` on this document (run_server_script → run_doc_method), then the
+   * form refreshes from the returned doc.
+   */
+  async clickButton(fieldname: string, cdt?: string, cdn?: string): Promise<void> {
+    const doctype = cdt ?? this.meta.name;
+    const handled =
+      (this.runtime.frappe.ui.form.handlers.get(doctype)?.get(fieldname)?.length ?? 0) > 0 ||
+      (doctype === this.meta.name && typeof (this.frm.cscript as Record<string, unknown>)[fieldname] === "function");
+    if (handled) {
+      await this.trigger(fieldname, cdt, cdn);
+      return;
+    }
+    const method = this.metas[doctype]?.fields?.find((f) => f.fieldname === fieldname)?.options;
+    if (typeof method === "string" && method.trim()) {
+      try {
+        await (this.frm.call as (o: { method: string; doc: Doc }) => Promise<unknown>)({ method: method.trim(), doc: this.doc as Doc });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : String(err), { duration: 8000 });
+      }
+    }
+  }
+
   async trigger(event: string, cdt?: string, cdn?: string): Promise<boolean> {
     const doctype = cdt ?? this.meta.name;
     const handlers = this.runtime.frappe.ui.form.handlers.get(doctype)?.get(event) ?? [];

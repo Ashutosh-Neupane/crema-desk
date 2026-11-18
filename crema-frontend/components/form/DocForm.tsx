@@ -750,7 +750,7 @@ export default function DocForm({ doctype, name }: Props) {
             overrides={snap.overrides}
             errors={snap.errors}
             onChange={(f, v) => void ctl.set_value(f, v)}
-            onButton={(f) => void ctl.trigger(f)}
+            onButton={(f) => void ctl.clickButton(f)}
             getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
             renderTable={(df) =>
               df.fieldtype === "Table MultiSelect" ? (

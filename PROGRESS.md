@@ -2,6 +2,13 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4 done: text, button, heading and comment controls like Desk
+- Text / Small Text / Long Text at Desk's heights with max_height; read-only text keeps line breaks and indentation.
+- Button: Desk's colours, sizes and tooltip; stays visible and clickable on read-only / submitted documents (Crema hid
+  it); without a form handler it runs the field's `options` method on the document (run_doc_method).
+- Heading is an <h4>; the dialog Comment control is a rich editor with Desk's Comment button, Ctrl+Enter, on_submit.
+- e2e: controls4 (new). Phase 1 status: M1–M6 done; left: fix 3 stale e2e suites, "day of work" suite, M7 minimum.
+
 ## 2026-11-18 — M5 done: ERPNext financial statements like Desk
 - ERPNext's own report helpers (utils.js, financial_statements.js, trends filters) load from the site's /assets and
   run unchanged before the report script; Balance Sheet, P&L, Cash Flow, Trial Balance, GL, Stock Ledger, Gross
