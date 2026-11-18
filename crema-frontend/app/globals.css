@@ -351,3 +351,30 @@ a:focus-visible,
 .crema-rich .text-right { text-align: right; }
 .crema-rich .text-left { text-align: left; }
 .crema-rich .tax-break-up { overflow-x: auto; }
+
+/* Text Editor (Quill 2, lib/crema-form/quill.ts) — Desk's .ql-editor.read-mode has no padding */
+.ql-editor.read-mode { padding: 0; height: auto; overflow: visible; }
+.crema-quill .ql-toolbar.ql-snow { border: 0; border-bottom: 1px solid var(--border-color); border-radius: 0.5rem 0.5rem 0 0; background: var(--gray-50); padding: 4px 6px; font-family: inherit; }
+.crema-quill .ql-container.ql-snow, .crema-quill .ql-container { border: 0; font-family: inherit; font-size: 0.875rem; }
+.crema-quill .ql-editor { min-height: clamp(6rem, 18vh, 10rem); padding: 0.5rem 0.75rem; line-height: 1.5; }
+.crema-quill-compact .ql-editor { min-height: 2rem; padding: 0.25rem 0.5rem; }
+.crema-quill .ql-editor.ql-blank::before { color: var(--gray-400); font-style: normal; left: 0.75rem; }
+.crema-quill .ql-editor table { width: 100%; border-collapse: collapse; }
+.crema-quill .ql-editor td { border: 1px solid var(--border-color); padding: 0.25em 0.5em; }
+.crema-quill .ql-tooltip { z-index: 30; }
+/* font sizes (text_editor.js font_sizes) and table actions show their names */
+.crema-quill .ql-snow .ql-picker.ql-size { width: 80px; }
+.crema-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value]::before,
+.crema-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value]::before { content: attr(data-value); }
+.crema-quill .ql-snow .ql-picker.ql-table { width: 32px; }
+.crema-quill .ql-snow .ql-picker.ql-table .ql-picker-label::before { content: "⊞"; font-size: 15px; }
+.crema-quill .ql-snow .ql-picker.ql-table .ql-picker-label svg { display: none; }
+.crema-quill .ql-snow .ql-picker.ql-table .ql-picker-options { width: 170px; }
+.crema-quill .ql-snow .ql-picker.ql-table .ql-picker-item::before { content: attr(data-label); }
+[data-theme="dark"] .crema-quill .ql-toolbar.ql-snow { background: var(--gray-900); }
+[data-theme="dark"] .crema-quill .ql-snow .ql-stroke { stroke: var(--gray-300); }
+[data-theme="dark"] .crema-quill .ql-snow .ql-fill { fill: var(--gray-300); }
+[data-theme="dark"] .crema-quill .ql-snow .ql-picker { color: var(--gray-300); }
+[data-theme="dark"] .crema-quill .ql-snow .ql-picker-options,
+[data-theme="dark"] .crema-quill .ql-snow .ql-tooltip { background: var(--gray-900); color: var(--gray-200); border-color: var(--gray-700); box-shadow: none; }
+[data-theme="dark"] .crema-quill .ql-snow .ql-tooltip input[type=text] { background: var(--gray-800); color: inherit; border-color: var(--gray-700); }

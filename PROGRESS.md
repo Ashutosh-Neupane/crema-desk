@@ -2,6 +2,17 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4: Text Editor is Quill, like Desk
+- The contentEditable box (execCommand, `window.prompt` for links) is replaced by Quill 2.0.3, set up from Desk's
+  `text_editor.js` (`lib/crema-form/quill.ts`), so HTML written in Crema and in Desk is the same. Loaded on demand.
+- Tables, images (Frappe turns the inline image into a File on save), checklist, colours, sizes, alignment, code
+  blocks; paste cleaned; pasted scripts dropped (Crema; Quill alone keeps their text).
+- e2e: texteditor (new); form.salesorder, formsave, formnav, mobile, timeline, formmenu, linkfield, dialogs green.
+- Dev note: after adding rules to `app/globals.css` the running dev server kept serving the old stylesheet
+  (Turbopack); restarting `npm run dev` picked them up. `next build` had them all along.
+
+Next: the 🟡 controls in GAPS § 2.3, one family at a time (Markdown / HTML / JSON / Code editors first).
+
 ## 2026-11-18 — M4 started: Link field like Desk; e2e suites own their data; #13–#16 merged
 - Merged CI (#13), M2 workflow (#14), M3 grid (#15) and the e2e data fixes (#16); each branch updated with `main`
   and green in CI before merging. Dependabot opened #17 / #18 (actions/checkout and setup-node 4 → 7): left open.
