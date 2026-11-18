@@ -527,7 +527,9 @@ export default function ListView({ doctype }: { doctype: string }) {
               <button
                 type="button"
                 onClick={onAdd}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                // the app's listview_settings (primary_action) must be in before Add means the same as in Desk
+                disabled={settings === undefined}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 <Plus className="h-4 w-4" /> Add {doctype}
               </button>
@@ -844,7 +846,7 @@ export default function ListView({ doctype }: { doctype: string }) {
             {filters.length || debounced ? (
               <button type="button" onClick={() => { setSearch(""); setFilters([]); }} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Clear filters</button>
             ) : (
-              canCreate && <button type="button" onClick={onAdd} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
+              canCreate && <button type="button" onClick={onAdd} disabled={settings === undefined} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
             )}
           </div>
         )}
