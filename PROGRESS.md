@@ -2,6 +2,17 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-18 — M4 started: Link field like Desk; e2e suites own their data; #13–#16 merged
+- Merged CI (#13), M2 workflow (#14), M3 grid (#15) and the e2e data fixes (#16); each branch updated with `main`
+  and green in CI before merging. Dependabot opened #17 / #18 (actions/checkout and setup-node 4 → 7): left open.
+- Link control: titles for "Show Title in Link Fields" DocTypes, `link_filters` applied (a real bug: Customize
+  Form filters on a Link were ignored), "Filtered by: …", Create only with permission, Advanced Search (the Add
+  Multiple dialog in single mode, title first).
+- e2e: linkfield (new); form.salesorder, formmenu, sidebar, timeline now find their own data — every suite run
+  this session passes on a fresh v16 + ERPNext site.
+
+Next: rest of M4 — Text Editor (images, mentions, tables, paste cleanup), then the 🟡 controls one family at a time.
+
 ## 2026-11-18 — M3: a grid you can type in
 - Keyboard and spreadsheet paste like Desk; Add Multiple (also on ERPNext transactions: Sales Order line gets its rate
   from ERPNext's own item events); per-user column settings in Desk's GridView format; a ⋯ row menu.

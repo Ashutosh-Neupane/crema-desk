@@ -178,9 +178,12 @@ Order of work: the milestones in § 0.1.
 - ✅ Data `options` validation (`lib/crema-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
   Phone, URL, Name — red field + message, `aria-invalid`; native email/tel/url inputs — `e2e/datavalidation.mjs`
   (agent-built, judged). IBAN: Desk has no client check either.
-- ❌ Link: `show_title_field_in_link` (title shown instead of name), "Create a new X" + "Advanced search" in the
-  dropdown (`link_selector`), link hover preview card (`ui/link_preview.js`, `components/hover_card.js`), filters
-  description under the field, `ignore_user_permissions`.
+- ✅ Link (`controls/link.js`): "Show Title in Link Fields" shows the title and stores the name (`get_link_title`);
+  `link_filters` from Customize Form applied (with `eval:` values) — they were ignored before; "Filtered by: …"
+  line (`get_filter_description`, or `filter_description`); "Create a new X" only with create permission and not
+  for `only_select`; "Advanced Search" → the link selector dialog — `e2e/linkfield.mjs`.
+- ❌ Link: hover preview card (`ui/link_preview.js`, `components/hover_card.js`), `ignore_user_permissions`,
+  custom `ControlLink.link_options`.
 - ❌ Camera capture for Attach (`ui/capture.js`) and barcode/QR scanner dialog (`scanner/`, `frappe.ui.Scanner`).
 - ❌ Address autocomplete (`ui/address_autocomplete`, geocoder setting).
 - ✅ Formatting from settings (`lib/frappe/format.ts` — transcribes `number_format.js`, `form/formatters.js`,
