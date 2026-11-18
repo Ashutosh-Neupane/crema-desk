@@ -150,7 +150,7 @@ export default function FormBody({
         error={errors[df.fieldname]}
         doc={parent ? { ...parent, ...values } : values}
         getQuery={getQuery?.(df.fieldname)}
-        onClick={df.fieldtype === "Button" && onButton ? () => onButton(df.fieldname) : undefined}
+        onClick={(df.fieldtype === "Button" || df.fieldtype === "Comment") && onButton ? () => onButton(df.fieldname) : undefined}
       />
     );
   };
