@@ -7,10 +7,19 @@ const t = await start();
 const { page, check, step, shot, errors } = t;
 
 step("sidebar POS → framed Point of Sale");
+// ERPNext's pos_controller.js asks check_opening_entry first: with an open POS Opening Entry for this user it
+// builds the POS app (.point-of-sale-app → .items-selector), otherwise it opens "Create POS Opening Entry".
+// Expect whichever the site's own data calls for.
+const opening = (await (await page.request.post(`${BASE}/api/frappe/api/method/erpnext.selling.page.point_of_sale.point_of_sale.check_opening_entry`, { data: { user: process.env.CREMA_USER ?? "Administrator" } })).json()).message ?? [];
 await page.goto(`${BASE}/desk/page/point-of-sale`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const frame = page.frameLocator('iframe[title="Frappe page point-of-sale"]');
-await frame.getByText("Create POS Opening Entry").waitFor({ timeout: 90000 });
-check(true, "POS opening dialog rendered by ERPNext's own page code");
+if (opening.length) {
+  await frame.locator(".point-of-sale-app .items-selector").waitFor({ timeout: 90000 });
+  check(true, `POS app rendered by ERPNext's own page code (open entry ${opening[0].name})`);
+} else {
+  await frame.getByText("Create POS Opening Entry").waitFor({ timeout: 90000 });
+  check(true, "POS opening dialog rendered by ERPNext's own page code (no open entry)");
+}
 await page.getByRole("heading", { name: "Point of Sale" }).waitFor({ timeout: 15000 });
 check(true, "title bridged to Crema");
 const innerFrame = () => page.frames().find((f) => f !== page.mainFrame());
