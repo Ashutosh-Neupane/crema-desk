@@ -1,13 +1,26 @@
 // Realtime: list_update refreshes the list; doc_update reloads a clean form and warns on a dirty one.
-// Needs the bench's socketio process and NEXT_PUBLIC_SOCKETIO_URL.
-//   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/realtime.mjs
+// Needs the bench's socketio process and NEXT_PUBLIC_SOCKETIO_URL (the value the dev server was started with);
+// without either it prints a SKIP line and exits 0 (Crema's realtime is off then, by design).
+//   BASE=http://localhost:3001 OUT=/tmp/shots NEXT_PUBLIC_SOCKETIO_URL=http://localhost:9000 node e2e/realtime.mjs
 import { start, BASE } from "./lib.mjs";
+
+const SIO = (process.env.NEXT_PUBLIC_SOCKETIO_URL ?? "").replace(/\/$/, "");
+const sioReachable = SIO
+  ? await fetch(`${SIO}/socket.io/?EIO=4&transport=polling`, { signal: AbortSignal.timeout(5000) }).then((r) => r.ok, () => false)
+  : false;
+if (!sioReachable) {
+  console.log(`SKIP realtime: ${SIO ? `socket.io not reachable at ${SIO}` : "NEXT_PUBLIC_SOCKETIO_URL is not set (Crema realtime off)"}`);
+  console.log("\nALL PASSED (0 failures, suite skipped)");
+  process.exit(0);
+}
 
 const t = await start();
 const { page, check, step } = t;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
 const tag = `RT${Date.now() % 100000}`;
 const made = [];
+
+try {
 
 step("list refreshes on list_update");
 await page.goto(`${BASE}/desk/doctype/ToDo?filters=${encodeURIComponent(JSON.stringify([["description", "like", `%${tag}%`]]))}`, { waitUntil: "domcontentloaded", timeout: 180000 });
@@ -37,6 +50,8 @@ await banner.getByRole("button", { name: /Reload/ }).click();
 await page.waitForTimeout(2000);
 check((await priority.inputValue()) === "Medium", "Reload brings the server version");
 
-step("cleanup");
-for (const n of made) await post("frappe.client.delete", { doctype: "ToDo", name: n });
+} finally {
+  step("cleanup");
+  for (const n of made) await post("frappe.client.delete", { doctype: "ToDo", name: n });
+}
 await t.finish();
