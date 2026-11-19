@@ -6,8 +6,13 @@ import { start, BASE, defaultCompany } from "./lib.mjs";
 const t = await start();
 const { page, check, step, shot } = t;
 const COMPANY = await defaultCompany(page);
-const STORES = `Stores - ${(await (await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.get_value`, { data: { doctype: "Company", fieldname: "abbr", filters: COMPANY } })).json()).message?.abbr}`;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
+// a stock warehouse of the company (the "Stores" one ERPNext's setup makes, else any leaf warehouse)
+const leafWh = (name) => post("frappe.client.get_list", { doctype: "Warehouse", filters: { company: COMPANY, is_group: 0, disabled: 0, ...(name ? { warehouse_name: name } : {}) }, fields: ["name"], limit_page_length: 1 });
+const STORES = ((await leafWh("Stores"))?.[0] ?? (await leafWh())?.[0])?.name;
+// the company currency's symbol, as Desk's format_currency shows it (falls back to the code)
+const CUR = (await post("frappe.client.get_value", { doctype: "Company", fieldname: "default_currency", filters: COMPANY }))?.default_currency;
+const SYMBOL = (await post("frappe.client.get_value", { doctype: "Currency", fieldname: "symbol", filters: CUR }))?.symbol || CUR;
 const SC = "erpnext.controllers.stock_controller";
 const created = [];
 async function cleanup() {
@@ -21,7 +26,9 @@ const open = async (dt, name, wait) => {
 // any customer and stock item of this site (no names from a particular bench)
 const CUSTOMER = (await post("frappe.client.get_list", { doctype: "Customer", filters: { disabled: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 const ITEM = (await post("frappe.client.get_list", { doctype: "Item", filters: { is_stock_item: 1, is_sales_item: 1, is_purchase_item: 1, disabled: 0, has_variants: 0, has_serial_no: 0, has_batch_no: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
-check(!!CUSTOMER && !!ITEM, `site data: customer ${CUSTOMER}, item ${ITEM}`);
+check(!!CUSTOMER && !!ITEM && !!STORES, `site data: customer ${CUSTOMER}, item ${ITEM}, warehouse ${STORES}, currency ${CUR} (${SYMBOL})`);
+
+try {
 
 step("draft Sales Invoice");
 const si = await post("frappe.client.insert", { doc: { doctype: "Sales Invoice", company: COMPANY, customer: CUSTOMER, set_posting_time: 0, items: [{ item_code: ITEM, qty: 2, rate: 100 }] } });
@@ -50,7 +57,7 @@ check(gl.gl_data.every((r, i) => num(rows[i][di]) === (r[di] || 0) && num(rows[i
 const dr = rows.reduce((s, r) => s + num(r[di]), 0);
 const cr = rows.reduce((s, r) => s + num(r[ci]), 0);
 check(dr > 0 && Math.abs(dr - cr) < 0.01, `balanced: debit ${dr} = credit ${cr}`);
-check(/(Rs|NPR|₨)/.test(rows[0][di] + rows[0][ci]), "currency cells formatted with a symbol");
+check(!!SYMBOL && (rows[0][di] + rows[0][ci]).includes(SYMBOL), `currency cells formatted with the company currency symbol (${SYMBOL})`);
 await shot("ledger_accounting", false);
 await page.keyboard.press("Escape");
 await dlg.waitFor({ state: "detached", timeout: 10000 });
@@ -65,7 +72,7 @@ if (!sup) {
 }
 const pi = await post("frappe.client.insert", { doc: { doctype: "Purchase Receipt", company: COMPANY, supplier: sup, set_warehouse: STORES, items: [{ item_code: ITEM, qty: 5, rate: 50, warehouse: STORES }] } });
 check(!!pi?.name, `inserted ${pi?.name} for ${sup}`);
-if (!pi?.name) { await cleanup(); await t.finish(); }
+if (pi?.name) {
 created.push(["Purchase Receipt", pi.name]);
 const sl = await post(`${SC}.show_stock_ledger_preview`, { company: pi.company, doctype: "Purchase Receipt", docname: pi.name });
 check(sl?.sl_data?.length === 1, `API returns ${sl?.sl_data?.length} SLE row`);
@@ -83,6 +90,8 @@ const ii = sl.sl_columns.findIndex((c) => c.name === "Item");
 check(srow[ii] === ITEM && sl.sl_data[0][ii] === ITEM, "item row shown");
 check(srow.some((c) => c === STORES), "warehouse shown");
 await shot("ledger_stock", false);
-
-await cleanup();
+}
+} finally {
+  await cleanup();
+}
 await t.finish();
