@@ -31,7 +31,7 @@ const CHECKS: Array<[keyof ListViewSettingsDoc, string]> = [
 ];
 const MAX_FIELDS = 50;
 
-export function defaultColumns(meta: DocTypeMeta, hasIndicator: boolean): ListColumnSetting[] {
+function defaultColumns(meta: DocTypeMeta, hasIndicator: boolean): ListColumnSetting[] {
   const title = typeof meta.title_field === "string" ? meta.title_field.trim() : "";
   const tf = title ? meta.fields?.find((f) => f.fieldname === title) : undefined;
   const subject = tf ? { fieldname: tf.fieldname, label: tf.label ?? tf.fieldname } : { fieldname: "name", label: "ID" };

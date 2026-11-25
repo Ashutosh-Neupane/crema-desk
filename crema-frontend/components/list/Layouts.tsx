@@ -91,6 +91,176 @@ function sortOptions(meta: DocTypeMeta): Array<{ value: string; label: string }>
   return out;
 }
 
+const LAYOUT_BREAKS = new Set(["Section Break", "Column Break", "Tab Break"]);
+const opLabel = (op: string) => OPERATORS.find((o) => o.op === op)?.label ?? op;
+
+/** layout_dialog.js validate: the first problem with the form, or null */
+function layoutError(o: { filterName: string; isStandard: boolean; module: string; layouts: ListLayout[]; editing: ListLayout | null; columns: ListColumnSetting[] }): string | null {
+  if (!o.filterName) return "Layout name is required";
+  if (o.isStandard && !o.module) return "Module is required for a standard layout";
+  if (o.layouts.some((l) => l.filter_name === o.filterName && l.name !== o.editing?.name)) return "A layout with this name already exists";
+  if (!o.columns.length) return "Select at least one field";
+  return null;
+}
+
+function initialLayoutName(layout: ListLayout | null, duplicateFrom: ListLayout | null) {
+  if (layout) return layout.filter_name;
+  return duplicateFrom ? `${duplicateFrom.filter_name} (copy)` : "";
+}
+
+function LayoutFiltersSection({
+  meta,
+  filters,
+  setFilters,
+  sortField,
+  setSortField,
+  sortOrder,
+  setSortOrder,
+}: {
+  meta: DocTypeMeta;
+  filters: Filter[];
+  setFilters: (f: Filter[]) => void;
+  sortField: string;
+  setSortField: (v: string) => void;
+  sortOrder: string;
+  setSortOrder: (v: string) => void;
+}) {
+  const sorts = useMemo(() => sortOptions(meta), [meta]);
+  return (
+    <section className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <h3 className="font-semibold">Filters &amp; Sorting</h3>
+      {filters.length === 0 ? (
+        <p className="text-xs text-zinc-500">No filters selected</p>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Layout filters">
+          {filters.map((f, i) => (
+            <li key={`${f[1]}-${f[2]}-${describeValue(f[3])}`} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs dark:bg-zinc-800">
+              {fieldLabel(meta, f[1])} {opLabel(f[2])} {describeValue(f[3])}
+              <button type="button" aria-label={`Remove filter ${fieldLabel(meta, f[1])}`} onClick={() => setFilters(filters.filter((_, j) => j !== i))} className="rounded p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700">
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="max-w-md rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+        <FilterEditor meta={meta} onAdd={(f) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f])} />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <label className="space-y-1">
+          <span className="block text-xs text-zinc-500">Sort Field *</span>
+          <select aria-label="Sort Field" value={sortField} onChange={(e) => setSortField(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
+            {!sorts.some((s) => s.value === sortField) && <option value={sortField}>{fieldLabel(meta, sortField)}</option>}
+            {sorts.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block text-xs text-zinc-500">Sort Order *</span>
+          <select aria-label="Sort Order" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </label>
+      </div>
+    </section>
+  );
+}
+
+function LayoutColumnsSection({ meta, columns, setColumns }: { meta: DocTypeMeta; columns: ListColumnSetting[]; setColumns: (c: ListColumnSetting[]) => void }) {
+  const [addField, setAddField] = useState("");
+  const shown = new Set(columns.map((c) => c.fieldname));
+  const addable = (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !LAYOUT_BREAKS.has(f.fieldtype) && !shown.has(f.fieldname));
+  const move = (i: number, d: number) => {
+    const j = i + d;
+    if (j < 0 || j >= columns.length) return;
+    const next = [...columns];
+    [next[i], next[j]] = [next[j], next[i]];
+    setColumns(next);
+  };
+  return (
+    <section className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <h3 className="font-semibold">Columns</h3>
+      <ul aria-label="Layout columns" className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-700">
+        {columns.map((c, i) => (
+          <li key={c.fieldname} data-column={c.fieldname} className="flex items-center gap-2 px-2 py-1.5">
+            <span className="flex-1 truncate">{c.fieldname === "status_field" ? "Status" : c.label || fieldLabel(meta, c.fieldname)}</span>
+            <input
+              type="number"
+              min={0}
+              aria-label={`${c.label || c.fieldname} width`}
+              value={c.width ?? ""}
+              placeholder="Width"
+              onChange={(e) => setColumns(columns.map((x, j) => (j === i ? { ...x, width: e.target.value ? Number(e.target.value) : undefined } : x)))}
+              className="w-20 rounded-md border border-zinc-200 px-2 py-0.5 text-right text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button type="button" aria-label={`Move ${c.label || c.fieldname} up`} disabled={i === 0} onClick={() => move(i, -1)} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-800">
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" aria-label={`Move ${c.label || c.fieldname} down`} disabled={i === columns.length - 1} onClick={() => move(i, 1)} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-800">
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" aria-label={`Remove column ${c.label || c.fieldname}`} onClick={() => setColumns(columns.filter((_, j) => j !== i))} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-2">
+        <select aria-label="Add column" value={addField} onChange={(e) => setAddField(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
+          <option value="">Add a field…</option>
+          {addable.map((f) => (
+            <option key={f.fieldname} value={f.fieldname}>
+              {f.label || f.fieldname}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!addField}
+          onClick={() => {
+            const df = meta.fields?.find((f) => f.fieldname === addField);
+            if (df) setColumns([...columns, { fieldname: df.fieldname, label: df.label || df.fieldname }]);
+            setAddField("");
+          }}
+          className="rounded-md border border-zinc-200 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700"
+        >
+          Add
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function LayoutScopeFields({ layout, global, canStandard, isGlobal, setIsGlobal, isStandard, setIsStandard, module, setModule }: { layout: ListLayout | null; global: boolean; canStandard: boolean; isGlobal: boolean; setIsGlobal: (v: boolean) => void; isStandard: boolean; setIsStandard: (v: boolean) => void; module: string; setModule: (v: string) => void }) {
+  return (
+    <>
+      {global && !layout?.is_standard && !isStandard && (
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={isGlobal} onChange={(e) => setIsGlobal(e.target.checked)} /> Available to all users
+        </label>
+      )}
+      {canStandard && (
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={isStandard} onChange={(e) => setIsStandard(e.target.checked)} /> Standard
+            <span className="text-xs text-zinc-500">Exported to the module and shipped with its app</span>
+          </label>
+          {isStandard && (
+            <div className="max-w-xs">
+              <span className="text-xs text-zinc-500">Module *</span>
+              <LinkInput doctype="Module Def" value={module} onChange={setModule} />
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function LayoutDialog({
   meta,
   layout,
@@ -114,41 +284,27 @@ export function LayoutDialog({
   const isEdit = !!layout;
   const global = canAddGlobal(ctx);
   const canStandard = global && ctx.developerMode && !isEdit;
-  const [name, setName] = useState(isEdit ? layout.filter_name : duplicateFrom ? `${duplicateFrom.filter_name} (copy)` : "");
+  const [name, setName] = useState(() => initialLayoutName(layout, duplicateFrom));
   const [isGlobal, setIsGlobal] = useState(source ? !source.for_user : false);
   const [isStandard, setIsStandard] = useState(false);
   const [module, setModule] = useState(String(meta.module ?? ""));
-  const [filters, setFilters] = useState<Filter[]>(source ? layoutFilters(source) : current.filters);
+  const [filters, setFilters] = useState<Filter[]>(() => (source ? layoutFilters(source) : current.filters));
   const [sortField, setSortField] = useState(source?.sort_field || current.sort_field);
-  const [sortOrder, setSortOrder] = useState((source?.sort_order || current.sort_order).toLowerCase() === "asc" ? "asc" : "desc");
+  const [sortOrder, setSortOrder] = useState(() => ((source?.sort_order || current.sort_order).toLowerCase() === "asc" ? "asc" : "desc"));
   const [columns, setColumns] = useState<ListColumnSetting[]>(() => {
     const saved = source ? layoutColumns(source) : [];
     return saved.length ? saved : current.columns;
   });
-  const [addField, setAddField] = useState("");
   const [saving, setSaving] = useState(false);
-  const sorts = useMemo(() => sortOptions(meta), [meta]);
-  const addable = (meta.fields ?? []).filter((f) => !NO_VALUE.has(f.fieldtype) && !["Section Break", "Column Break", "Tab Break"].includes(f.fieldtype) && !columns.some((c) => c.fieldname === f.fieldname));
-  const opLabel = (op: string) => OPERATORS.find((o) => o.op === op)?.label ?? op;
-
-  const move = (i: number, d: number) => {
-    const j = i + d;
-    if (j < 0 || j >= columns.length) return;
-    const next = [...columns];
-    [next[i], next[j]] = [next[j], next[i]];
-    setColumns(next);
-  };
 
   const save = async () => {
     const filterName = name.trim();
-    if (!filterName) return toast.error("Layout name is required");
-    if (isStandard && !module) return toast.error("Module is required for a standard layout");
-    if (layouts.some((l) => l.filter_name === filterName && l.name !== layout?.name)) return toast.error("A layout with this name already exists");
-    if (!columns.length) return toast.error("Select at least one field");
+    const error = layoutError({ filterName, isStandard, module, layouts, editing: layout, columns });
+    if (error) return toast.error(error);
     setSaving(true);
     try {
       const input = { filter_name: filterName, is_global: global && isGlobal, is_standard: canStandard && isStandard, module, filters, columns, sort_field: sortField, sort_order: sortOrder };
-      const saved = isEdit ? await updateLayout(meta.name, layout, ctx.user, input, global) : await createLayout(meta.name, ctx.user, input);
+      const saved = layout ? await updateLayout(meta.name, layout, ctx.user, input, global) : await createLayout(meta.name, ctx.user, input);
       toast.success(isEdit ? `Layout ${filterName} updated` : `Layout ${filterName} created`);
       onSaved(saved);
     } catch (e) {
@@ -169,117 +325,9 @@ export function LayoutDialog({
             <span className="font-medium text-zinc-700 dark:text-zinc-300">Layout name *</span>
             <input aria-label="Layout name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          {global && !layout?.is_standard && !isStandard && (
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={isGlobal} onChange={(e) => setIsGlobal(e.target.checked)} /> Available to all users
-            </label>
-          )}
-          {canStandard && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={isStandard} onChange={(e) => setIsStandard(e.target.checked)} /> Standard
-                <span className="text-xs text-zinc-500">Exported to the module and shipped with its app</span>
-              </label>
-              {isStandard && (
-                <div className="max-w-xs">
-                  <span className="text-xs text-zinc-500">Module *</span>
-                  <LinkInput doctype="Module Def" value={module} onChange={setModule} />
-                </div>
-              )}
-            </div>
-          )}
-
-          <section className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-            <h3 className="font-semibold">Filters &amp; Sorting</h3>
-            {filters.length === 0 ? (
-              <p className="text-xs text-zinc-500">No filters selected</p>
-            ) : (
-              <ul className="flex flex-wrap gap-1.5" aria-label="Layout filters">
-                {filters.map((f, i) => (
-                  <li key={`${f[1]}-${f[2]}-${describeValue(f[3])}`} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs dark:bg-zinc-800">
-                    {fieldLabel(meta, f[1])} {opLabel(f[2])} {describeValue(f[3])}
-                    <button type="button" aria-label={`Remove filter ${fieldLabel(meta, f[1])}`} onClick={() => setFilters(filters.filter((_, j) => j !== i))} className="rounded p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="max-w-md rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
-              <FilterEditor meta={meta} onAdd={(f) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f])} />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <label className="space-y-1">
-                <span className="block text-xs text-zinc-500">Sort Field *</span>
-                <select aria-label="Sort Field" value={sortField} onChange={(e) => setSortField(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
-                  {!sorts.some((s) => s.value === sortField) && <option value={sortField}>{fieldLabel(meta, sortField)}</option>}
-                  {sorts.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="block text-xs text-zinc-500">Sort Order *</span>
-                <select aria-label="Sort Order" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
-                  <option value="desc">Descending</option>
-                  <option value="asc">Ascending</option>
-                </select>
-              </label>
-            </div>
-          </section>
-
-          <section className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-            <h3 className="font-semibold">Columns</h3>
-            <ul aria-label="Layout columns" className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-700">
-              {columns.map((c, i) => (
-                <li key={c.fieldname} data-column={c.fieldname} className="flex items-center gap-2 px-2 py-1.5">
-                  <span className="flex-1 truncate">{c.fieldname === "status_field" ? "Status" : c.label || fieldLabel(meta, c.fieldname)}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    aria-label={`${c.label || c.fieldname} width`}
-                    value={c.width ?? ""}
-                    placeholder="Width"
-                    onChange={(e) => setColumns(columns.map((x, j) => (j === i ? { ...x, width: e.target.value ? Number(e.target.value) : undefined } : x)))}
-                    className="w-20 rounded-md border border-zinc-200 px-2 py-0.5 text-right text-xs dark:border-zinc-700 dark:bg-zinc-900"
-                  />
-                  <button type="button" aria-label={`Move ${c.label || c.fieldname} up`} disabled={i === 0} onClick={() => move(i, -1)} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-800">
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" aria-label={`Move ${c.label || c.fieldname} down`} disabled={i === columns.length - 1} onClick={() => move(i, 1)} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-800">
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" aria-label={`Remove column ${c.label || c.fieldname}`} onClick={() => setColumns(columns.filter((_, j) => j !== i))} className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex items-center gap-2">
-              <select aria-label="Add column" value={addField} onChange={(e) => setAddField(e.target.value)} className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
-                <option value="">Add a field…</option>
-                {addable.map((f) => (
-                  <option key={f.fieldname} value={f.fieldname}>
-                    {f.label || f.fieldname}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!addField}
-                onClick={() => {
-                  const df = meta.fields?.find((f) => f.fieldname === addField);
-                  if (df) setColumns([...columns, { fieldname: df.fieldname, label: df.label || df.fieldname }]);
-                  setAddField("");
-                }}
-                className="rounded-md border border-zinc-200 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700"
-              >
-                Add
-              </button>
-            </div>
-          </section>
+          <LayoutScopeFields layout={layout} global={global} canStandard={canStandard} isGlobal={isGlobal} setIsGlobal={setIsGlobal} isStandard={isStandard} setIsStandard={setIsStandard} module={module} setModule={setModule} />
+          <LayoutFiltersSection meta={meta} filters={filters} setFilters={setFilters} sortField={sortField} setSortField={setSortField} sortOrder={sortOrder} setSortOrder={setSortOrder} />
+          <LayoutColumnsSection meta={meta} columns={columns} setColumns={setColumns} />
         </div>
         <DialogFooter>
           <button type="button" onClick={onClose} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm dark:border-zinc-700">

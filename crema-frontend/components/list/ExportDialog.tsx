@@ -16,7 +16,7 @@ type Records = "all" | "by_filter" | "5_records" | "blank_template";
 const exportable = (m: DocTypeMeta): DocField[] => (m.fields ?? []).filter((f) => !NO_EXPORT.has(f.fieldtype) && f.fieldname);
 
 /** Download a template/export through the BFF proxy (the response is the file) */
-export function downloadTemplate(doctype: string, fields: Record<string, string[]>, records: Records, filters: Filter[], fileType: "CSV" | "Excel") {
+function downloadTemplate(doctype: string, fields: Record<string, string[]>, records: Records, filters: Filter[], fileType: "CSV" | "Excel") {
   const qs = new URLSearchParams({
     doctype,
     export_fields: JSON.stringify(fields),

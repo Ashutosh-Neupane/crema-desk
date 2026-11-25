@@ -55,9 +55,14 @@ export default function ListSidebar({
   const { data: saved = [] } = useQuery({ queryKey: ["list-group-by-fields", doctype], queryFn: () => loadGroupByFields(doctype), staleTime: 60_000 });
   const fields = useMemo(() => {
     const out = [...STANDARD];
+    const byName = new Map((meta.fields ?? []).map((f) => [f.fieldname, f]));
+    const seen = new Set(out.map((o) => o.fieldname));
     for (const fn of saved) {
-      const df = meta.fields?.find((f) => f.fieldname === fn);
-      if (df && !out.some((o) => o.fieldname === fn)) out.push({ fieldname: fn, label: df.label ?? fn });
+      const df = byName.get(fn);
+      if (df && !seen.has(fn)) {
+        seen.add(fn);
+        out.push({ fieldname: fn, label: df.label ?? fn });
+      }
     }
     return out;
   }, [saved, meta]);
@@ -206,6 +211,7 @@ function GroupByDropdown({
 function Customize({ meta, saved, onSaved }: { meta: DocTypeMeta; saved: string[]; onSaved: () => void }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const savedSet = useMemo(() => new Set(saved), [saved]);
   const options = useMemo(() => (meta.fields ?? []).filter((f) => FIELD_TYPES.includes(f.fieldtype) && !f.hidden && f.fieldname !== "naming_series"), [meta]);
   const save = useMutation({
     mutationFn: async (next: string[]) => {
@@ -231,7 +237,7 @@ function Customize({ meta, saved, onSaved }: { meta: DocTypeMeta; saved: string[
           {options.map((f) => (
             <li key={f.fieldname}>
               <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <input type="checkbox" checked={saved.includes(f.fieldname)} onChange={() => toggle(f.fieldname)} />
+                <input type="checkbox" checked={savedSet.has(f.fieldname)} onChange={() => toggle(f.fieldname)} />
                 <span className="truncate text-zinc-700 dark:text-zinc-200">{f.label ?? f.fieldname}</span>
               </label>
             </li>
