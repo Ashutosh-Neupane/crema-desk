@@ -31,8 +31,7 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ module: string }> },
 ) {
-  const { module } = await params;
-  const cookie = await getCookieHeader();
+  const [{ module }, cookie] = await Promise.all([params, getCookieHeader()]);
 
   const contents: ModuleContents = {
     module: null,

@@ -73,8 +73,11 @@ export async function DELETE(
 
     const results = { deleted: [] as string[], failed: [] as { name: string; error: string }[] };
 
+    // One at a time, in selection order, like Desk's delete_bulk: a selected record linked from
+    // another selected record can only be deleted after it, and parallel deletes race on link checks.
     for (const name of names) {
       try {
+        // react-doctor-disable-next-line async-await-in-loop -- deletes are order-dependent (link checks)
         await frappeServerFetch(
           cookie,
           `api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,

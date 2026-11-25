@@ -18,8 +18,7 @@ export async function generateMetadata({ params }: WwwRouteProps): Promise<Metad
  * rewritten to the backend origin.
  */
 export default async function WwwCatchAllPage({ params }: WwwRouteProps) {
-  const { path } = await params;
-  const cookieHeader = await getCookieHeader();
+  const [{ path }, cookieHeader] = await Promise.all([params, getCookieHeader()]);
   const result = await fetchWwwPage(path.join("/"), cookieHeader);
 
   return (
