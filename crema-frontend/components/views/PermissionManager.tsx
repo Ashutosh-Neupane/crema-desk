@@ -141,69 +141,7 @@ export default function PermissionManager({ doctype }: { doctype: string }) {
         </div>
       </div>
 
-      {optsQ.error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{errText(optsQ.error, "Not permitted")}</p>
-      ) : !doctype && !role ? (
-        <p className="py-20 text-center text-sm text-zinc-500">Select Document Type or Role to start.</p>
-      ) : permsQ.isLoading ? (
-        <p className="flex justify-center py-20 text-zinc-400">
-          <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />
-        </p>
-      ) : !perms.length ? (
-        <p className="py-20 text-center text-sm text-zinc-500">No Permissions set for this criteria.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <table className="w-full text-sm" aria-label="Permission rules">
-            <thead className="bg-zinc-50 text-left text-xs text-zinc-500 dark:bg-zinc-900">
-              <tr>
-                <th scope="col" className="w-44 px-3 py-2 font-medium">Document Type</th>
-                <th scope="col" className="w-48 px-3 py-2 font-medium">Role</th>
-                <th scope="col" className="w-14 px-3 py-2 font-medium">Level</th>
-                <th scope="col" className="px-3 py-2 font-medium">Permissions</th>
-                <th scope="col" className="w-12 px-3 py-2"><span className="sr-only">Remove</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {perms.map((p) => (
-                <tr key={p.name} aria-label={`${p.parent} ${p.role} level ${p.permlevel}`} className="border-t border-zinc-100 align-top dark:border-zinc-800">
-                  <td className="px-3 py-3">
-                    <Link href={`/desk/doctype/${enc(p.parent)}`} className="text-zinc-900 hover:underline dark:text-zinc-100">
-                      {p.parent}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-3">
-                    <button type="button" onClick={() => setUsersOf(p.role)} className="text-left text-zinc-700 hover:underline dark:text-zinc-300" title="Users with this role">
-                      {p.role}
-                    </button>
-                    {!p.permlevel && (
-                      <label className="mt-3 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                        <input type="checkbox" checked={!!Number(p.if_owner)} disabled={busy === `${p.name}:if_owner`} onChange={(e) => void toggle(p, "if_owner", e.target.checked)} />
-                        Only if Creator
-                      </label>
-                    )}
-                  </td>
-                  <td className={`px-3 py-3 ${p.permlevel ? "" : "font-semibold"}`}>{p.permlevel}</td>
-                  <td className="px-3 py-3">
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3 xl:grid-cols-5" role="group" aria-label={`${p.role} rights`}>
-                      {rightsFor(p, ptypeMap[p.parent] ?? []).map((r) => (
-                        <label key={r} className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                          <input type="checkbox" checked={!!Number(p[r])} disabled={busy === `${p.name}:${r}`} onChange={(e) => void toggle(p, r, e.target.checked)} />
-                          {label(r)}
-                        </label>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <button type="button" aria-label={`Remove ${p.role} level ${p.permlevel}`} disabled={busy === p.name} onClick={() => void remove(p)} className="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40">
-                      <X className="h-4 w-4" aria-hidden />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <RulesBody error={optsQ.error} empty={!doctype && !role} loading={permsQ.isLoading} perms={perms} ptypeMap={ptypeMap} busy={busy} onToggle={toggle} onRemove={remove} onUsers={setUsersOf} />
 
       <details className="rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
         <summary className="cursor-pointer font-medium text-zinc-800 dark:text-zinc-200">How permissions work</summary>
@@ -221,6 +159,84 @@ export default function PermissionManager({ doctype }: { doctype: string }) {
       {usersOf && <RoleUsers role={usersOf} onClose={() => setUsersOf(null)} />}
       {resetting && doctype && <ResetDialog doctype={doctype} custom={ptypeMap[doctype] ?? []} onClose={() => setResetting(false)} onReset={refresh} />}
     </div>
+  );
+}
+
+interface RowActions {
+  busy: string | null;
+  onToggle: (p: Perm, ptype: string, on: boolean) => Promise<void>;
+  onRemove: (p: Perm) => Promise<void>;
+  onUsers: (role: string) => void;
+}
+
+function RulesBody({ error, empty, loading, perms, ptypeMap, busy, onToggle, onRemove, onUsers }: RowActions & { error: unknown; empty: boolean; loading: boolean; perms: Perm[]; ptypeMap: Record<string, string[]> }) {
+  if (error) return <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{errText(error, "Not permitted")}</p>;
+  if (empty) return <p className="py-20 text-center text-sm text-zinc-500">Select Document Type or Role to start.</p>;
+  if (loading)
+    return (
+      <p className="flex justify-center py-20 text-zinc-400">
+        <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />
+      </p>
+    );
+  if (!perms.length) return <p className="py-20 text-center text-sm text-zinc-500">No Permissions set for this criteria.</p>;
+  return (
+    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <table className="w-full text-sm" aria-label="Permission rules">
+        <thead className="bg-zinc-50 text-left text-xs text-zinc-500 dark:bg-zinc-900">
+          <tr>
+            <th scope="col" className="w-44 px-3 py-2 font-medium">Document Type</th>
+            <th scope="col" className="w-48 px-3 py-2 font-medium">Role</th>
+            <th scope="col" className="w-14 px-3 py-2 font-medium">Level</th>
+            <th scope="col" className="px-3 py-2 font-medium">Permissions</th>
+            <th scope="col" className="w-12 px-3 py-2"><span className="sr-only">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {perms.map((p) => (
+            <PermRow key={p.name} p={p} rights={rightsFor(p, ptypeMap[p.parent] ?? [])} busy={busy} onToggle={onToggle} onRemove={onRemove} onUsers={onUsers} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PermRow({ p, rights, busy, onToggle, onRemove, onUsers }: RowActions & { p: Perm; rights: string[] }) {
+  return (
+    <tr aria-label={`${p.parent} ${p.role} level ${p.permlevel}`} className="border-t border-zinc-100 align-top dark:border-zinc-800">
+      <td className="px-3 py-3">
+        <Link href={`/desk/doctype/${enc(p.parent)}`} className="text-zinc-900 hover:underline dark:text-zinc-100">
+          {p.parent}
+        </Link>
+      </td>
+      <td className="px-3 py-3">
+        <button type="button" onClick={() => onUsers(p.role)} className="text-left text-zinc-700 hover:underline dark:text-zinc-300" title="Users with this role">
+          {p.role}
+        </button>
+        {!p.permlevel && (
+          <label className="mt-3 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <input type="checkbox" checked={!!Number(p.if_owner)} disabled={busy === `${p.name}:if_owner`} onChange={(e) => void onToggle(p, "if_owner", e.target.checked)} />
+            Only if Creator
+          </label>
+        )}
+      </td>
+      <td className={`px-3 py-3 ${p.permlevel ? "" : "font-semibold"}`}>{p.permlevel}</td>
+      <td className="px-3 py-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3 xl:grid-cols-5" role="group" aria-label={`${p.role} rights`}>
+          {rights.map((r) => (
+            <label key={r} className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+              <input type="checkbox" checked={!!Number(p[r])} disabled={busy === `${p.name}:${r}`} onChange={(e) => void onToggle(p, r, e.target.checked)} />
+              {label(r)}
+            </label>
+          ))}
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <button type="button" aria-label={`Remove ${p.role} level ${p.permlevel}`} disabled={busy === p.name} onClick={() => void onRemove(p)} className="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40">
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </td>
+    </tr>
   );
 }
 

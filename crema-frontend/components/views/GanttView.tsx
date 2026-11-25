@@ -10,13 +10,13 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Filter as FilterIcon, ListFilter, X } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { fetchRows, type Filter } from "@/lib/list/api";
 import { useCalendarSettings } from "@/lib/views/calendarSettings";
-import { FilterEditor, OPERATORS, describeValue, fieldLabel } from "@/components/list/filters";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
+import { fieldLabel } from "@/components/list/filters";
+import { FilterButton, FilterPills } from "./parts/FilterBar";
+import { monthDay, monthShortYear } from "./parts/dateLabels";
 
 type Scale = "Day" | "Week" | "Month";
 const PX: Record<Scale, number> = { Day: 36, Week: 14, Month: 4 };
@@ -82,8 +82,8 @@ export default function GanttView({ doctype }: { doctype: string }) {
     for (let i = 0; i < span.days; i++) {
       const d = new Date(span.from.getTime() + i * DAY);
       if (scale === "Day") out.push({ left: i * px, label: `${d.getDate()}` });
-      else if (scale === "Week" && d.getDay() === 1) out.push({ left: i * px, label: d.toLocaleDateString("en", { month: "short", day: "numeric" }) });
-      else if (scale === "Month" && d.getDate() === 1) out.push({ left: i * px, label: d.toLocaleDateString("en", { month: "short", year: "2-digit" }) });
+      else if (scale === "Week" && d.getDay() === 1) out.push({ left: i * px, label: monthDay(d) });
+      else if (scale === "Month" && d.getDate() === 1) out.push({ left: i * px, label: monthShortYear(d) });
     }
     return out;
   }, [span, scale, px]);
@@ -169,32 +169,10 @@ export default function GanttView({ doctype }: { doctype: string }) {
             </button>
           ))}
         </div>
-        <Popover>
-          <PopoverTrigger className={btn}>
-            <FilterIcon className="h-3.5 w-3.5" aria-hidden /> Filter
-            {filters.length > 0 && <span className="rounded-full bg-zinc-900 px-1.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">{filters.length}</span>}
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <FilterEditor meta={meta} onAdd={(f) => setFilters((fs) => [...fs.filter((y) => !(y[1] === f[1] && y[2] === f[2])), f])} />
-          </PopoverContent>
-        </Popover>
+        <FilterButton meta={meta} filters={filters} setFilters={setFilters} className={btn} />
       </div>
 
-      {filters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {filters.map((f, i) => (
-            <span key={`${f[1]}|${f[2]}|${JSON.stringify(f[3])}`} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-              <ListFilter className="h-3 w-3 text-zinc-400" aria-hidden />
-              <span className="font-medium">{fieldLabel(meta, f[1])}</span>
-              <span className="text-zinc-400">{OPERATORS.find((o) => o.op === f[2])?.label ?? f[2]}</span>
-              <span>{describeValue(f[3]).replace(/^%|%$/g, "")}</span>
-              <button type="button" onClick={() => setFilters(filters.filter((_, j) => j !== i))} aria-label={`Remove ${fieldLabel(meta, f[1])} filter`} className="rounded-full p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700">
-                <X className="h-3 w-3" aria-hidden />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <FilterPills meta={meta} filters={filters} setFilters={setFilters} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         {/* names */}
