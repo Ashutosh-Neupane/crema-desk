@@ -99,7 +99,8 @@ export default function LegacyPage({
           title={`Frappe page ${route}`}
           src={`/app/${route}`}
           onLoad={onLoad}
-          // Frappe's own Desk page: needs scripts, same-origin session/storage, forms, dialogs, downloads
+          // Frappe's own Desk page (same origin by design): it needs scripts plus its same-origin session/storage, forms, dialogs, downloads
+          // react-doctor-disable-next-line react-doctor/iframe-missing-sandbox -- the embedded page is Frappe Desk itself and cannot run without allow-scripts + allow-same-origin
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
           className="h-full w-full border-0 bg-[var(--bg-color)]"
         />

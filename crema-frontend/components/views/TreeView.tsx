@@ -95,8 +95,9 @@ export default function TreeView({ doctype }: { doctype: string }) {
           r = { label, value: label };
         } else {
           const top = await fetchChildren("", true);
+          if (cancelled) return;
           r = top.length === 1 ? { label: String(top[0].title ?? top[0].value), value: top[0].value } : { label: String(settings.root_label ?? doctype), value: "" };
-          if (top.length !== 1 && !cancelled) setChildren({ "": top });
+          if (top.length !== 1) setChildren({ "": top });
         }
         if (cancelled) return;
         setRoot(r);

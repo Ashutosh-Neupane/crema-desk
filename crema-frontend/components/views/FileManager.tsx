@@ -218,7 +218,7 @@ export default function FileManager() {
             <DialogTitle>New Folder</DialogTitle>
             <DialogDescription>Created inside {folder}.</DialogDescription>
           </DialogHeader>
-          <input aria-label="Folder name" autoFocus value={newFolder ?? ""} onChange={(e) => setNewFolder(e.target.value)} className="h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+          <input aria-label="Folder name" value={newFolder ?? ""} onChange={(e) => setNewFolder(e.target.value)} className="h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
           <DialogFooter>
             <button type="button" className={btn} onClick={() => setNewFolder(null)}>
               Cancel
