@@ -19,9 +19,11 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ doctype: string }> },
 ) {
-  const { doctype } = await params;
-  const cookie = await getCookieHeader();
-  const body = (await req.json()) as Record<string, unknown>;
+  const [{ doctype }, cookie, body] = await Promise.all([
+    params,
+    getCookieHeader(),
+    req.json() as Promise<Record<string, unknown>>,
+  ]);
   const action = typeof body.action === "string" && VALID_ACTIONS.includes(body.action) ? body.action : "Save";
   delete body.action;
 

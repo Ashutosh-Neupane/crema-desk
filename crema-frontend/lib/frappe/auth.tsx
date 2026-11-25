@@ -15,7 +15,7 @@
  * This client-side refresh runs once when the desk shell mounts.
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import type { FrappeUser, BootInfo } from "./types";
 import { clientLogin, clientLogout, clientBoot } from "./client";
 import { useAuthStore } from "@/lib/stores/auth.store";
@@ -106,8 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.assign("/login");
   }, [storeLogout]);
 
+  const value = useMemo(() => ({ user, loading, login, logout, refresh }), [user, loading, login, logout, refresh]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

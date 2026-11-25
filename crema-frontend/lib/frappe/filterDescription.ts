@@ -141,10 +141,11 @@ export function applyLinkFilters(doctype: string, filters: unknown, linkFilters:
   }
   if (Array.isArray(filters)) {
     const names = Object.keys(lf);
+    const overridden = new Set(names);
     return (filters as unknown[][])
       .filter((f) => {
         const [fdt, fn] = f.length >= 4 ? f : [doctype, f[0]];
-        return fdt !== doctype || !names.includes(String(fn));
+        return fdt !== doctype || !overridden.has(String(fn));
       })
       .concat(names.map((n) => [n, ...lf[n]]));
   }

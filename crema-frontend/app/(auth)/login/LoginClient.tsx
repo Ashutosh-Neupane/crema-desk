@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/frappe/auth";
 
@@ -9,19 +9,12 @@ const noopSubscribe = () => () => {};
 
 export function LoginClient() {
   const router = useRouter();
-  const { login, user, loading } = useAuth();
+  const { login } = useAuth();
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Until hydration, a submit would be a native form submit that reloads the page
   const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
-
-  // Redirect to desk if already authenticated (effect avoids setState during render)
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace("/desk");
-    }
-  }, [loading, user, router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,10 +33,6 @@ export function LoginClient() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (!loading && user) {
-    return null;
   }
 
   return (
