@@ -1,5 +1,7 @@
 // Server error details: a failing save shows the error toast with a "Details" action (System Manager),
 // which opens the server traceback in a dialog. Also: the email composer dialog is wider than max-w-lg.
+// The failing save comes from a Server Script, so that part runs only when the site has server scripts enabled
+// (`server_script_enabled` in site config); otherwise it prints a SKIP line and the email check still runs.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/errordetails.mjs
 import { start, BASE } from "./lib.mjs";
 
@@ -19,11 +21,18 @@ async function cleanup() {
   await post("frappe.client.delete", { doctype: "DocType", name: DT }).catch(() => {});
 }
 await cleanup();
+const SERVER = !!(await post("frappe.core.doctype.server_script.server_script.enabled", {}).catch(() => false));
 
-step("DocType + Server Script that raises on before_save");
+try {
+step("DocType for the test");
 await post("frappe.client.insert", { doc: { doctype: "DocType", name: DT, module: "Custom", custom: 1, autoname: "hash", fields: [
   { fieldname: "title", label: "Title", fieldtype: "Data", reqd: 1 },
 ], permissions: [{ role: "System Manager", read: 1, write: 1, create: 1, delete: 1, email: 1 }] } });
+
+if (!SERVER) {
+  console.log("  SKIP failing save → Details → traceback: server scripts are disabled on this site (server_script_enabled)");
+} else {
+step("Server Script that raises on before_save");
 await post("frappe.client.insert", { doc: { doctype: "Server Script", name: SS, script_type: "DocType Event", reference_doctype: DT,
   doctype_event: "Before Save", disabled: 0, script: "1 / 0\n" } });
 
@@ -48,8 +57,10 @@ await page.keyboard.press("Escape");
 await errDlg.waitFor({ state: "detached", timeout: 5000 });
 check(true, "Escape closes the error dialog");
 
-step("saved doc → email composer dialog is wider than max-w-lg");
 await post("frappe.client.set_value", { doctype: "Server Script", name: SS, fieldname: "disabled", value: 1 });
+}
+
+step("saved doc → email composer dialog is wider than max-w-lg");
 const name = (await post("frappe.client.insert", { doc: { doctype: DT, title: "Saved" } })).name;
 await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("textbox", { name: /^Title/ }).waitFor({ timeout: 90000 });
@@ -63,6 +74,8 @@ check(box && box.width > lg, `email composer width ${Math.round(box?.width ?? 0)
 await page.keyboard.press("Escape");
 await mail.waitFor({ state: "detached", timeout: 5000 });
 
-step("cleanup");
-await cleanup();
+} finally {
+  step("cleanup");
+  await cleanup();
+}
 await t.finish();
