@@ -379,3 +379,239 @@ a:focus-visible,
 [data-theme="dark"] .crema-quill .ql-snow .ql-tooltip { background: var(--gray-900); color: var(--gray-200); border-color: var(--gray-700); box-shadow: none; }
 [data-theme="dark"] .crema-quill .ql-snow .ql-tooltip input[type=text] { background: var(--gray-800); color: inherit; border-color: var(--gray-700); }
 .crema-locate { width: 30px; height: 30px; background: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+
+/* ============================================================================
+ * Phase 2 design tokens (docs/GAPS.md § 3.2). Used by components/crema-ui/*; nothing above changes.
+ * A theme is a token swap: type scale, radii, elevation, motion, density, status colours, focus ring.
+ * ==========================================================================*/
+:root {
+  /* type scale: headings grow with the viewport (html is 14px, so 1rem = 14px) */
+  --type-display: clamp(1.5rem, 1.25rem + 1.1vw, 2.143rem); /* 21 → 30px */
+  --type-h1: clamp(1.286rem, 1.15rem + 0.6vw, 1.571rem); /* 18 → 22px */
+  --type-h2: clamp(1.143rem, 1.08rem + 0.3vw, 1.286rem); /* 16 → 18px */
+  --type-h3: clamp(1rem, 0.96rem + 0.2vw, 1.071rem); /* 14 → 15px */
+  --type-body: 1rem; /* 14px */
+  --type-small: 0.929rem; /* 13px */
+  --type-caption: 0.857rem; /* 12px */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* radii (semantic aliases of the espresso scale) */
+  --round-control: var(--radius);
+  --round-card: var(--radius-lg);
+  --round-panel: var(--radius-xl);
+  --round-pill: var(--radius-full);
+
+  /* elevation */
+  --elevation-0: none;
+  --elevation-1: var(--shadow-xs);
+  --elevation-2: var(--shadow-sm);
+  --elevation-3: var(--shadow-md);
+  --elevation-4: var(--shadow-lg);
+
+  /* motion */
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
+  /* layers and sizes */
+  --z-bottombar: 30;
+  --z-panel: 50;
+  --panel-width: min(30rem, 100vw);
+  --touch-target: 40px;
+
+  /* focus: a 2px ring with a gap, ≥ 3:1 against the surface */
+  --focus-color: var(--blue-700);
+  --focus-ring: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--focus-color);
+
+  /* status (StatusPill): every fg/bg pair ≥ 4.5:1 */
+  --status-neutral-bg: #f3f3f3;
+  --status-neutral-fg: #383838;
+  --status-neutral-border: #e2e2e2;
+  --status-info-bg: #e8f3fe;
+  --status-info-fg: #0a5aa8;
+  --status-info-border: #b5ddfd;
+  --status-success-bg: #e5f6eb;
+  --status-success-fg: #146c37;
+  --status-success-border: #b7e3c6;
+  --status-warning-bg: #fff3dc;
+  --status-warning-fg: #8a4600;
+  --status-warning-border: #f6d49a;
+  --status-danger-bg: #fdecec;
+  --status-danger-fg: #b02424;
+  --status-danger-border: #f5c2c2;
+}
+
+[data-theme="dark"] {
+  --focus-color: var(--blue-400);
+  --status-neutral-bg: #292929;
+  --status-neutral-fg: #d9d9d9;
+  --status-neutral-border: #383838;
+  --status-info-bg: #0f2a45;
+  --status-info-fg: #92c9ff;
+  --status-info-border: #1d4a78;
+  --status-success-bg: #10301d;
+  --status-success-fg: #86d9a6;
+  --status-success-border: #1f5a35;
+  --status-warning-bg: #3a2a0a;
+  --status-warning-fg: #f3c46e;
+  --status-warning-border: #6a4c12;
+  --status-danger-bg: #3f1616;
+  --status-danger-fg: #ff9e9e;
+  --status-danger-border: #6e2525;
+}
+
+/* density (per user: lib/ui/newLayout.ts sets <html data-density>); also settable on any subtree */
+:root,
+[data-density="comfortable"] {
+  --density-control-height: 40px;
+  --density-row-height: 44px;
+  --density-pad-x: 12px;
+  --density-pad-y: 10px;
+  --density-gap: 12px;
+  --density-section-pad: var(--space-section);
+  --density-text: var(--type-body);
+}
+[data-density="compact"] {
+  --density-control-height: 28px; /* Desk --btn-height */
+  --density-row-height: 30px; /* Desk --list-row-height */
+  --density-pad-x: 8px;
+  --density-pad-y: 4px;
+  --density-gap: 8px;
+  --density-section-pad: var(--space-field);
+  --density-text: var(--type-small);
+}
+/* touch screens keep 40px targets even when compact (GAPS § 3.1 rule 6) */
+@media (pointer: coarse) {
+  [data-density="compact"] {
+    --density-control-height: var(--touch-target);
+  }
+}
+
+/* high contrast: data-contrast="more" forces it; the OS setting turns it on unless data-contrast="normal" */
+[data-contrast="more"] {
+  --text-color: #000000;
+  --text-muted: #2b2b2b;
+  --text-light: #3d3d3d;
+  --border-color: #525252;
+  --dark-border-color: #383838;
+  --placeholder-color: #525252;
+  --heading-color: #000000;
+  --link-color: #004f9e;
+  --focus-color: #000000;
+  --foreground: var(--text-color);
+  --muted-foreground: var(--text-muted);
+  --border: var(--border-color);
+  --status-neutral-fg: #000000;
+  --status-neutral-border: #000000;
+  --status-info-fg: #003f7d;
+  --status-info-border: #003f7d;
+  --status-success-fg: #0b4a24;
+  --status-success-border: #0b4a24;
+  --status-warning-fg: #5c2e00;
+  --status-warning-border: #5c2e00;
+  --status-danger-fg: #7d1010;
+  --status-danger-border: #7d1010;
+}
+[data-theme="dark"][data-contrast="more"],
+[data-theme="dark"] [data-contrast="more"] {
+  --text-color: #ffffff;
+  --text-muted: #e6e6e6;
+  --text-light: #cccccc;
+  --border-color: #a3a3a3;
+  --dark-border-color: #c7c7c7;
+  --placeholder-color: #b3b3b3;
+  --heading-color: #ffffff;
+  --link-color: #b5ddfd;
+  --focus-color: #ffffff;
+  --status-neutral-fg: #ffffff;
+  --status-neutral-border: #ffffff;
+  --status-info-fg: #cfe7ff;
+  --status-info-border: #cfe7ff;
+  --status-success-fg: #c4f2d4;
+  --status-success-border: #c4f2d4;
+  --status-warning-fg: #ffe2a8;
+  --status-warning-border: #ffe2a8;
+  --status-danger-fg: #ffd0d0;
+  --status-danger-border: #ffd0d0;
+}
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]):not([data-theme="dark"]) {
+    --text-color: #000000;
+    --text-muted: #2b2b2b;
+    --text-light: #3d3d3d;
+    --border-color: #525252;
+    --heading-color: #000000;
+    --focus-color: #000000;
+  }
+  :root[data-theme="dark"]:not([data-contrast="normal"]) {
+    --text-color: #ffffff;
+    --text-muted: #e6e6e6;
+    --text-light: #cccccc;
+    --border-color: #a3a3a3;
+    --heading-color: #ffffff;
+    --focus-color: #ffffff;
+  }
+}
+
+/* reduced motion: every duration token collapses */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* Tailwind utilities: text-h1/h2/h3/display/density, h-control, min-h-touch, rounded-card, shadow-elev-2, … */
+@theme inline {
+  --text-display: var(--type-display);
+  --text-display--line-height: var(--leading-tight);
+  --text-h1: var(--type-h1);
+  --text-h1--line-height: var(--leading-tight);
+  --text-h2: var(--type-h2);
+  --text-h2--line-height: var(--leading-tight);
+  --text-h3: var(--type-h3);
+  --text-h3--line-height: var(--leading-tight);
+  --text-density: var(--density-text);
+  --spacing-control: var(--density-control-height);
+  --spacing-row: var(--density-row-height);
+  --spacing-touch: var(--touch-target);
+  --radius-control: var(--round-control);
+  --radius-card: var(--round-card);
+  --radius-panel: var(--round-panel);
+  --shadow-elev-1: var(--elevation-1);
+  --shadow-elev-2: var(--elevation-2);
+  --shadow-elev-3: var(--elevation-3);
+  --shadow-elev-4: var(--elevation-4);
+}
+
+/* crema-ui focus ring (keyboard only) */
+.crema-focus:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
+}
+
+/* SidePanel: slides in from the right; a bottom sheet under 640px */
+@keyframes crema-panel-in {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+@keyframes crema-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes crema-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.crema-panel { animation: crema-panel-in var(--duration-base) var(--ease-enter); }
+.crema-backdrop { animation: crema-fade-in var(--duration-fast) var(--ease-standard); }
+@media (max-width: 639.98px) {
+  .crema-panel { animation-name: crema-sheet-in; }
+}

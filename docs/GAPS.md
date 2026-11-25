@@ -614,6 +614,10 @@ each change keeps the e2e suites green. Nothing here is built yet.
   (DocForm `btnCls`, ListView triggers) with them.
 - Density setting: Comfortable / Compact (Desk-like) per user.
 - Themes: light, dark, high-contrast; company accent colour from Website Settings / Navbar Settings.
+- ✅ Tokens in `app/globals.css` (type scale, radii, elevation, motion, density, status colours, focus ring,
+  high contrast, reduced motion); primitives in `components/crema-ui` (PageHeader, Section, StatusPill, EmptyState,
+  SidePanel with a bottom sheet under 640px, BottomBar, Stepper, LayoutSwitch, DensitySwitch); showcase at
+  `/desk/ui-kit` (`e2e/p2.foundation.mjs`). Still to do: Field, DataTable, accent colour.
 
 ### 3.3 Popup, side panel or page? (the rule)
 | Use | When | Examples |
@@ -657,6 +661,8 @@ Never stack more than one dialog; a dialog that needs another dialog becomes a p
 ### 3.6 How phase 2 is delivered
 One screen at a time behind a per-user "New layout" switch, with before / after screenshots at 390 / 768 / 1280 px in
 the PR, e2e suites unchanged, and a short usability check (task time, clicks) against Desk.
+- ✅ The switch: `lib/ui/newLayout.ts` (`useNewLayout()` / `setNewLayout()`, plus `useDensity()` / `setDensity()`),
+  stored per user in Frappe `user_settings` ("Crema UI") with a localStorage cache; SSR renders the classic layout.
 
 ---
 
