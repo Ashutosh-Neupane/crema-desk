@@ -56,6 +56,17 @@ function origin(): string {
   }
 }
 
+/** Port of NEXT_PUBLIC_SOCKETIO_URL, or "" when unset or not a valid URL. */
+function socketioPort(): string {
+  const url = process.env.NEXT_PUBLIC_SOCKETIO_URL;
+  if (!url) return "";
+  try {
+    return new URL(url).port;
+  } catch {
+    return "";
+  }
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   const parts = (await params).path ?? [];
   const target = new URL(`${origin()}/desk/${parts.map(encodeURIComponent).join("/")}`);
@@ -67,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   }
   let html = await res.text();
   // the bench publishes socket.io on another host port than it believes (docker): point the framed page at it
-  const sio = process.env.NEXT_PUBLIC_SOCKETIO_URL ? new URL(process.env.NEXT_PUBLIC_SOCKETIO_URL).port : "";
+  const sio = socketioPort();
   if (sio) html = html.replace(/"socketio_port":\s*"?\d+"?/, `"socketio_port":"${sio}"`);
   html = html.replace(/<head([^>]*)>/i, `<head$1>${PRE_ROUTER_JS}`).replace("</head>", `${CHROME_CSS}</head>`).replace("</body>", `${BRIDGE_JS}</body>`);
   return new NextResponse(html, { status: res.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
