@@ -10,17 +10,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import type { DocField } from "@/lib/frappe/types";
-
-/** Desk grid.js GRID_MIN_COLUMN_WIDTH / GRID_MAX_COLUMN_WIDTH */
-export const MIN_COL_PX = 60;
-export const MAX_COL_PX = 600;
-export const clampWidth = (w: number) => Math.max(MIN_COL_PX, Math.min(MAX_COL_PX, Math.round(w) || MIN_COL_PX));
-
-export interface GridViewColumn {
-  fieldname: string;
-  width: number;
-  sticky?: number;
-}
+import { MAX_COL_PX, MIN_COL_PX, clampWidth, type GridViewColumn } from "@/components/form/gridColumns";
 
 export default function GridColumnsDialog({
   title,
