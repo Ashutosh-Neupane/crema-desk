@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import ReportView from "@/components/views/ReportView";
 import { safeDecode } from "@/lib/utils/safeDecode";
 
@@ -8,5 +9,9 @@ interface Props {
 export default async function ReportViewPage({ params }: Props) {
   const { doctype } = await params;
   const d = safeDecode(doctype);
-  return <ReportView key={d} doctype={d} />;
+  return (
+    <Suspense>
+      <ReportView key={d} doctype={d} />
+    </Suspense>
+  );
 }
