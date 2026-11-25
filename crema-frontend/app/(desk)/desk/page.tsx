@@ -163,7 +163,7 @@ export default function DeskHomePage() {
                 <Link
                   key={m.id}
                   href={firstLink}
-                  className="group flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3.5 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                  className="group flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3.5 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 transition-colors group-hover:bg-zinc-900 group-hover:text-white dark:bg-zinc-800 dark:text-zinc-200 dark:group-hover:bg-zinc-100 dark:group-hover:text-zinc-900">
                     <SidebarIcon name={m.icon} className="h-[18px] w-[18px]" />
