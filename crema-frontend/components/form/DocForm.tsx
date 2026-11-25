@@ -9,125 +9,38 @@
  *   validate → before_save → mandatory check → savedocs → reload → after_save → refresh
  * Submit adds before_submit / on_submit; Cancel before_cancel / after_cancel.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { toastError } from "@/lib/frappe/errors";
-import { AlarmClock, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Copy, CopyPlus, FileCode, Link2, Pencil, Printer, Settings2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import FormBody from "@/components/form/FormBody";
 import Grid from "@/components/form/Grid";
 import FormBuilder from "@/components/form/FormBuilder";
-import { useFormMetas } from "@/lib/hooks/useFormMetas";
-import { useDeskContext } from "@/lib/hooks/useDeskContext";
-import { FormController, newFormDoc } from "@/lib/form/FormController";
-import { attachDoctypeAdapters } from "@/lib/form/adapters";
-import { DeskError, cancelDoc, deleteDoc, deskCall, getDoc, isNewDoc, saveDoc, type Doc, type DocInfo, type SaveAction } from "@/lib/frappe/form";
-import { PREFILL_KEY, takePrefill } from "@/lib/form/prefill";
-import { asksForName, withNewNameField } from "@/lib/form/newName";
 import FormSidebar from "@/components/form/FormSidebar";
-import { useDocRealtime } from "@/lib/services/realtime";
 import Timeline from "@/components/form/Timeline";
-import { getHtmlWidget } from "@/components/form/widgets";
+import Connections from "@/components/form/Connections";
 import HtmlHost from "@/components/form/HtmlHost";
 import FormDashboard, { FormHeadlines } from "@/components/form/FormDashboard";
-import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
-import { applyWorkflow, defaultState, editableBy, getWorkflow, isWorkflowReadOnly, stateColour, useTransitions, workflowStatus, type Transition } from "@/lib/form/workflow";
 import WorkflowBar from "@/components/form/WorkflowBar";
-import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
-import { addRecentDoc } from "@/lib/utils/recentDocs";
-import { loadUserSettings, userSettingsKey } from "@/lib/list/useUserListState";
+import { getHtmlWidget } from "@/components/form/widgets";
+import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
+import { ConfirmDialog, JumpToField, MissingFieldsDialog, PageError, WorkflowHelpDialog } from "@/components/form/DocFormDialogs";
+import { DocFormBottomBar, DocFormHeader, type MainActionsProps, type MoreMenuProps } from "@/components/form/DocFormHeader";
+import { builderTabOf, connectionsTabOf, formView, type FormView } from "@/components/form/docFormRules";
+import { useDocForm, type Loaded } from "@/components/form/useDocForm";
+import { useDocWorkflow } from "@/components/form/useDocWorkflow";
+import { useDocActions } from "@/components/form/useDocActions";
+import { useFormMetas } from "@/lib/hooks/useFormMetas";
+import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useIsPhone } from "@/lib/hooks/useIsPhone";
-import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
-import { useShortcuts } from "@/lib/shortcuts";
-import { Command } from "cmdk";
-
-/** Saving these changes other DocTypes' meta — drop cached metas so forms/lists pick it up */
-const META_EDITORS = new Set(["DocType", "Customize Form", "Custom Field", "Property Setter", "Client Script", "DocType Layout"]);
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
-import { FormSkeleton } from "@/components/Skeleton";
-import { INDICATOR_PILL } from "@/lib/list/indicator";
+import { isNewDoc, type Doc } from "@/lib/frappe/form";
+import { asksForName, withNewNameField } from "@/lib/form/newName";
+import { defaultState } from "@/lib/form/workflow";
+import type { FormController, FormSnapshot } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import TableMultiSelectField from "@/lib/crema-form/controls/TableMultiSelectField";
+import { FormSkeleton } from "@/components/Skeleton";
 
 const enc = encodeURIComponent;
-
-/** Fields Desk never copies on Duplicate/Amend (frappe.model.copy_doc) */
-const NO_COPY_ALWAYS = new Set([
-  "name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "amended_from",
-  "amendment_date", "__islocal", "__unsaved", "_user_tags", "_comments", "_assign", "_liked_by", "_seen",
-]);
-
-function copyForNew(meta: DocTypeMeta, doc: Doc): Record<string, unknown> {
-  const noCopy = new Set((meta.fields ?? []).filter((f) => f.no_copy).map((f) => f.fieldname));
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(doc)) {
-    if (NO_COPY_ALWAYS.has(k) || noCopy.has(k)) continue;
-    out[k] = Array.isArray(v)
-      ? v.map((row) => {
-          const r = { ...(row as Record<string, unknown>) };
-          for (const key of ["name", "parent", "creation", "modified", "owner", "modified_by", "docstatus"]) delete r[key];
-          return r;
-        })
-      : v;
-  }
-  return out;
-}
-
-/** Desk's form indicator: unsaved → cancelled → workflow → draft → status → submitted */
-function getIndicator(meta: DocTypeMeta, doc: Doc, dirty: boolean): [string, string] | null {
-  if (isNewDoc(doc) || dirty) return ["Not Saved", "orange"];
-  if (doc.docstatus === 2) return ["Cancelled", "red"];
-  if (typeof doc.workflow_state === "string" && doc.workflow_state) return [doc.workflow_state, "blue"];
-  if (meta.is_submittable && doc.docstatus === 0) return ["Draft", "red"];
-  if (typeof doc.status === "string" && doc.status) {
-    const s = doc.status.toLowerCase();
-    return [doc.status, /to |pending|open|overdue|draft|hold/.test(s) ? "orange" : /complete|closed|paid|active|enabled|delivered/.test(s) ? "green" : /cancel|disabled|expired|lost/.test(s) ? "red" : "blue"];
-  }
-  if (meta.is_submittable && doc.docstatus === 1) return ["Submitted", "blue"];
-  return null;
-}
-
-/** __dashboard → Connections: related doctypes with counts (frappe.desk.notifications.get_open_count) */
-function Connections({ meta, doc }: { meta: DocTypeMeta; doc: Doc }) {
-  const dash = (meta as { __dashboard?: { fieldname?: string; non_standard_fieldnames?: Record<string, string>; transactions?: Array<{ label?: string; items: string[] }> } }).__dashboard;
-  const items = useMemo(() => (dash?.transactions ?? []).flatMap((t) => t.items), [dash]);
-  const { data: counts } = useQuery({
-    queryKey: ["open-count", meta.name, doc.name],
-    enabled: !!items.length && !isNewDoc(doc),
-    queryFn: async () => {
-      const { env } = await deskCall("frappe.desk.notifications.get_open_count", { doctype: meta.name, name: doc.name, items: JSON.stringify(items) });
-      const count = (env.message as { count?: Array<{ name: string; count: number }> } | undefined)?.count ?? [];
-      return Object.fromEntries(count.map((c) => [c.name, c.count]));
-    },
-  });
-  if (!dash?.transactions?.length || isNewDoc(doc)) return null;
-  const fieldFor = (dt: string) => dash.non_standard_fieldnames?.[dt] ?? dash.fieldname ?? "";
-  return (
-    <div className="grid grid-cols-1 gap-x-column gap-y-field p-section sm:grid-cols-2 lg:grid-cols-3">
-      {dash.transactions.map((t) => (
-        <div key={t.label ?? t.items.join(",")}>
-          <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">{t.label}</h4>
-          <ul className="space-y-1">
-            {t.items.map((dt) => (
-              <li key={dt} className="flex items-center gap-2">
-                <Link href={`/desk/doctype/${enc(dt)}?${new URLSearchParams({ [fieldFor(dt)]: doc.name })}`} className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                  <span className="flex-1 truncate">{dt}</span>
-                  {!!counts?.[dt] && <span className="rounded-full bg-zinc-100 px-1.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{counts[dt]}</span>}
-                </Link>
-                <Link href={`/desk/doctype/${enc(dt)}/new`} aria-label={`New ${dt}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
-                  <Plus className="h-3.5 w-3.5" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 interface Props {
   doctype: string;
@@ -136,749 +49,331 @@ interface Props {
 }
 
 export default function DocForm({ doctype, name }: Props) {
-  const router = useRouter();
-  const qc = useQueryClient();
   const { data: metas, error: metaError } = useFormMetas(doctype);
   const { data: ctx } = useDeskContext();
-  const phone = useIsPhone();
-  const isNew = !name;
+  const form = useDocForm(doctype, name, metas, ctx);
+  const { ctl, snap, loadError } = form;
 
-  const [loaded, setLoaded] = useState<{ doc: Doc; docinfo: DocInfo } | null>(null);
-  const [loadError, setLoadError] = useState<{ message: string; status?: number } | null>(null);
-  const [busy, setBusy] = useState<null | "save" | "submit" | "cancel" | "delete">(null);
-  const [confirm, setConfirm] = useState<null | "submit" | "cancel" | "delete">(null);
-  const [missing, setMissing] = useState<string[] | null>(null);
-  const [prefill] = useState<Record<string, unknown>>(() => (name ? {} : takePrefill(doctype)));
-
-  const load = useCallback(async () => {
-    if (!name) return;
-    try {
-      const r = await getDoc(doctype, name);
-      addRecentDoc({ doctype, name: r.doc.name, title: typeof r.doc.title === "string" ? r.doc.title : undefined });
-      setLoaded(r);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError({ message: e instanceof Error ? e.message : "Failed to load document", status: e instanceof DeskError ? e.status : undefined });
-    }
-  }, [doctype, name]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch; state is set after the await
-    void load();
-  }, [load]);
-
-  // One controller per form instance, created once meta, context and the doc are known
-  const ctlRef = useRef<FormController | null>(null);
-  const [ctl, setCtl] = useState<FormController | null>(null);
-  useEffect(() => {
-    if (!metas || !ctx || ctlRef.current) return;
-    if (!isNew && !loaded) return;
-    const base = isNew ? newFormDoc(metas.meta, ctx, prefill) : loaded!.doc;
-    // Desk set_default_state: a new doc starts in the workflow state for docstatus 0
-    const wfNew = isNew ? getWorkflow(metas.meta) : null;
-    const doc = wfNew && !base[wfNew.workflow_state_field] ? { ...base, [wfNew.workflow_state_field]: defaultState(wfNew, 0) ?? undefined } : base;
-    const c = new FormController(metas.meta, metas.children, doc, {
-      user: ctx.user,
-      full_name: ctx.full_name,
-      roles: ctx.roles,
-      defaults: ctx.defaults,
-      sysdefaults: ctx.sysdefaults,
-      perms: ctx.perms,
-      developer_mode: ctx.developer_mode,
-      boot: ctx.boot,
-      navigate: (href) => router.push(href),
-    });
-    c.setDocinfo(loaded?.docinfo);
-    attachDoctypeAdapters(c);
-    c.loadScripts();
-    ctlRef.current = c;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time controller creation once inputs are ready
-    setCtl(c);
-    // Desk route_options: ?field=value on the URL is applied after load (fires field events, e.g.
-    // Customize Form ?doc_type=X loads that DocType)
-    const routeOptions = typeof window !== "undefined" ? [...new URLSearchParams(window.location.search).entries()].filter(([k]) => metas.meta.fields?.some((f) => f.fieldname === k)) : [];
-    void c.runLoadEvents(true).then(async () => {
-      for (const [k, v] of routeOptions) await c.set_value(k, v);
-    });
-  }, [metas, ctx, loaded, isNew, prefill, router]);
-
-  // Later reloads (Reload / after cancel) feed the same controller
-  useEffect(() => {
-    const c = ctlRef.current;
-    if (loaded && c && c.docname === loaded.doc.name && c.getDoc().modified !== loaded.doc.modified) {
-      c.load(loaded.doc);
-      void c.runLoadEvents(false);
-    }
-  }, [loaded]);
-
-  // the server's per-document permissions/shares feed frm.perm
-  useEffect(() => {
-    ctlRef.current?.setDocinfo(loaded?.docinfo);
-  }, [loaded, ctl]);
-
-  const noopSubscribe = useCallback(() => () => {}, []);
-  const snap = useSyncExternalStore(ctl?.subscribe ?? noopSubscribe, () => ctl?.snapshot() ?? null, () => null);
-
-  // workflow: active Workflow from the meta, transitions for the saved + clean doc
-  const workflow = useMemo(() => getWorkflow(metas?.meta), [metas]);
-  const { data: serverTransitions } = useTransitions(workflow, snap?.doc ?? null, !!snap?.dirty);
-  const wfDoc = snap?.doc;
-  const wfStatus = workflow && wfDoc && !isNewDoc(wfDoc) ? workflowStatus(workflow, wfDoc, serverTransitions ?? [], ctx?.user, ctx?.roles ?? []) : null;
-  const transitions = wfStatus?.mine ?? [];
-  const [wfHelp, setWfHelp] = useState(false);
-  const { data: stateStyles } = useQuery({
-    queryKey: ["workflow-state-styles"],
-    enabled: !!workflow,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const { env } = await deskCall("frappe.client.get_list", { doctype: "Workflow State", fields: ["name", "style"], limit_page_length: 0 });
-      return Object.fromEntries(((env.message as Array<{ name: string; style?: string }>) ?? []).map((w) => [w.name, w.style ?? ""]));
-    },
-  });
-  const [wfBusy, setWfBusy] = useState(false);
-  const runTransition = useCallback(
-    async (t: Transition) => {
-      const c = ctlRef.current;
-      if (!c) return;
-      const go = async () => {
-        setWfBusy(true);
-        try {
-          c.frm.selected_workflow_action = t.action;
-          if (!(await c.trigger("before_workflow_action"))) return;
-          const doc = await applyWorkflow(c.getDoc(), t.action);
-          c.load(doc);
-          await load();
-          c.frm.selected_workflow_action = null;
-          await c.trigger("after_workflow_action");
-          await c.runLoadEvents(false);
-          qc.invalidateQueries({ queryKey: ["list", doctype] });
-          toast.success(`${t.action}: ${t.next_state}`);
-        } catch (e) {
-          toastError(e, "Workflow action failed", { duration: 10000 });
-        } finally {
-          setWfBusy(false);
-        }
-      };
-      if (workflow?.enable_action_confirmation) deskConfirm(`Are you sure you want to ${t.action}?`, () => void go());
-      else await go();
-    },
-    [workflow, qc, doctype, load],
-  );
-
-  // Realtime (Desk: form.js doc_update / form_viewers.js): reload a clean form when someone else saves,
-  // warn on a dirty one; show who else has it open
-  const [conflict, setConflict] = useState<string | null>(null);
-  const [viewers, setViewers] = useState<string[]>([]);
-  useDocRealtime(isNew ? undefined : doctype, isNew ? undefined : name, {
-    onUpdate: (e) => {
-      const c = ctlRef.current;
-      if (!c || !e.modified || e.modified === c.getDoc().modified) return;
-      if (c.isDirty()) setConflict(String(e.modified));
-      else void load();
-    },
-    onViewers: (users) => setViewers(users.filter((u) => u !== ctx?.user)),
-  });
-  const [prevLoaded, setPrevLoaded] = useState(loaded);
-  if (prevLoaded !== loaded) {
-    setPrevLoaded(loaded);
-    setConflict(null);
-  }
-
-  // Warn before leaving with unsaved changes (Desk does the same)
-  useEffect(() => {
-    if (!snap?.dirty) return;
-    const h = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", h);
-    return () => window.removeEventListener("beforeunload", h);
-  }, [snap?.dirty]);
-
-  // ── actions ─────────────────────────────────────────────────────────────
-  // Desk form/save.js + form.js validate_and_save: a plain Save of an unchanged doc sends nothing and says
-  // "No changes in document"; after a real save the form refreshes in place from the savedocs response
-  const persist = useCallback(
-    async (action: SaveAction) => {
-      const c = ctlRef.current;
-      if (!c) return;
-      const wasNew = isNewDoc(c.getDoc());
-      if (action === "Save" && !wasNew && !c.isDirty()) {
-        toast.warning("No changes in document");
-        return;
-      }
-      if (!(await c.trigger("validate"))) return;
-      if (action !== "Submit" && !(await c.trigger("before_save"))) return;
-      if (action === "Submit" && !(await c.trigger("before_submit"))) return;
-      const miss = c.validateMandatory();
-      if (miss.length) {
-        setMissing(miss);
-        return;
-      }
-      const { doc: saved, docinfo, messages } = await saveDoc(c.getDoc(), action);
-      messages.forEach((m) => toast.info(m));
-      c.load(saved);
-      await c.trigger(action === "Submit" ? "on_submit" : "after_save");
-      qc.invalidateQueries({ queryKey: ["list", doctype] });
-      if (META_EDITORS.has(doctype)) {
-        clearDoctypeMetaCache();
-        qc.invalidateQueries({ queryKey: ["form-metas"] });
-        qc.invalidateQueries({ queryKey: ["doctype"] });
-      }
-      toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
-      if (wasNew) router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
-      else {
-        // docinfo (versions, comments) came back with the save; the controller already holds the saved doc
-        if (docinfo) setLoaded({ doc: saved, docinfo });
-        else await load();
-        await c.runLoadEvents(false);
-      }
-    },
-    [doctype, qc, router, load],
-  );
-
-  const run = useCallback(
-    async (kind: "save" | "submit", action: SaveAction) => {
-      setBusy(kind);
-      try {
-        // ⌘S / Save while a field still has focus: cells and inputs commit on blur (Link fields 150 ms later, so a
-        // click on a suggestion still counts), so blur it and let that land first, or the last edit is lost
-        const active = document.activeElement;
-        if (active instanceof HTMLElement && active.matches("input,textarea,select,[contenteditable=true]")) {
-          active.blur();
-          await new Promise((r) => setTimeout(r, 200));
-        }
-        await persist(action);
-      } catch (e) {
-        toastError(e, "Save failed", { duration: 10000 });
-      } finally {
-        setBusy(null);
-      }
-    },
-    [persist],
-  );
-
-  useEffect(() => {
-    const c = ctlRef.current;
-    if (!c) return;
-    // scripts' frm.save() / frm.reload_doc() route through the page's pipeline
-    c.onSave = (a) => run(a === "Submit" ? "submit" : "save", (a as SaveAction) || "Save");
-    c.onReload = load;
-  }, [ctl, run, load]);
-
-  const [jumpOpen, setJumpOpen] = useState(false);
-  // Desk form.js navigate_records: the next / previous record in the list's own filters and sort
-  // (frappe.desk.form.utils.get_next; user_settings.List when the list isn't open), keeping the active tab
-  const navigate = useCallback(
-    async (prev: boolean) => {
-      const c = ctlRef.current;
-      if (!c || isNewDoc(c.getDoc())) return;
-      try {
-        const s = await qc.fetchQuery({ queryKey: userSettingsKey(doctype), queryFn: () => loadUserSettings(doctype), staleTime: 30_000 });
-        const list = s.List ?? {};
-        const { env, messages } = await deskCall("frappe.desk.form.utils.get_next", {
-          doctype,
-          value: c.docname,
-          prev: prev ? 1 : 0,
-          filters: JSON.stringify(list.filters ?? []),
-          ...(list.sort_by ? { sort_field: list.sort_by } : {}),
-          ...(list.sort_order ? { sort_order: list.sort_order } : {}),
-        });
-        const next = typeof env.message === "string" ? env.message : "";
-        if (next) router.push(`/desk/doctype/${enc(doctype)}/${enc(next)}${window.location.hash}`);
-        else toast.info(messages[0] ?? "No further records");
-      } catch (e) {
-        toastError(e, "Could not open the next document");
-      }
-    },
-    [doctype, qc, router],
-  );
-  const [formDialog, setFormDialog] = useState<null | "rename" | "links" | "remind">(null);
-  const [focusRequest, setFocusRequest] = useState<{ fieldname: string; n: number } | null>(null);
-  const docstatusNow = () => Number(ctlRef.current?.getDoc().docstatus ?? 0);
-  // Desk form shortcuts (frappe/public/js/frappe/form/toolbar.js, form.js)
-  useShortcuts(
-    [
-      { keys: "mod+s", description: "Save", group: "Form", allowInInput: true, action: () => docstatusNow() === 0 && void run("save", "Save") },
-      { keys: "mod+j", description: "Jump to field", group: "Form", allowInInput: true, action: () => setJumpOpen(true) },
-      { keys: "mod+b", description: `New ${doctype}`, group: "Form", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) },
-      { keys: "shift+mod+d", description: "Delete", group: "Form", action: () => ctlRef.current && !isNewDoc(ctlRef.current.getDoc()) && docstatusNow() !== 1 && setConfirm("delete") },
-      { keys: "shift+r", description: "Reload", group: "Form", action: () => void load() },
-      { keys: "shift+mod+>", description: "Next document", group: "Form", action: () => void navigate(false) },
-      { keys: "shift+mod+<", description: "Previous document", group: "Form", action: () => void navigate(true) },
-      {
-        keys: "mod+p",
-        description: "Print",
-        group: "Form",
-        action: () => {
-          const c = ctlRef.current;
-          if (!c || isNewDoc(c.getDoc())) return;
-          router.push(`/desk/print/${enc(doctype)}/${enc(c.docname)}`);
-        },
-      },
-    ],
-    [run, load, doctype, router],
-  );
-
-  const onCancelConfirmed = async () => {
-    const c = ctlRef.current;
-    setConfirm(null);
-    if (!c) return;
-    setBusy("cancel");
-    try {
-      if (!(await c.trigger("before_cancel"))) return;
-      await cancelDoc(doctype, c.docname);
-      toast.success("Cancelled");
-      await load();
-      await c.trigger("after_cancel");
-    } catch (e) {
-      toastError(e, "Cancel failed", { duration: 10000 });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const onDeleteConfirmed = async () => {
-    const c = ctlRef.current;
-    setConfirm(null);
-    if (!c) return;
-    setBusy("delete");
-    try {
-      await deleteDoc(doctype, c.docname);
-      toast.success(`${doctype} ${c.docname} deleted`);
-      qc.invalidateQueries({ queryKey: ["list", doctype] });
-      router.push(`/desk/doctype/${enc(doctype)}`);
-    } catch (e) {
-      toastError(e, "Delete failed", { duration: 10000 });
-      setBusy(null);
-    }
-  };
-
-  const openCopy = (amend: boolean) => {
-    const c = ctlRef.current;
-    if (!c || !metas) return;
-    const copy = copyForNew(metas.meta, c.getDoc());
-    if (amend) copy.amended_from = c.docname;
-    sessionStorage.setItem(PREFILL_KEY(doctype), JSON.stringify(copy));
-    router.push(`/desk/doctype/${enc(doctype)}/new`);
-  };
-
-  // ── render ──────────────────────────────────────────────────────────────
   const pageError = loadError ?? (metaError ? { message: (metaError as Error).message, status: (metaError as { status?: number }).status } : null);
-  if (pageError) {
-    // Desk pageview.js show_not_permitted / show_not_found
-    const heading = pageError.status === 403 ? "Not permitted" : pageError.status === 404 ? "Not found" : "Could not open this document";
-    const detail =
-      pageError.status === 403
-        ? `Sorry! You are not permitted to view ${doctype}${name ? ` ${name}` : ""}. Ask your System Manager for access.`
-        : pageError.status === 404
-          ? `${doctype} ${name ?? ""} does not exist, or was deleted or renamed.`
-          : pageError.message;
-    return (
-      <div className="mx-auto max-w-lg p-10 text-center" role="alert">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{heading}</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{detail}</p>
-        <Link href={`/desk/doctype/${enc(doctype)}`} className="mt-4 inline-block text-sm text-zinc-600 underline">Back to {doctype} list</Link>
-      </div>
-    );
-  }
+  if (pageError) return <PageError error={pageError} doctype={doctype} name={name} />;
   if (!metas || !ctl || !snap) return <FormSkeleton />;
+  return <DocFormView doctype={doctype} isNew={!name} meta={metas.meta} childMetas={metas.children} form={form} ctl={ctl} snap={snap} />;
+}
 
-  const { meta } = metas;
+type FormState = ReturnType<typeof useDocForm>;
+
+function DocFormView({
+  doctype,
+  isNew,
+  meta,
+  childMetas,
+  form,
+  ctl,
+  snap,
+}: {
+  doctype: string;
+  isNew: boolean;
+  meta: DocTypeMeta;
+  childMetas: DocTypeMeta[];
+  form: FormState;
+  ctl: FormController;
+  snap: FormSnapshot;
+}) {
+  const { data: ctx } = useDeskContext();
+  const desk = deskInfo(ctx);
+  const phone = useIsPhone();
+  const { loaded, load, ctlRef } = form;
   const doc = snap.doc;
-  const docstatus = Number(doc.docstatus ?? 0);
-  const perms = loaded?.docinfo.permissions ?? {};
-  const can = (p: string) => isNew || perms[p] === undefined || !!perms[p];
-  const submittable = !!meta.is_submittable;
-  const wfReadOnly = !!workflow && isWorkflowReadOnly(workflow, doc, ctx?.roles ?? []);
-  const readOnly = docstatus !== 0 || !can("write") || !!snap.overrides.__form?.read_only || wfReadOnly;
-  const wfState = workflow ? (doc[workflow.workflow_state_field] as string | undefined) : undefined;
-  const indicator: [string, string] | null =
-    workflow && wfState && !isNewDoc(doc) && !snap.dirty ? [wfState, stateColour(workflow, wfState, stateStyles)] : getIndicator(meta, doc, snap.dirty);
-  const titleField = typeof meta.title_field === "string" ? meta.title_field : "";
-  // Desk: the title is clickable to rename when the DocType allows renaming or has an editable title field
-  const titleDf = titleField ? meta.fields?.find((f) => f.fieldname === titleField) : undefined;
-  const canRename = !isNewDoc(doc) && can("write") && (!!meta.allow_rename || (!!titleDf && !titleDf.read_only && docstatus === 0));
-  const titleValue = titleField ? doc[titleField] : "";
-  const title = isNewDoc(doc) ? `New ${doctype}` : typeof titleValue === "string" && titleValue ? titleValue : doc.name;
-
-  let primary: null | { label: string; kind: "save" | "submit" | "cancel" } = null;
-  if (docstatus === 0 && !snap.overrides.__form?.disable_save) {
-    if (isNewDoc(doc) || snap.dirty || !submittable) primary = isNew || can("write") ? { label: "Save", kind: "save" } : null;
-    else primary = can("submit") ? { label: "Submit", kind: "submit" } : null;
-  } else if (docstatus === 1 && can("cancel")) primary = { label: "Cancel", kind: "cancel" };
-  // Desk workflow setup_btn: transitions replace the primary/secondary buttons
-  const showActions = transitions.length > 0 && !snap.dirty && !isNewDoc(doc);
-  if (showActions) primary = null;
-
-  // custom buttons: ungrouped as buttons, grouped as dropdowns (Desk "Create ▾")
-  const groups = new Map<string, typeof snap.buttons>();
-  for (const b of snap.buttons) {
-    const g = b.group ?? "";
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g)!.push(b);
-  }
-
-  const docinfo = loaded?.docinfo ?? {};
-  const connectionsTab = (meta.fields ?? []).find((f) => f.fieldtype === "Tab Break" && /connection/i.test(f.fieldname))?.fieldname;
-  // DocType / Customize Form: the tab holding the `form_builder` HTML field hosts the visual builder
-  let builderTab: string | undefined;
-  {
-    let tab: string | undefined;
-    for (const f of meta.fields ?? []) {
-      if (f.fieldtype === "Tab Break") tab = f.fieldname;
-      if (f.fieldname === "form_builder" && f.fieldtype === "HTML") builderTab = tab ?? "__details";
-    }
-  }
-  const tabExtras: Record<string, React.ReactNode> = {};
-  if (connectionsTab) tabExtras[connectionsTab] = <Connections meta={meta} doc={doc} />;
-  if (builderTab && ctl.field("fields")) {
-    tabExtras[builderTab] = (
-      <FormBuilder ctl={ctl} childMeta={metas.children.find((m) => m.name === ctl.field("fields")?.options)} readOnly={readOnly} />
-    );
-  }
-  const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
-
-  // custom buttons and the main actions: in the header on wider screens, in a bottom bar on phones (thumb reach)
-  const customButtons = (
-    <>
-      {[...groups.entries()].map(([g, btns]) =>
-        g ? (
-          <DropdownMenu key={g}>
-            <DropdownMenuTrigger className={`inline-flex items-center gap-1 ${btnCls}`}>
-              {g} <ChevronDown className="h-3.5 w-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {btns.map((b) => (
-                <DropdownMenuItem key={b.label} onClick={() => void b.action()}>{b.label}</DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          btns.map((b) => (
-            <button key={b.label} type="button" onClick={() => void b.action()} className={btnCls}>
-              {b.label}
-            </button>
-          ))
-        ),
-      )}
-    </>
-  );
-  const mainActions = (
-    <>
-      {docstatus === 2 && can("amend") && (
-        <button type="button" onClick={() => openCopy(true)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">Amend</button>
-      )}
-      {showActions && (
-        <DropdownMenu>
-          <DropdownMenuTrigger disabled={wfBusy} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
-            {wfBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-            Actions <ChevronDown className="h-3.5 w-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            {transitions.map((t) => (
-              <DropdownMenuItem key={`${t.action}|${t.next_state}`} onClick={() => void runTransition(t)}>
-                {t.action}
-              </DropdownMenuItem>
-            ))}
-            {/* Desk FormStates.setup_help */}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setWfHelp(true)}>Help</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      {primary && (
-        <button
-          type="button"
-          disabled={!!busy}
-          onClick={() => (primary!.kind === "save" ? void run("save", "Save") : setConfirm(primary!.kind))}
-          className={[
-            "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60",
-            primary.kind === "cancel"
-              ? "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-              : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200",
-          ].join(" ")}
-        >
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          {primary.label}
-        </button>
-      )}
-    </>
-  );
-  const hasBottomBar = phone && (snap.buttons.length > 0 || !!primary || showActions || (docstatus === 2 && can("amend")));
+  const roles = desk.roles;
+  const wf = useDocWorkflow({ doctype, meta, doc, dirty: snap.dirty, user: desk.user, roles, ctlRef, load });
+  const actions = useDocActions({ doctype, meta, ctlRef, ctl, load, setLoaded: form.setLoaded });
+  const [formDialog, setFormDialog] = useState<FormDialogKind | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ fieldname: string; n: number } | null>(null);
+  const view = formView({
+    doctype,
+    meta,
+    doc,
+    dirty: snap.dirty,
+    overrides: snap.overrides,
+    isNew,
+    perms: loaded?.docinfo.permissions ?? {},
+    roles,
+    workflow: wf.workflow,
+    styles: wf.styles,
+    hasTransitions: wf.transitions.length > 0,
+  });
+  const mainActions = mainActionsOf(view, wf, actions);
+  const moreMenu = moreMenuOf({ doctype, meta, doc, view, desk, actions, load, onDialog: setFormDialog, getDoc: () => ctl.getDoc() });
+  const hasBottomBar = phone && (snap.buttons.length > 0 || view.hasMainActions);
 
   return (
     <div className={`space-y-stack ${hasBottomBar ? "pb-28" : "pb-16"}`}>
-      {/* Header (sticks under the navbar so actions stay reachable on long forms) */}
-      <div className="sticky top-12 z-20 -mx-gutter flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg-color)]/95 px-gutter py-2 backdrop-blur">
-        {canRename ? (
-          <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            <button type="button" onClick={() => setFormDialog("rename")} title="Rename" className="max-w-full truncate rounded px-1 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
-              {title}
-            </button>
-          </h1>
-        ) : (
-          <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">{title}</h1>
-        )}
-        {indicator && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${INDICATOR_PILL[indicator[1]] ?? INDICATOR_PILL.gray}`}>{indicator[0]}</span>}
-        {viewers.length > 0 && (
-          <span className="flex items-center -space-x-1.5" aria-label={`Also viewing: ${viewers.join(", ")}`} title={`Also viewing: ${viewers.join(", ")}`}>
-            {viewers.slice(0, 4).map((u) => (
-              <span key={u} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-100 text-[10px] font-semibold uppercase text-emerald-800 dark:border-zinc-950 dark:bg-emerald-900 dark:text-emerald-200">
-                {u.charAt(0)}
-              </span>
-            ))}
-          </span>
-        )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {!phone && customButtons}
-          {!isNewDoc(doc) && !meta.issingle && (ctx?.boot?.desk_settings as { form_navigation_buttons?: number } | undefined)?.form_navigation_buttons !== 0 && (
-            <span className="inline-flex">
-              <button type="button" onClick={() => void navigate(true)} aria-label="Previous document" title="Previous document (⇧⌘<)" className="rounded-l-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
-                <ChevronLeft className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
-              </button>
-              <button type="button" onClick={() => void navigate(false)} aria-label="Next document" title="Next document (⇧⌘>)" className="-ml-px rounded-r-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
-                <ChevronRight className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
-              </button>
-            </span>
-          )}
-          {!isNewDoc(doc) && (
-            <Link href={`/desk/print/${enc(doctype)}/${enc(doc.name)}`} aria-label="Print" title="Print (⌘P)" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
-              <Printer className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
-            </Link>
-          )}
-          {!isNewDoc(doc) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger aria-label="More actions" className="rounded-lg border border-zinc-200 bg-white p-2 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
-                <MoreHorizontal className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                {can("create") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}><Plus className="h-4 w-4" /> New {doctype}</DropdownMenuItem>}
-                {can("create") && meta.allow_copy !== 0 && <DropdownMenuItem onClick={() => openCopy(false)}><CopyPlus className="h-4 w-4" /> Duplicate</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Reload</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(`/desk/print/${enc(doctype)}/${enc(doc.name)}`)}><Printer className="h-4 w-4" /> Print</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFormDialog("links")}><Link2 className="h-4 w-4" /> Links</DropdownMenuItem>
-                {canRename && <DropdownMenuItem onClick={() => setFormDialog("rename")}><Pencil className="h-4 w-4" /> Rename</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => setFormDialog("remind")}><AlarmClock className="h-4 w-4" /> Remind Me</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(doc.name); toast.success("Copied"); }}><Copy className="h-4 w-4" /> Copy name</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(JSON.stringify(ctl.getDoc(), null, 2)); toast.success("Document copied as JSON"); }}><ClipboardCopy className="h-4 w-4" /> Copy to Clipboard</DropdownMenuItem>
-                {(ctx?.roles ?? []).includes("System Manager") && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize%20Form/Customize%20Form?doc_type=${enc(doctype)}`)}><Settings2 className="h-4 w-4" /> Customize</DropdownMenuItem>
-                    {!!ctx?.developer_mode && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}><FileCode className="h-4 w-4" /> Edit DocType</DropdownMenuItem>}
-                  </>
-                )}
-                {can("delete") && docstatus !== 1 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setConfirm("delete")} className="text-red-600"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {!phone && mainActions}
-        </div>
-      </div>
-
-      {hasBottomBar && (
-        <div role="toolbar" aria-label="Document actions" className="fixed inset-x-0 bottom-0 z-30 mb-0 flex items-center gap-2 border-t border-zinc-200 bg-[var(--bg-color)]/95 px-gutter pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-zinc-800">
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none]">{customButtons}</div>
-          <div className="flex shrink-0 items-center gap-2">{mainActions}</div>
-        </div>
-      )}
-
-      {conflict && (
-        <div role="alert" className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-          This document was changed by someone else after you opened it.
-          <button type="button" onClick={() => void load()} className="ml-auto font-medium underline">
-            Reload (discards your changes)
-          </button>
-        </div>
-      )}
-      <FormHeadlines
-        state={snap.dashboard}
-        onDismiss={(id) => ctl.dash.removeHeadline(id)}
-        // Desk show_submit_message: a saved, clean draft of a submittable doctype without a workflow
-        extra={meta.is_submittable && can("submit") && !snap.dirty && !isNew && !workflow && docstatus === 0 ? [{ key: "submit", html: "Submit this document to confirm", color: "blue" }] : undefined}
+      <DocFormHeader
+        title={view.title}
+        onRename={view.canRename ? () => setFormDialog("rename") : undefined}
+        indicator={view.indicator}
+        viewers={form.viewers}
+        phone={phone}
+        saved={view.saved}
+        showNav={view.saved && !meta.issingle && desk.navButtons}
+        onNavigate={(prev) => void actions.navigate(prev)}
+        buttons={snap.buttons}
+        more={moreMenu}
+        actions={mainActions}
       />
-      {workflow && wfStatus && (
-        <WorkflowBar
-          workflow={workflow}
-          doc={doc}
-          status={wfStatus}
-          docinfo={loaded?.docinfo}
-          styles={stateStyles}
-          user={ctx?.user}
-          dirty={snap.dirty}
-          busy={wfBusy}
-          defaultState={defaultState(workflow, docstatus)}
-          onRun={(t) => void runTransition(t)}
-          onSetDefault={() => void ctl.set_value(workflow.workflow_state_field, defaultState(workflow, docstatus))}
-          onHelp={() => setWfHelp(true)}
-        />
-      )}
-      {workflow && wfStatus && (
-        <Dialog open={wfHelp} onOpenChange={setWfHelp}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Workflow: {workflow.name}</DialogTitle>
-              <DialogDescription>Who can do what in this document&apos;s current state.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-              <p>Current status: <strong>{wfStatus.state ?? "not set"}</strong></p>
-              <p>Document is only editable by users with role: <strong>{wfStatus.state ? editableBy(workflow, wfStatus.state).join(", ") || "nobody" : "-"}</strong></p>
-              <p>
-                Next actions:{" "}
-                {wfStatus.next.length ? wfStatus.next.map((t, i) => (
-                  <span key={`${t.action}|${t.allowed}|${i}`}>{i > 0 && ", "}<strong>{t.action}</strong> by role {t.allowed}</span>
-                )) : <strong>None: End of Workflow</strong>}
-              </p>
-              <p className="text-zinc-500"><strong>Note:</strong> Other permission rules may also apply.</p>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {hasBottomBar && <DocFormBottomBar buttons={snap.buttons} actions={mainActions} />}
+      {form.conflict && <ConflictBanner onReload={() => void load()} />}
+      <FormHeadlines state={snap.dashboard} onDismiss={(id) => ctl.dash.removeHeadline(id)} extra={view.submitHint ? [{ key: "submit", html: "Submit this document to confirm", color: "blue" }] : undefined} />
+      <DocFormWorkflow wf={wf} ctl={ctl} doc={doc} docinfo={loaded?.docinfo} dirty={snap.dirty} user={desk.user} />
       <FormDashboard state={snap.dashboard} />
-      {docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
+      {view.docstatus === 2 && <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>}
 
-      <div className="grid grid-cols-1 gap-stack xl:grid-cols-[minmax(0,1fr)_clamp(13rem,18vw,16rem)]">
-        <div className="min-w-0 space-y-4">
-          <FormBody
-            meta={isNewDoc(doc) && asksForName(meta) ? withNewNameField(meta) : meta}
-            values={doc}
-            readOnly={readOnly}
-            fieldPerm={ctl.fieldStatus}
-            overrides={snap.overrides}
-            errors={snap.errors}
-            onChange={(f, v) => void ctl.set_value(f, v)}
-            onButton={(f) => void ctl.clickButton(f)}
-            getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
-            renderTable={(df) =>
-              df.fieldtype === "Table MultiSelect" ? (
-                <TableMultiSelectField
-                  field={df as DocField}
-                  value={doc[df.fieldname]}
-                  onChange={(v) => void ctl.set_value(df.fieldname, v)}
-                  onAddRow={(values) => ctl.add_child(df.fieldname, values)}
-                  onRemoveRow={(row) => ctl.remove_rows(df.fieldname, [String(row.name)])}
-                  disabled={readOnly && !df.allow_on_submit}
-                  error={snap.errors[df.fieldname]}
-                  getQuery={() => ctl.getQuery(df.fieldname)?.(ctl.getDoc())}
-                  doc={doc}
-                />
-              ) : (
-              <Grid
-                ctl={ctl}
-                df={df}
-                meta={metas.children.find((m) => m.name === df.options) ?? ({ name: String(df.options), fields: [] } as unknown as DocTypeMeta)}
-                readOnly={readOnly && !df.allow_on_submit}
-                overrides={snap.overrides}
-                errors={snap.errors}
-              />
-              )
-            }
-            renderHtml={(df) => {
-              const widget = getHtmlWidget(doctype, df.fieldname);
-              return widget ? widget({ ctl, readOnly }) : <HtmlHost el={ctl.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />;
-            }}
-            tabExtras={tabExtras}
-            focusRequest={focusRequest}
-          />
+      <DocFormMain doctype={doctype} meta={meta} childMetas={childMetas} ctl={ctl} snap={snap} loaded={loaded} view={view} desk={desk} load={load} focusRequest={focusRequest} />
 
-          {!isNewDoc(doc) && (
-            <Timeline doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} meta={meta} childMetas={metas.children} user={ctx?.user} fullName={ctx?.full_name} onChanged={load} fieldPerm={ctl?.fieldStatus} />
-          )}
-        </div>
-
-        {/* Form sidebar (Desk: assigned / attachments / tags / shared / follow / like) */}
-        {!isNewDoc(doc) && (
-          <FormSidebar doc={(loaded?.doc ?? doc) as Doc} docinfo={docinfo} user={ctx?.user} canWrite={can("write")} trackChanges={!!meta.track_changes} onChanged={load} />
-        )}
-      </div>
-
-      {formDialog === "rename" && (
-        <RenameDialog
-          doctype={doctype}
-          name={doc.name}
-          titleField={titleDf && !titleDf.read_only && docstatus === 0 ? titleField : undefined}
-          title={titleField ? String(doc[titleField] ?? "") : undefined}
-          allowRename={!!meta.allow_rename}
-          onClose={() => setFormDialog(null)}
-          onDone={(n) => {
-            setFormDialog(null);
-            if (n !== doc.name) router.replace(`/desk/doctype/${enc(doctype)}/${enc(n)}`);
-            else void load();
+      <FormDialogHost kind={formDialog} onClose={() => setFormDialog(null)} doctype={doctype} doc={doc} meta={meta} view={view} load={load} />
+      {actions.jumpOpen && (
+        <JumpToField
+          meta={meta}
+          onClose={() => actions.setJumpOpen(false)}
+          onPick={(fieldname) => {
+            actions.setJumpOpen(false);
+            setFocusRequest((r) => ({ fieldname, n: (r?.n ?? 0) + 1 }));
           }}
         />
       )}
-      {formDialog === "links" && <LinksDialog doctype={doctype} name={doc.name} onClose={() => setFormDialog(null)} />}
-      {formDialog === "remind" && <ReminderDialog doctype={doctype} name={doc.name} onClose={() => setFormDialog(null)} />}
-
-      {/* Ctrl+J — Jump to field */}
-      {jumpOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && setJumpOpen(false)}>
-          <Command loop className="w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900" onKeyDown={(e) => e.key === "Escape" && setJumpOpen(false)}>
-            <Command.Input autoFocus placeholder="Jump to field…" className="h-11 w-full border-b border-zinc-200 bg-transparent px-4 text-sm text-zinc-900 outline-none dark:border-zinc-700 dark:text-zinc-100" />
-            <Command.List className="max-h-80 overflow-y-auto p-1.5">
-              <Command.Empty className="px-3 py-6 text-center text-sm text-zinc-500">No field found</Command.Empty>
-              {(meta.fields ?? [])
-                .filter((f) => !["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Heading"].includes(f.fieldtype) && !f.hidden && f.label)
-                .map((f) => (
-                  <Command.Item
-                    key={f.fieldname}
-                    value={`${f.label} ${f.fieldname}`}
-                    onSelect={() => {
-                      setJumpOpen(false);
-                      setFocusRequest((r) => ({ fieldname: f.fieldname, n: (r?.n ?? 0) + 1 }));
-                    }}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-800 data-[selected=true]:bg-zinc-100 dark:text-zinc-200 dark:data-[selected=true]:bg-zinc-800"
-                  >
-                    <span className="flex-1 truncate">{f.label}</span>
-                    <span className="text-xs text-zinc-400">{f.fieldtype}</span>
-                  </Command.Item>
-                ))}
-            </Command.List>
-          </Command>
-        </div>
-      )}
-
-      {/* Missing mandatory fields (Desk's "Missing Fields" dialog) */}
-      <Dialog open={!!missing} onOpenChange={(o) => !o && setMissing(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Missing fields</DialogTitle>
-            <DialogDescription>Mandatory fields required in {doctype}:</DialogDescription>
-          </DialogHeader>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-200">{(missing ?? []).map((m) => <li key={m}>{m}</li>)}</ul>
-          <DialogFooter>
-            <button type="button" onClick={() => setMissing(null)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">OK</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{confirm === "submit" ? `Permanently submit ${doc.name}?` : confirm === "cancel" ? `Permanently cancel ${doc.name}?` : `Delete ${doc.name}?`}</DialogTitle>
-            <DialogDescription>{confirm === "delete" ? "This cannot be undone." : confirm === "submit" ? "Submitted documents cannot be edited." : "Cancelled documents cannot be edited; you can amend them."}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200">No</button>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm === "submit") {
-                  setConfirm(null);
-                  void run("submit", "Submit");
-                } else if (confirm === "cancel") void onCancelConfirmed();
-                else void onDeleteConfirmed();
-              }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${confirm === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"}`}
-            >
-              Yes
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MissingFieldsDialog doctype={doctype} missing={actions.missing} onClose={() => actions.setMissing(null)} />
+      <ConfirmDialog kind={actions.confirm} name={doc.name} onClose={() => actions.setConfirm(null)} onConfirm={actions.confirmed} />
     </div>
   );
 }
+
+type DeskInfo = ReturnType<typeof deskInfo>;
+
+function deskInfo(ctx: ReturnType<typeof useDeskContext>["data"]) {
+  return {
+    user: ctx?.user,
+    fullName: ctx?.full_name,
+    roles: ctx?.roles ?? [],
+    developerMode: !!ctx?.developer_mode,
+    navButtons: (ctx?.boot?.desk_settings as { form_navigation_buttons?: number } | undefined)?.form_navigation_buttons !== 0,
+  };
+}
+
+function moreMenuOf(o: {
+  doctype: string;
+  meta: DocTypeMeta;
+  doc: Doc;
+  view: FormView;
+  desk: DeskInfo;
+  actions: ReturnType<typeof useDocActions>;
+  load: () => Promise<void>;
+  onDialog: (d: FormDialogKind) => void;
+  getDoc: () => Doc;
+}): MoreMenuProps {
+  const { view, actions } = o;
+  return {
+    doctype: o.doctype,
+    name: o.doc.name,
+    can: view.can,
+    allowCopy: o.meta.allow_copy !== 0,
+    canRename: view.canRename,
+    canDelete: view.can("delete") && view.docstatus !== 1,
+    isSystemManager: o.desk.roles.includes("System Manager"),
+    developerMode: o.desk.developerMode,
+    onDuplicate: () => actions.openCopy(false),
+    onReload: () => void o.load(),
+    onDialog: o.onDialog,
+    onCopyJson: () => {
+      void navigator.clipboard.writeText(JSON.stringify(o.getDoc(), null, 2));
+      toast.success("Document copied as JSON");
+    },
+    onDelete: () => actions.setConfirm("delete"),
+  };
+}
+
+/** the fields, the timeline and the sidebar */
+function DocFormMain({
+  doctype,
+  meta,
+  childMetas,
+  ctl,
+  snap,
+  loaded,
+  view,
+  desk,
+  load,
+  focusRequest,
+}: {
+  doctype: string;
+  meta: DocTypeMeta;
+  childMetas: DocTypeMeta[];
+  ctl: FormController;
+  snap: FormSnapshot;
+  loaded: Loaded | null;
+  view: FormView;
+  desk: DeskInfo;
+  load: () => Promise<void>;
+  focusRequest: { fieldname: string; n: number } | null;
+}) {
+  const shownDoc = (loaded?.doc ?? snap.doc) as Doc;
+  const docinfo = loaded?.docinfo ?? {};
+  return (
+    <div className="grid grid-cols-1 gap-stack xl:grid-cols-[minmax(0,1fr)_clamp(13rem,18vw,16rem)]">
+      <div className="min-w-0 space-y-4">
+        <DocFormBody doctype={doctype} meta={meta} childMetas={childMetas} ctl={ctl} snap={snap} readOnly={view.readOnly} focusRequest={focusRequest} />
+        {view.saved && <Timeline doc={shownDoc} docinfo={docinfo} meta={meta} childMetas={childMetas} user={desk.user} fullName={desk.fullName} onChanged={load} fieldPerm={ctl.fieldStatus} />}
+      </div>
+
+      {/* Form sidebar (Desk: assigned / attachments / tags / shared / follow / like) */}
+      {view.saved && <FormSidebar doc={shownDoc} docinfo={docinfo} user={desk.user} canWrite={view.can("write")} trackChanges={!!meta.track_changes} onChanged={load} />}
+    </div>
+  );
+}
+
+function mainActionsOf(view: FormView, wf: ReturnType<typeof useDocWorkflow>, actions: ReturnType<typeof useDocActions>): MainActionsProps {
+  return {
+    canAmend: view.canAmend,
+    onAmend: () => actions.openCopy(true),
+    transitions: view.showTransitions ? wf.transitions : null,
+    wfBusy: wf.busy,
+    onTransition: (t) => void wf.run(t),
+    onWorkflowHelp: () => wf.setHelpOpen(true),
+    primary: view.primary,
+    busy: !!actions.busy,
+    onPrimary: (p) => (p.kind === "save" ? void actions.run("save", "Save") : actions.setConfirm(p.kind)),
+  };
+}
+
+function ConflictBanner({ onReload }: { onReload: () => void }) {
+  return (
+    <div role="alert" className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      This document was changed by someone else after you opened it.
+      <button type="button" onClick={onReload} className="ml-auto font-medium underline">
+        Reload (discards your changes)
+      </button>
+    </div>
+  );
+}
+
+/** the workflow bar and its help dialog, when the DocType has an active Workflow */
+function DocFormWorkflow({ wf, ctl, doc, docinfo, dirty, user }: { wf: ReturnType<typeof useDocWorkflow>; ctl: FormController; doc: Doc; docinfo: Record<string, unknown> | undefined; dirty: boolean; user?: string }) {
+  const { workflow, status } = wf;
+  if (!workflow || !status) return null;
+  const docstatus = Number(doc.docstatus ?? 0);
+  return (
+    <>
+      <WorkflowBar
+        workflow={workflow}
+        doc={doc}
+        status={status}
+        docinfo={docinfo}
+        styles={wf.styles}
+        user={user}
+        dirty={dirty}
+        busy={wf.busy}
+        defaultState={defaultState(workflow, docstatus)}
+        onRun={(t) => void wf.run(t)}
+        onSetDefault={() => void ctl.set_value(workflow.workflow_state_field, defaultState(workflow, docstatus))}
+        onHelp={() => wf.setHelpOpen(true)}
+      />
+      <WorkflowHelpDialog open={wf.helpOpen} onOpenChange={wf.setHelpOpen} workflow={workflow} status={status} />
+    </>
+  );
+}
+
+type FormDialogKind = "rename" | "links" | "remind";
+
+/** Rename / Links / Remind Me from the ⋯ menu */
+function FormDialogHost({ kind, onClose, doctype, doc, meta, view, load }: { kind: FormDialogKind | null; onClose: () => void; doctype: string; doc: Doc; meta: DocTypeMeta; view: FormView; load: () => Promise<void> }) {
+  const router = useRouter();
+  if (kind === "links") return <LinksDialog doctype={doctype} name={doc.name} onClose={onClose} />;
+  if (kind === "remind") return <ReminderDialog doctype={doctype} name={doc.name} onClose={onClose} />;
+  if (kind !== "rename") return null;
+  return (
+    <RenameDialog
+      doctype={doctype}
+      name={doc.name}
+      titleField={view.titleEditable ? view.titleField : undefined}
+      title={view.titleField ? String(doc[view.titleField] ?? "") : undefined}
+      allowRename={!!meta.allow_rename}
+      onClose={onClose}
+      onDone={(n) => {
+        onClose();
+        if (n !== doc.name) router.replace(`/desk/doctype/${enc(doctype)}/${enc(n)}`);
+        else void load();
+      }}
+    />
+  );
+}
+
+/** the form's fields: FormBody with child tables (Grid / Table MultiSelect), HTML widgets and the extra tab content */
+function DocFormBody({
+  doctype,
+  meta,
+  childMetas,
+  ctl,
+  snap,
+  readOnly,
+  focusRequest,
+}: {
+  doctype: string;
+  meta: DocTypeMeta;
+  childMetas: DocTypeMeta[];
+  ctl: FormController;
+  snap: FormSnapshot;
+  readOnly: boolean;
+  focusRequest: { fieldname: string; n: number } | null;
+}) {
+  const doc = snap.doc;
+  const tabExtras: Record<string, React.ReactNode> = {};
+  const connectionsTab = connectionsTabOf(meta);
+  if (connectionsTab) tabExtras[connectionsTab] = <Connections meta={meta} doc={doc} />;
+  const builderTab = builderTabOf(meta);
+  if (builderTab && ctl.field("fields")) {
+    tabExtras[builderTab] = <FormBuilder ctl={ctl} childMeta={childMetas.find((m) => m.name === ctl.field("fields")?.options)} readOnly={readOnly} />;
+  }
+  const renderTable = (df: DocField) =>
+    df.fieldtype === "Table MultiSelect" ? (
+      <TableMultiSelectField
+        field={df}
+        value={doc[df.fieldname]}
+        onChange={(v) => void ctl.set_value(df.fieldname, v)}
+        onAddRow={(values) => ctl.add_child(df.fieldname, values)}
+        onRemoveRow={(row) => ctl.remove_rows(df.fieldname, [String(row.name)])}
+        disabled={readOnly && !df.allow_on_submit}
+        error={snap.errors[df.fieldname]}
+        getQuery={() => ctl.getQuery(df.fieldname)?.(ctl.getDoc())}
+        doc={doc}
+      />
+    ) : (
+      <Grid
+        ctl={ctl}
+        df={df}
+        meta={childMetas.find((m) => m.name === df.options) ?? ({ name: String(df.options), fields: [] } as unknown as DocTypeMeta)}
+        readOnly={readOnly && !df.allow_on_submit}
+        overrides={snap.overrides}
+        errors={snap.errors}
+      />
+    );
+  return (
+    <FormBody
+      meta={isNewDoc(doc) && asksForName(meta) ? withNewNameField(meta) : meta}
+      values={doc}
+      readOnly={readOnly}
+      fieldPerm={ctl.fieldStatus}
+      overrides={snap.overrides}
+      errors={snap.errors}
+      onChange={(f, v) => void ctl.set_value(f, v)}
+      onButton={(f) => void ctl.clickButton(f)}
+      getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
+      renderTable={(df) => renderTable(df as DocField)}
+      renderHtml={(df) => {
+        const widget = getHtmlWidget(doctype, df.fieldname);
+        return widget ? widget({ ctl, readOnly }) : <HtmlHost el={ctl.htmlWrapper(df.fieldname)} html={typeof df.options === "string" ? df.options : null} />;
+      }}
+      tabExtras={tabExtras}
+      focusRequest={focusRequest}
+    />
+  );
+}
+
