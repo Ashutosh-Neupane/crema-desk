@@ -1,39 +1,15 @@
 "use client";
 
 /**
- * Native replacements for the jQuery widgets Desk mounts into HTML fields (layer 3 of the
- * compatibility plan in docs/GAPS.md). Keyed by DocType + HTML fieldname; each writes to the
- * same child tables Desk's widget writes to, so saving behaves exactly like Desk.
- *   frappe.RoleEditor   → User.roles_html, Role Profile.roles_html   (Has Role rows)
- *   frappe.ModuleEditor → User.modules_html, Module Profile.module_html (Block Module rows = unchecked)
+ * frappe.RoleEditor / frappe.ModuleEditor (Desk: frappe/public/js/frappe/roles_editor.js, module_editor.js):
+ * a filterable grid of checkboxes over the Has Role / Block Module child tables.
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
-import type { FormController, Row } from "@/lib/form/FormController";
-import { AddressContact } from "./AddressContact";
-
-export interface WidgetProps {
-  ctl: FormController;
-  readOnly: boolean;
-}
-
-const WIDGETS: Record<string, Record<string, (p: WidgetProps) => React.ReactNode>> = {
-  User: { roles_html: (p) => <RoleEditor {...p} />, modules_html: (p) => <ModuleEditor {...p} /> },
-  "Role Profile": { roles_html: (p) => <RoleEditor {...p} /> },
-  "Module Profile": { module_html: (p) => <ModuleEditor {...p} /> },
-};
-
-/** Desk renders these for ANY doctype that has the field (frappe.contacts.render_address_and_contact) */
-const FIELD_WIDGETS: Record<string, (p: WidgetProps) => React.ReactNode> = {
-  address_html: (p) => <AddressContact {...p} fieldname="address_html" />,
-  contact_html: (p) => <AddressContact {...p} fieldname="contact_html" />,
-};
-
-export function getHtmlWidget(doctype: string, fieldname: string) {
-  return WIDGETS[doctype]?.[fieldname] ?? FIELD_WIDGETS[fieldname];
-}
+import type { Row } from "@/lib/form/FormController";
+import type { WidgetProps } from "./types";
 
 /** Desk's MultiCheck look: filter box, select all / none, a column grid of checkboxes */
 function MultiCheck({

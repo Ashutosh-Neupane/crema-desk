@@ -15,6 +15,9 @@ function attach(host: HTMLElement, node: HTMLElement) {
   };
 }
 function fill(node: HTMLElement, html: string | null | undefined, first: boolean) {
+  // the HTML field's `options` is DocType meta written by a developer, and Desk puts it in unsanitised
+  // ($wrapper.html(df.options), frappe/form/controls/html.js); sanitising would strip what site layouts rely on
+  // react-doctor-disable-next-line dangerous-html-sink
   if (first ? !node.innerHTML && html : true) node.innerHTML = html ?? "";
 }
 

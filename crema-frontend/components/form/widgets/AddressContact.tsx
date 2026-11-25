@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { deskCall, getDoc, isNewDoc } from "@/lib/frappe/form";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { PREFILL_KEY } from "@/lib/form/prefill";
-import type { WidgetProps } from "./index";
+import type { WidgetProps } from "./types";
 
 type Rec = Record<string, unknown> & { name: string };
 

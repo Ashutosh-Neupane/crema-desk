@@ -189,8 +189,8 @@ export default function FormBody({
         )}
         {!isCollapsed && (
           <div className={`grid grid-cols-1 gap-x-column gap-y-field ${grid}`}>
-            {nonEmptyCols.map((col, i) => (
-              <div key={i} className="flex min-w-0 flex-col gap-field">
+            {nonEmptyCols.map((col) => (
+              <div key={(col[0] as DocField).fieldname} className="flex min-w-0 flex-col gap-field">
                 {col.map((f) => renderField(f as DocField))}
               </div>
             ))}

@@ -16,24 +16,10 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { getNewDoc } from "@/lib/crema-form/newDoc";
 import { saveDoc, type Doc } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
+import { quickFields } from "@/components/form/quickEntryRules";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
-const LAYOUT = new Set(["Section Break", "Column Break", "Tab Break", "Fold", "HTML", "Button", "Heading"]);
-
-function quickFields(meta: DocTypeMeta): DocField[] {
-  return (meta.fields ?? []).filter(
-    (f) => !LAYOUT.has(f.fieldtype) && !f.hidden && !f.read_only && (f.allow_in_quick_entry || (f.reqd && !f.default)),
-  );
-}
-
-/** Desk's QuickEntryForm.is_quick_entry() */
-export function canQuickEntry(meta: DocTypeMeta): boolean {
-  if (!meta.quick_entry || meta.is_submittable || meta.issingle || meta.istable) return false;
-  const fields = quickFields(meta);
-  if (fields.some((f) => f.fieldtype === "Table" || f.fieldtype === "Table MultiSelect")) return false;
-  if ((meta.fields ?? []).some((f) => f.reqd && (f.fieldtype === "Table" || f.fieldtype === "Table MultiSelect"))) return false;
-  return fields.length > 0 && fields.length <= 7;
-}
+export { canQuickEntry } from "@/components/form/quickEntryRules";
 
 export default function QuickEntry({
   meta,

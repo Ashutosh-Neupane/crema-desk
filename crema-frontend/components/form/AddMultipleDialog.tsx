@@ -113,8 +113,8 @@ export default function AddMultipleDialog({
             {single ? `Search ${doctype} and pick one.` : qtyLabel ? `Pick a ${doctype}, enter the ${qtyLabel.toLowerCase()}, press Enter. Repeat for more.` : `Pick each ${doctype} to add a row.`}
           </DialogDescription>
         </DialogHeader>
+        {/* the Dialog focuses its first input on open */}
         <input
-          autoFocus
           aria-label="Beginning with"
           placeholder="Beginning with…"
           value={txt}

@@ -112,7 +112,8 @@ export default function Timeline({
   fieldPerm?: (df: DocField) => FieldStatus;
 }) {
   const [text, setText] = useState("");
-  const [mentions, setMentions] = useState<Record<string, string>>({});
+  // label → user id of the @mentions picked for the comment being written (only read when it is posted)
+  const mentions = useRef<Record<string, string>>({});
   const [suggest, setSuggest] = useState<{ q: string; items: Array<{ value: string; description?: string }> } | null>(null);
   const [editing, setEditing] = useState<{ name: string; text: string } | null>(null);
   const [composing, setComposing] = useState(false);
@@ -162,7 +163,7 @@ export default function Timeline({
     const caret = box.current?.selectionStart ?? text.length;
     const before = text.slice(0, caret).replace(/@[\w.-]*$/, `@${label} `);
     setText(before + text.slice(caret));
-    setMentions((m) => ({ ...m, [label]: u.value }));
+    mentions.current = { ...mentions.current, [label]: u.value };
     setSuggest(null);
     box.current?.focus();
   };
@@ -170,7 +171,7 @@ export default function Timeline({
   /** plain text → comment HTML with Frappe mention spans (notifications parse data-id) */
   const toHtml = (s: string) => {
     let html = escapeHtml(s.trim()).replace(/\n/g, "<br>");
-    for (const [label, id] of Object.entries(mentions)) {
+    for (const [label, id] of Object.entries(mentions.current)) {
       const span = `<span class="mention" data-id="${escapeHtml(id)}" data-value="${escapeHtml(label)}" data-denotation-char="@">@${escapeHtml(label)}</span>`;
       html = html.split(`@${escapeHtml(label)}`).join(span);
     }
@@ -182,7 +183,7 @@ export default function Timeline({
     try {
       await deskCall("frappe.desk.form.utils.add_comment", { reference_doctype: doc.doctype, reference_name: doc.name, content: toHtml(text), comment_email: user, comment_by: fullName });
       setText("");
-      setMentions({});
+      mentions.current = {};
       await onChanged();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not add comment");
