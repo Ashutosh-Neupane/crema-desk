@@ -26,6 +26,120 @@ const inputCls = "h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 t
 const primaryBtn = "rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900";
 const ghostBtn = "rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200";
 
+type ConfirmKind = "delete" | "submit" | "cancel" | { workflow: string };
+
+/** the open action that needs a Yes / No confirmation (delete, submit, cancel, a workflow action) */
+function confirmKindOf(open: Kind | null): ConfirmKind | null {
+  if (open === null) return null;
+  if (typeof open === "object" || open === "delete" || open === "submit" || open === "cancel") return open;
+  return null;
+}
+
+const CONFIRM_LABEL = { delete: "Delete", submit: "Submit", cancel: "Cancel" } as const;
+const confirmLabelOf = (k: ConfirmKind) => (typeof k === "object" ? k.workflow : CONFIRM_LABEL[k]);
+
+function runSafely(action: () => unknown) {
+  try {
+    action();
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : String(e));
+  }
+}
+
+function BulkActionsMenu({
+  count,
+  submittable,
+  extraActions,
+  wfActions,
+  onPick,
+  onExport,
+}: {
+  count: number;
+  submittable: boolean;
+  extraActions: Array<{ label: string; action: () => unknown }>;
+  wfActions: string[];
+  onPick: (k: Kind) => void;
+  onExport: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+        Actions ({count}) <ChevronDown className="h-3.5 w-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => onPick("edit")}>Edit</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPick("assign")}>Assign To</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPick("tags")}>Add Tags</DropdownMenuItem>
+        <DropdownMenuItem onClick={onExport}>Export</DropdownMenuItem>
+        {extraActions.length > 0 && <DropdownMenuSeparator />}
+        {extraActions.map((a) => (
+          <DropdownMenuItem key={a.label} onClick={() => runSafely(a.action)}>
+            {a.label}
+          </DropdownMenuItem>
+        ))}
+        {wfActions.length > 0 && <DropdownMenuSeparator />}
+        {wfActions.map((a) => (
+          <DropdownMenuItem key={a} onClick={() => onPick({ workflow: a })}>
+            {a}
+          </DropdownMenuItem>
+        ))}
+        {submittable ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onPick("submit")}>Submit</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPick("cancel")}>Cancel</DropdownMenuItem>
+          </>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onPick("delete")} className="text-red-600">
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConfirmDialog({ kind, count, doctype, onNo, onYes }: { kind: ConfirmKind | null; count: number; doctype: string; onNo: () => void; onYes: () => void }) {
+  return (
+    <Dialog open={!!kind} onOpenChange={(o) => !o && onNo()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {kind === null ? "" : confirmLabelOf(kind)} {count} {doctype} {count === 1 ? "record" : "records"}?
+          </DialogTitle>
+          <DialogDescription>{kind === "delete" ? "This cannot be undone." : "This changes the documents permanently."}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <button type="button" onClick={onNo} className={ghostBtn}>
+            No
+          </button>
+          <button type="button" onClick={onYes} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${kind === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}>
+            Yes
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function exportCsv(doctype: string, rows: Row[], columns: Array<{ fieldname: string; label: string; fieldtype: string }>) {
+  const cols = [{ fieldname: "name", label: "ID", fieldtype: "Data" }, ...columns.filter((c) => c.fieldname !== "name")];
+  const blob = new Blob([toCsv(rows, cols)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${doctype}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function bulkUpdate(doctype: string, names: string[], field: DocField, value: unknown) {
+  const { env } = await deskCall("frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs", { doctype, docnames: JSON.stringify(names), action: "update", data: JSON.stringify({ [field.fieldname]: value }) });
+  const failed = (env.message as { failed?: unknown[] } | undefined)?.failed ?? [];
+  if (Array.isArray(env.message) && env.message.length) throw new Error(`Could not update ${env.message.length} record(s)`);
+  if (failed.length) throw new Error(`Could not update ${failed.length} record(s)`);
+}
+
 export default function BulkActions({
   meta,
   rows,
@@ -67,19 +181,7 @@ export default function BulkActions({
     onDone();
   };
 
-  const exportCsv = () => {
-    const cols = [{ fieldname: "name", label: "ID", fieldtype: "Data" }, ...columns.filter((c) => c.fieldname !== "name")];
-    const blob = new Blob([toCsv(rows, cols)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${doctype}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const confirmKind = open === "delete" || open === "submit" || open === "cancel" || (typeof open === "object" && open) ? open : null;
-  const confirmLabel = confirmKind === null ? "" : typeof confirmKind === "object" ? confirmKind.workflow : confirmKind === "delete" ? "Delete" : confirmKind === "submit" ? "Submit" : "Cancel";
+  const confirmKind = confirmKindOf(open);
   const onConfirm = () => {
     if (!confirmKind) return;
     if (typeof confirmKind === "object") void run(confirmKind.workflow, () => deskCall("frappe.model.workflow.bulk_workflow_approval", { docnames: JSON.stringify(names), doctype, action: confirmKind.workflow }));
@@ -89,84 +191,9 @@ export default function BulkActions({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-          Actions ({rows.length}) <ChevronDown className="h-3.5 w-3.5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => setOpen("edit")}>Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setOpen("assign")}>Assign To</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setOpen("tags")}>Add Tags</DropdownMenuItem>
-          <DropdownMenuItem onClick={exportCsv}>Export</DropdownMenuItem>
-          {extraActions.length > 0 && <DropdownMenuSeparator />}
-          {extraActions.map((a) => (
-            <DropdownMenuItem
-              key={a.label}
-              onClick={() => {
-                try {
-                  a.action();
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : String(e));
-                }
-              }}
-            >
-              {a.label}
-            </DropdownMenuItem>
-          ))}
-          {wfActions.length > 0 && <DropdownMenuSeparator />}
-          {wfActions.map((a) => (
-            <DropdownMenuItem key={a} onClick={() => setOpen({ workflow: a })}>
-              {a}
-            </DropdownMenuItem>
-          ))}
-          {meta.is_submittable ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setOpen("submit")}>Submit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setOpen("cancel")}>Cancel</DropdownMenuItem>
-            </>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setOpen("delete")} className="text-red-600">
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Dialog open={!!confirmKind} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {confirmLabel} {rows.length} {doctype} {rows.length === 1 ? "record" : "records"}?
-            </DialogTitle>
-            <DialogDescription>{confirmKind === "delete" ? "This cannot be undone." : "This changes the documents permanently."}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button type="button" onClick={() => setOpen(null)} className={ghostBtn}>
-              No
-            </button>
-            <button type="button" onClick={onConfirm} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${confirmKind === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}>
-              Yes
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {open === "edit" && (
-        <BulkEdit
-          meta={meta}
-          count={rows.length}
-          onClose={() => setOpen(null)}
-          onApply={(field, value) =>
-            void run(`Updated ${field.label ?? field.fieldname}`, async () => {
-              const { env } = await deskCall("frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs", { doctype, docnames: JSON.stringify(names), action: "update", data: JSON.stringify({ [field.fieldname]: value }) });
-              const failed = (env.message as { failed?: unknown[] } | undefined)?.failed ?? [];
-              if (Array.isArray(env.message) && env.message.length) throw new Error(`Could not update ${env.message.length} record(s)`);
-              if (failed.length) throw new Error(`Could not update ${failed.length} record(s)`);
-            })
-          }
-        />
-      )}
+      <BulkActionsMenu count={rows.length} submittable={!!meta.is_submittable} extraActions={extraActions} wfActions={wfActions} onPick={setOpen} onExport={() => exportCsv(doctype, rows, columns)} />
+      <ConfirmDialog kind={confirmKind} count={rows.length} doctype={doctype} onNo={() => setOpen(null)} onYes={onConfirm} />
+      {open === "edit" && <BulkEdit meta={meta} count={rows.length} onClose={() => setOpen(null)} onApply={(field, value) => void run(`Updated ${field.label ?? field.fieldname}`, () => bulkUpdate(doctype, names, field, value))} />}
       {open === "assign" && (
         <AssignDialog
           count={rows.length}
@@ -312,7 +339,7 @@ function TagsDialog({ count, onClose, onApply }: { count: number; onClose: () =>
             Comma-separated; new tags are created. Applies to {count} {count === 1 ? "record" : "records"}.
           </DialogDescription>
         </DialogHeader>
-        <input aria-label="Tags" autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tags.length && onApply(tags)} placeholder="urgent, follow-up" className={inputCls} />
+        <input aria-label="Tags" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tags.length && onApply(tags)} placeholder="urgent, follow-up" className={inputCls} />
         <DialogFooter>
           <button type="button" onClick={onClose} className={ghostBtn}>
             Cancel
