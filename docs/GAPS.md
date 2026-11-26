@@ -132,6 +132,13 @@ Order of work: the milestones in § 0.1.
 - ❌ **[Parity]** Form tour (`form_tour.js`, Form Tour doctype, `onboarding_tours.bundle.js`).
 - ❌ **[P2]** Success action after submit/save (`success_action.js`, Success Action doctype).
 - ❌ **[P2]** Info card (`form/info_card.js`) and side panel record preview (`ui/side_panel.js`) — v16.
+- ❌ **[P2]** New form of a log-type DocType opens as a page of blank fields (seen on a compliance app's *Query Audit
+  Log*: every field `read_only`, no role has `create`). Desk: `frappe.model.can_create` is false, so it offers no
+  "New" and `/new` doesn't give an editable document (`form/form.js` `can_create`); read-only fields with no value are
+  not drawn (`form/controls/base_control.js` `get_status`, `model/perm.js` `get_field_display_status`). Crema: open
+  `/new` only with create permission (else the "Not permitted" page), hide empty read-only fields, and in the new
+  layout show such DocTypes as read-only logs (no "New" button, filters first). Add `e2e/formreadonly.mjs` with a
+  test DocType made the same way.
 - ❌ **[P2]** Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
 - ✅ Field permlevels (`lib/form/perm.ts`, Desk `model/perm.js`): a field at a level the user cannot read is hidden,
   one they cannot write is read-only; `frm.perm`, `frm.has_perm`, `frappe.perm.*` for scripts (`e2e/permlevel.mjs`).
@@ -626,7 +633,9 @@ layout asks to convert it in Desk once.
 
 Phase 1 copies Desk; phase 2 makes it pleasant for a **normal user** (sales clerk, storekeeper, accountant, approver)
 rather than for an implementer. Behaviour stays Frappe's (same APIs, same scripts); only presentation changes, and
-each change keeps the e2e suites green. Nothing here is built yet.
+each change keeps the e2e suites green. Built so far: the design system (3.2), My work (3.4), the layout switch
+(3.6). Order once phase 1 is closed: record preview + wiring → 3.7 large screens and dashboard home → 3.8 DocType
+builder → 3.9 AI assistant → the rest of 3.4. Phase 3 starts after phase 2 and the [Parity] items (§ 0.2).
 
 ### 3.1 Principles
 1. **One obvious next step.** Every screen answers "what do I do now?": one primary button, the rest in menus.
@@ -700,6 +709,91 @@ One screen at a time behind a per-user "New layout" switch, with before / after 
 the PR, e2e suites unchanged, and a short usability check (task time, clicks) against Desk.
 - ✅ The switch: `lib/ui/newLayout.ts` (`useNewLayout()` / `setNewLayout()`, plus `useDensity()` / `setDensity()`),
   stored per user in Frappe `user_settings` ("Crema UI") with a localStorage cache; SSR renders the classic layout.
+
+### 3.7 Large screens and a dashboard home
+Desk was laid out for ~1280px; on 1600–2560px monitors most of the screen is empty.
+- **Width:** content grows to the window (text keeps a readable line length). Forms use 2 → 3 columns by container
+  width (the DocType's section `columns` stay the minimum); timeline, comments and record info move into a right
+  panel beside the form instead of below it.
+- **List + preview:** on wide screens a list keeps a preview panel open on the right (3.3); ↑ / ↓ moves the preview,
+  Enter opens the full page.
+- **Dashboard home:** `/desk` opens a dashboard that follows the site's own home setting first (`app_home` hook, the
+  user's default workspace, Navbar Settings), so a white-label or industry app that sets its own home keeps it in
+  Crema without per-app code. It shows the workspace's number cards, charts, shortcuts and quick lists in a grid,
+  plus My work (3.4). Users pin, move and resize cards (saved in `user_settings`); a System Manager can publish a
+  layout per role.
+- **Charts:** number cards and dashboard charts use the site's own Number Card / Dashboard Chart sources (no new
+  backend), with date range and filters on the card.
+- Tests: screenshots at 1280 / 1600 / 2560 px; `e2e/p2.home.mjs` (site home respected, card pin / move saved).
+
+### 3.8 Creating a DocType (builder)
+Today "New DocType" opens the raw DocType form (a fields table). Admins who aren't developers need a builder:
+1. **Guided start:** name, module, "child table / single settings page / submittable", naming rule (series, field,
+   prompt, hash) with a live example name.
+2. **Visual form builder:** drag fields from a palette with plain names ("Amount" → Currency, "Choose one" → Select,
+   "Link to another record" → Link) into tabs / sections / columns; live preview on the right; field options in a
+   side panel (mandatory, default, depends on, in list view, read only …). Port Desk v16's form builder
+   (`form_builder/*`).
+3. **Checks before saving:** duplicate or reserved fieldnames, Link / Table targets that don't exist, Select without
+   options, `amended_from` added for submittable DocTypes (as Desk does).
+4. **Permissions step:** roles × read / write / create / submit / cancel / delete with sensible defaults.
+5. **After saving:** "Open the new list" / "Add to a workspace" / "Create the first record".
+- The same builder edits **Customize Form** (Custom Field + Property Setter), so standard DocTypes are never edited
+  directly outside developer mode.
+- The AI assistant (3.9) proposes a DocType by filling this builder; the admin reviews and saves.
+- Tests: `e2e/p2.doctypebuilder.mjs` (DocType with a table and a Link, permissions, first record, cleanup).
+
+### 3.9 AI assistant inside Crema
+A chat panel in Crema (side panel on desktop, bottom sheet on phones, ⌘I) that reads and changes the site in plain
+language: "make a purchase invoice from Supplier X for 10 × Item Y at 500", "which sales orders are overdue?",
+"create a DocType Vehicle with plate number, owner (Employee) and insurance expiry", "add a client script that fills
+the delivery date".
+
+**Frappe's side already exists.** Frappe v16 has an MCP server
+([docs](https://docs.frappe.io/framework/guides-integration/mcp)): Streamable HTTP at `/api/v2/mcp`, on by default
+(System Settings → AI Agents → Enable MCP), 13 tools (find DocTypes and methods, schemas, list / get / count /
+create / update / delete documents, call whitelisted and document methods such as submit). Calls run as the
+authenticated user with REST v2 permission checks. External AI apps (Claude Desktop / claude.ai custom connector,
+other MCP clients) already connect to it through Frappe OAuth; that path needs nothing from Crema. It also works
+through Crema with the user's session (checked: `tools/list` via `:3001/api/v2/mcp`).
+
+**What Crema adds: the assistant built in (nothing to install or open on the server, no terminal).**
+```
+Browser chat panel ──► Crema server  /api/ai/chat
+                         1. message + Frappe tool list ──► Claude API (api.anthropic.com)
+                         2. Claude: "call create_document {…}" ◄──
+                         3. Crema calls /api/v2/mcp with the USER's own session
+                         4. result back to Claude; repeat until done
+Browser ◄── answer, confirm card, or the filled form
+```
+- **Setup (web only):** a System Manager pastes an Anthropic API key (platform.claude.com; a claude.ai subscription
+  can't be used by an app) into an **AI Settings** page, or the server has `ANTHROPIC_API_KEY` in its environment.
+  The key stays on the server; the browser never sees it.
+- **Why Crema runs the tool calls itself** instead of giving Anthropic the MCP URL: Anthropic's hosted MCP connector
+  needs a publicly reachable server and a token, so a site on a private network or `localhost` would not work and
+  the user's session would leave the server.
+- **Who is shown as the editor:** the user who asked. Claude is not a Frappe user; every call uses that person's
+  session, so `owner` / `modified_by` and the version history name them, and only their permissions apply. Crema
+  adds a timeline note "via AI assistant" on each changed record and an **AI activity log** (who asked, what was
+  asked, what ran, result). A separate "AI Agent" user is only for later background jobs (e.g. nightly summaries).
+- **How changes happen:**
+  - Reads run at once (lists, counts, documents, schemas).
+  - **Create a document → Crema opens the new form already filled** (`/desk/<doctype>/new` with route options); the
+    user checks it and presses Save.
+  - Update / submit / cancel / delete / anything in bulk → a **confirm card** listing exactly what changes (fields
+    old → new, totals). Nothing runs until Confirm; submit, cancel and delete always ask separately.
+  - Setup changes (DocType, Custom Field, Client Script, Server Script, Report, Workflow, Print Format,
+    Notification) open as drafts in the matching builder (3.8, Print Format Builder, workflow builder) to review and
+    save. Server Scripts only where the site allows them (`server_script_enabled`); the assistant says so instead of
+    failing. Standard DocTypes are customised, never edited.
+  - After each change the open list / form refreshes (react-query invalidation), so the result shows at once.
+- **Context:** the current page (DocType, record, filters) goes with the question, so "this order" means the open one;
+  the site's "Agent Instructions" (System Settings → AI Agents) are added to the assistant's instructions.
+- **Controls:** on/off, roles allowed, per-user daily limit, model (default Claude Opus 5.5; fixed instructions and
+  tool list prompt-cached). The settings page states what data is sent to the AI provider.
+- **Delivery (one PR each, with e2e using a stub model so tests cost nothing):** (a) AI Settings + chat panel with
+  read-only tools; (b) filled new form + confirm cards for update / submit / cancel; (c) setup changes through the
+  builders; (d) timeline note, activity log and limits.
 
 ---
 
