@@ -7,6 +7,7 @@
  * "Card Break", charts, number_cards, quick_lists).
  */
 import Link from "next/link";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, FileText, BarChart3, LayoutGrid, Link2 } from "lucide-react";
 import { ChartCard, NumberCard, WidgetShell } from "@/components/desk/Widgets";
@@ -14,6 +15,7 @@ import { SidebarIcon } from "@/components/DeskSidebar";
 import { sidebarItemHref } from "@/lib/navigation";
 import OnboardingWidget, { type OnboardingData } from "@/components/desk/OnboardingWidget";
 import CustomBlock from "@/components/desk/CustomBlock";
+import { objectKey } from "@/components/desk/objectKey";
 
 interface Block {
   id?: string;
@@ -172,6 +174,96 @@ interface DesktopPage {
   custom_blocks?: { items: Array<{ custom_block_name: string }> };
 }
 
+/** The Workspace doc's `content`: its ordered blocks (bad JSON renders an empty workspace, like Desk) */
+function parseBlocks(content: string | undefined): Block[] {
+  try {
+    const parsed: unknown = JSON.parse(content || "[]");
+    return Array.isArray(parsed) ? (parsed as Block[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** links come flat: a "Card Break" row followed by its Link rows */
+function groupCards(links: LinkRow[] | undefined): Map<string, LinkRow[]> {
+  const cards = new Map<string, LinkRow[]>();
+  let current: LinkRow[] | null = null;
+  for (const l of links ?? []) {
+    if (l.type === "Card Break") {
+      current = [];
+      cards.set(l.label, current);
+    } else if (current) current.push(l);
+  }
+  return cards;
+}
+
+interface BlockProps {
+  d: Block["data"];
+  ws: WorkspaceDoc;
+  cards: Map<string, LinkRow[]>;
+  page?: DesktopPage;
+}
+
+function ShortcutBlock({ d, ws }: BlockProps) {
+  const s = ws.shortcuts?.find((x) => x.label === d.shortcut_name);
+  return s ? <div className={span(d.col ?? 3)}><Shortcut s={s} /></div> : null;
+}
+
+function CardBlock({ d, cards }: BlockProps) {
+  const links = cards.get(String(d.card_name)) ?? [];
+  return links.length ? <div className={span(d.col)}><LinkCard title={String(d.card_name)} links={links} /></div> : null;
+}
+
+function ChartBlock({ d, ws }: BlockProps) {
+  const c = ws.charts?.find((x) => x.chart_name === d.chart_name);
+  return <div className={span(d.col)}><ChartCard name={String(d.chart_name)} label={c?.label} /></div>;
+}
+
+function QuickListBlock({ d, ws }: BlockProps) {
+  const q = ws.quick_lists?.find((x) => (x.label || x.document_type) === d.quick_list_name);
+  return q ? <div className={span(d.col)}><QuickList q={q} /></div> : null;
+}
+
+function OnboardingBlock({ d, page }: BlockProps) {
+  const ob = page?.onboardings?.items.find((x) => x.label === d.onboarding_name);
+  return ob ? <div className="col-span-12"><OnboardingWidget key={ob.items.map((x) => `${x.name}:${x.is_complete}${x.is_skipped}`).join()} data={ob} /></div> : null;
+}
+
+function CustomBlockBlock({ d, page }: BlockProps) {
+  const allowed = page?.custom_blocks?.items.some((x) => x.custom_block_name === d.custom_block_name);
+  return allowed ? <div className={span(d.col)}><CustomBlock name={String(d.custom_block_name)} /></div> : null;
+}
+
+/** One content block (Desk workspace.js block types), placed on the 12-column grid; unknown types render nothing */
+function WorkspaceBlock({ b, ...rest }: Omit<BlockProps, "d"> & { b: Block }) {
+  const p: BlockProps = { d: b.data ?? {}, ...rest };
+  const { d } = p;
+  switch (b.type) {
+    case "header":
+      return <h2 className="col-span-12 mt-2 text-base font-semibold text-zinc-900 first:mt-0 dark:text-zinc-100">{stripHtml(d.text)}</h2>;
+    case "paragraph":
+      return <p className={`${span(d.col)} text-sm text-zinc-600 dark:text-zinc-400`}>{stripHtml(d.text)}</p>;
+    case "spacer":
+      return <div className={`${span(d.col)} h-2`} />;
+    case "shortcut":
+      return <ShortcutBlock {...p} />;
+    case "card":
+      return <CardBlock {...p} />;
+    case "chart":
+      return <ChartBlock {...p} />;
+    case "number_card":
+      return <div className={span(d.col ?? 4)}><NumberCard name={String(d.number_card_name)} /></div>;
+    case "quick_list":
+      return <QuickListBlock {...p} />;
+    case "onboarding":
+      return <OnboardingBlock {...p} />;
+    case "custom_block":
+      return <CustomBlockBlock {...p} />;
+    default:
+      return null;
+  }
+}
+
 export default function WorkspaceView({ name }: { name: string }) {
   const { data: ws, isLoading, error } = useQuery<WorkspaceDoc>({
     queryKey: ["workspace", name],
@@ -183,17 +275,17 @@ export default function WorkspaceView({ name }: { name: string }) {
     staleTime: 60_000,
   });
 
+  const blocks = useMemo(() => parseBlocks(ws?.content), [ws?.content]);
+  const cards = useMemo(() => groupCards(ws?.links), [ws?.links]);
+
   const hasDynamic = !!ws?.content && /"type":\s*"(onboarding|custom_block)"/.test(ws.content);
   const { data: page } = useQuery<DesktopPage>({
     queryKey: ["desktop-page", name],
     enabled: hasDynamic,
     queryFn: async () => {
-      const res = await fetch("/api/frappe/api/method/frappe.desk.desktop.get_desktop_page", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ page: JSON.stringify({ name, title: ws?.title ?? name, public: ws?.public ?? 1 }) }),
-      });
+      // a read (@frappe.read_only): GET, like any whitelisted getter
+      const params = new URLSearchParams({ page: JSON.stringify({ name, title: ws?.title ?? name, public: ws?.public ?? 1 }) });
+      const res = await fetch(`/api/frappe/api/method/frappe.desk.desktop.get_desktop_page?${params}`, { credentials: "include" });
       return res.ok ? ((await res.json()) as { message?: DesktopPage }).message ?? {} : {};
     },
     staleTime: 0,
@@ -209,68 +301,6 @@ export default function WorkspaceView({ name }: { name: string }) {
   }
   if (error || !ws) return <p className="p-6 text-sm text-red-600">{(error as Error)?.message}</p>;
 
-  let blocks: Block[] = [];
-  try {
-    blocks = JSON.parse(ws.content || "[]");
-  } catch {
-    blocks = [];
-  }
-
-  // links come flat: a "Card Break" row followed by its Link rows
-  const cards = new Map<string, LinkRow[]>();
-  let current: LinkRow[] | null = null;
-  for (const l of ws.links ?? []) {
-    if (l.type === "Card Break") {
-      current = [];
-      cards.set(l.label, current);
-    } else if (current) current.push(l);
-  }
-
-  const render = (b: Block, i: number) => {
-    const key = b.id ?? `${b.type}-${i}`;
-    const d = b.data ?? {};
-    switch (b.type) {
-      case "header":
-        return (
-          <h2 key={key} className="col-span-12 mt-2 text-base font-semibold text-zinc-900 first:mt-0 dark:text-zinc-100">
-            {stripHtml(d.text)}
-          </h2>
-        );
-      case "paragraph":
-        return <p key={key} className={`${span(d.col)} text-sm text-zinc-600 dark:text-zinc-400`}>{stripHtml(d.text)}</p>;
-      case "spacer":
-        return <div key={key} className={`${span(d.col)} h-2`} />;
-      case "shortcut": {
-        const s = ws.shortcuts?.find((x) => x.label === d.shortcut_name);
-        return s ? <div key={key} className={span(d.col ?? 3)}><Shortcut s={s} /></div> : null;
-      }
-      case "card": {
-        const links = cards.get(String(d.card_name)) ?? [];
-        return links.length ? <div key={key} className={span(d.col)}><LinkCard title={String(d.card_name)} links={links} /></div> : null;
-      }
-      case "chart": {
-        const c = ws.charts?.find((x) => x.chart_name === d.chart_name);
-        return <div key={key} className={span(d.col)}><ChartCard name={String(d.chart_name)} label={c?.label} /></div>;
-      }
-      case "number_card":
-        return <div key={key} className={span(d.col ?? 4)}><NumberCard name={String(d.number_card_name)} /></div>;
-      case "quick_list": {
-        const q = ws.quick_lists?.find((x) => (x.label || x.document_type) === d.quick_list_name);
-        return q ? <div key={key} className={span(d.col)}><QuickList q={q} /></div> : null;
-      }
-      case "onboarding": {
-        const ob = page?.onboardings?.items.find((x) => x.label === d.onboarding_name);
-        return ob ? <div key={key} className="col-span-12"><OnboardingWidget key={ob.items.map((x) => `${x.name}:${x.is_complete}${x.is_skipped}`).join()} data={ob} /></div> : null;
-      }
-      case "custom_block":
-        return page?.custom_blocks?.items.some((x) => x.custom_block_name === d.custom_block_name) ? (
-          <div key={key} className={span(d.col)}><CustomBlock name={String(d.custom_block_name)} /></div>
-        ) : null;
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -285,7 +315,12 @@ export default function WorkspaceView({ name }: { name: string }) {
           Edit
         </Link>
       </div>
-      <div className="grid grid-cols-12 gap-4">{blocks.map(render)}</div>
+      <div className="grid grid-cols-12 gap-4">
+        {blocks.map((b) => (
+          // Desk blocks carry an editor id; older content without one keys by the parsed block object
+          <WorkspaceBlock key={b.id ?? objectKey(b)} b={b} ws={ws} cards={cards} page={page} />
+        ))}
+      </div>
       {!blocks.length && <p className="text-sm text-zinc-500">This workspace is empty.</p>}
     </div>
   );

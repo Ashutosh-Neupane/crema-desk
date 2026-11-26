@@ -53,8 +53,9 @@ export default function DialogTable({ d, df: shown }: { d: DeskDialog; df: Dialo
                 <td colSpan={cols.length + 2} className="px-3 py-6 text-center text-sm text-zinc-500">No Data</td>
               </tr>
             )}
-            {rows.map((row: DialogRow, i) => (
-              <tr key={row.name ?? i} data-idx={row.idx} className="grid-row">
+            {rows.map((row: DialogRow) => (
+              // tableData() gives every row a name (grid.js row names), so it is the stable key
+              <tr key={String(row.name)} data-idx={row.idx} className="grid-row">
                 {canDelete && (
                   <td className="px-2 py-1.5">
                     <input

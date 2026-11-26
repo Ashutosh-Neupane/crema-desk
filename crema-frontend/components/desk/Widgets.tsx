@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, ExternalLink } from "lucide-react";
 import DeskChart from "@/components/desk/DeskChart";
-import { useDashboardChart, useNumberCard } from "@/lib/hooks/useDashboardChart";
+import { useDashboardChart, useNumberCard, type NumberCardResult } from "@/lib/hooks/useDashboardChart";
 import { formatCompact, formatValue } from "@/lib/utils/formatNumber";
 
 const TIMESPANS = ["Last Week", "Last Month", "Last Quarter", "Last Year"];
@@ -70,10 +70,46 @@ export function ChartCard({ name, label, height = 240, className }: { name: stri
   );
 }
 
+/** The card's figure: compact, with the exact value on hover (Desk number_card.js) */
+function NumberCardValue({ data }: { data?: NumberCardResult }) {
+  const value = data?.value;
+  let shown = "–";
+  if (value != null) shown = data?.fieldtype === "Currency" ? `${data.currency ?? ""} ${formatCompact(value)}`.trim() : formatCompact(value);
+  return (
+    <span
+      className="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50"
+      title={value != null ? formatValue(value, data?.fieldtype, data?.currency) : undefined}
+    >
+      {shown}
+    </span>
+  );
+}
+
+/** Percentage change against the previous interval */
+function NumberCardChange({ change, interval }: { change: number; interval: string }) {
+  const up = change >= 0;
+  return (
+    <span className={`inline-flex items-center text-xs font-medium ${up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+      {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+      {Math.abs(change).toFixed(1)}%
+      <span className="ml-1 font-normal text-zinc-400">vs last {interval.toLowerCase().replace(/ly$/, "")}</span>
+    </span>
+  );
+}
+
+function NumberCardBody({ data, isLoading, error }: { data?: NumberCardResult; isLoading: boolean; error: unknown }) {
+  if (isLoading) return <div className="mt-2 h-8 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />;
+  if (error) return <p className="mt-2 text-xs text-zinc-500">{(error as Error).message}</p>;
+  return (
+    <div className="mt-1.5 flex items-baseline gap-2">
+      <NumberCardValue data={data} />
+      {data?.change != null && <NumberCardChange change={data.change} interval={data.interval} />}
+    </div>
+  );
+}
+
 export function NumberCard({ name, label }: { name: string; label?: string }) {
   const { data, isLoading, error } = useNumberCard(name);
-  const value = data?.value;
-  const up = (data?.change ?? 0) >= 0;
   return (
     <section className="group relative min-w-0 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-start gap-2">
@@ -88,31 +124,7 @@ export function NumberCard({ name, label }: { name: string; label?: string }) {
           </Link>
         )}
       </div>
-      {isLoading ? (
-        <div className="mt-2 h-8 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-      ) : error ? (
-        <p className="mt-2 text-xs text-zinc-500">{(error as Error).message}</p>
-      ) : (
-        <div className="mt-1.5 flex items-baseline gap-2">
-          <span
-            className="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50"
-            title={value != null ? formatValue(value, data?.fieldtype, data?.currency) : undefined}
-          >
-            {value == null
-              ? "–"
-              : data?.fieldtype === "Currency"
-                ? `${data.currency ?? ""} ${formatCompact(value)}`.trim()
-                : formatCompact(value)}
-          </span>
-          {data?.change != null && (
-            <span className={`inline-flex items-center text-xs font-medium ${up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-              {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-              {Math.abs(data.change).toFixed(1)}%
-              <span className="ml-1 font-normal text-zinc-400">vs last {data.interval.toLowerCase().replace(/ly$/, "")}</span>
-            </span>
-          )}
-        </div>
-      )}
+      <NumberCardBody data={data} isLoading={isLoading} error={error} />
     </section>
   );
 }
