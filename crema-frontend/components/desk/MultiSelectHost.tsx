@@ -4,7 +4,8 @@
  * Renders frappe.ui.form.MultiSelectDialog opened by scripts (e.g. ERPNext "Get Items From").
  * Same search as Desk: frappe.desk.search.search_widget with setters as filters and filter_fields.
  */
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
 import { multiSelectStore, type MultiSelectDialog } from "@/lib/desk-runtime/multiSelect";
@@ -43,58 +44,59 @@ function MultiSelect({ d }: { d: MultiSelectDialog }) {
 
   const [values, setValues] = useState<Record<string, unknown>>(() => Object.fromEntries(setters.map((s) => [s.fieldname, s.default ?? ""])));
   const [txt, setTxt] = useState("");
-  const [results, setResults] = useState<Array<Record<string, unknown>>>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const filterFields = setters.map((s) => s.fieldname);
   const columns = opts.columns ?? ["name", ...filterFields, ...(opts.date_field ? [opts.date_field] : [])];
+  const readOnlySetters = useMemo(() => new Set(opts.read_only_setters ?? []), [opts.read_only_setters]);
 
+  // typing and setter changes search after a 250ms pause (Desk debounces the same way)
+  const [search, setSearch] = useState({ values, txt });
   useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const q = opts.get_query?.() ?? {};
-        const filters: unknown[][] = Object.entries(q.filters ?? {}).map(([k, v]) => (Array.isArray(v) ? [opts.doctype, k, v[0], v[1]] : [opts.doctype, k, "=", v]));
-        for (const s of setters) {
-          const v = values[s.fieldname];
-          if (v === "" || v == null) continue;
-          filters.push(s.df.fieldtype === "Data" ? [opts.doctype, s.fieldname, "like", `%${v}%`] : [opts.doctype, s.fieldname, "=", v]);
-        }
-        const { env } = await deskCall(
-          "frappe.desk.search.search_widget",
-          {
-            doctype: opts.doctype,
-            txt,
-            filters: JSON.stringify(filters),
-            filter_fields: JSON.stringify([...filterFields, ...(opts.date_field ? [opts.date_field] : [])]),
-            page_length: 30,
-            query: q.query ?? "",
-            query_filters_as_dict: 1,
-            as_dict: 1,
-          },
-          { get: true },
-        );
-        if (!cancelled) {
-          setResults(((env.message as Array<Record<string, unknown>>) ?? []).filter((r) => r && r.name));
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Search failed");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- values/txt drive searches; setters derive from opts
-  }, [values, txt, meta]);
+    const t = setTimeout(() => setSearch({ values, txt }), 250);
+    return () => clearTimeout(t);
+  }, [values, txt]);
 
-  const label = (fn: string) => (fn === "name" ? opts.doctype : (meta?.fields?.find((f) => f.fieldname === fn)?.label ?? fn));
+  const {
+    data: results = [],
+    isFetching: loading,
+    error: searchError,
+  } = useQuery({
+    queryKey: ["multi-select", d.id, opts.doctype, meta?.name ?? null, search],
+    queryFn: async () => {
+      const q = opts.get_query?.() ?? {};
+      const filters: unknown[][] = Object.entries(q.filters ?? {}).map(([k, v]) => (Array.isArray(v) ? [opts.doctype, k, v[0], v[1]] : [opts.doctype, k, "=", v]));
+      for (const s of setters) {
+        const v = search.values[s.fieldname];
+        if (v === "" || v == null) continue;
+        filters.push(s.df.fieldtype === "Data" ? [opts.doctype, s.fieldname, "like", `%${v}%`] : [opts.doctype, s.fieldname, "=", v]);
+      }
+      const { env } = await deskCall(
+        "frappe.desk.search.search_widget",
+        {
+          doctype: opts.doctype,
+          txt: search.txt,
+          filters: JSON.stringify(filters),
+          filter_fields: JSON.stringify([...filterFields, ...(opts.date_field ? [opts.date_field] : [])]),
+          page_length: 30,
+          query: q.query ?? "",
+          query_filters_as_dict: 1,
+          as_dict: 1,
+        },
+        { get: true },
+      );
+      return ((env.message as Array<Record<string, unknown>>) ?? []).filter((r) => r && r.name);
+    },
+    // keep the last rows on screen while the next search runs, like Desk
+    placeholderData: keepPreviousData,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+  const error = searchError ? (searchError instanceof Error ? searchError.message : "Search failed") : null;
+
+  const fieldsByName = useMemo(() => new Map((meta?.fields ?? []).map((f) => [f.fieldname, f])), [meta]);
+  const label = (fn: string) => (fn === "name" ? opts.doctype : (fieldsByName.get(fn)?.label ?? fn));
   const toggle = (n: string) =>
     setSelected((s) => {
       const x = new Set(s);
@@ -117,7 +119,7 @@ function MultiSelect({ d }: { d: MultiSelectDialog }) {
             <input aria-label="Search" placeholder="Search" value={txt} onChange={(e) => setTxt(e.target.value)} className={`${input} pl-7`} />
           </div>
           {setters.map((s) => {
-            const ro = opts.read_only_setters?.includes(s.fieldname);
+            const ro = readOnlySetters.has(s.fieldname);
             const v = String(values[s.fieldname] ?? "");
             const set = (nv: string) => setValues((x) => ({ ...x, [s.fieldname]: nv }));
             return s.df.fieldtype === "Link" && !ro ? (
@@ -151,21 +153,7 @@ function MultiSelect({ d }: { d: MultiSelectDialog }) {
             <tbody>
               {results.map((r) => {
                 const n = String(r.name);
-                return (
-                  <tr key={n} onClick={() => toggle(n)} className={`cursor-pointer border-t border-zinc-100 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40 ${selected.has(n) ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}>
-                    <td className="px-2 py-1.5 text-center">
-                      <input type="checkbox" aria-label={`Select ${n}`} checked={selected.has(n)} onChange={() => toggle(n)} onClick={(e) => e.stopPropagation()} />
-                    </td>
-                    {columns.map((c) => {
-                      const df = meta?.fields?.find((f) => f.fieldname === c);
-                      return (
-                        <td key={c} className="whitespace-nowrap px-3 py-1.5 text-zinc-800 dark:text-zinc-200">
-                          {df ? formatCell(r[c], df, r) : String(r[c] ?? "")}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
+                return <ResultRow key={n} row={r} name={n} columns={columns} fields={fieldsByName} checked={selected.has(n)} onToggle={toggle} />;
               })}
               {!loading && !results.length && (
                 <tr>
@@ -197,5 +185,44 @@ function MultiSelect({ d }: { d: MultiSelectDialog }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * One result: clicking anywhere on the row ticks it (Desk MultiSelectDialog). Every cell is a <label> for the row's
+ * checkbox, so the row needs no click handler of its own and the checkbox stays the one control.
+ */
+function ResultRow({
+  row,
+  name,
+  columns,
+  fields,
+  checked,
+  onToggle,
+}: {
+  row: Record<string, unknown>;
+  name: string;
+  columns: string[];
+  fields: Map<string, DocField>;
+  checked: boolean;
+  onToggle: (name: string) => void;
+}) {
+  const id = useId();
+  return (
+    <tr className={`cursor-pointer border-t border-zinc-100 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40 ${checked ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}>
+      <td className="px-2 py-1.5 text-center">
+        <input id={id} type="checkbox" aria-label={`Select ${name}`} checked={checked} onChange={() => onToggle(name)} />
+      </td>
+      {columns.map((c) => {
+        const df = fields.get(c);
+        return (
+          <td key={c} className="whitespace-nowrap p-0 text-zinc-800 dark:text-zinc-200">
+            <label htmlFor={id} className="block cursor-pointer px-3 py-1.5">
+              {df ? formatCell(row[c], df, row) : String(row[c] ?? "")}
+            </label>
+          </td>
+        );
+      })}
+    </tr>
   );
 }
