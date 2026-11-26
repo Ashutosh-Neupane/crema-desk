@@ -20,6 +20,7 @@ import type {
   WorkspaceData,
   InstalledApp,
 } from "@/lib/frappe/types";
+import { dashboardUrl, doctypeUrl, pageUrl, workspaceUrl } from "@/lib/navigation/deskUrl";
 
 export interface NavLinkItem {
   type: "link";
@@ -53,7 +54,7 @@ function workspaceToSection(page: WorkspaceSidebarItem): NavSection {
     type: "section",
     id: page.name,
     label: page.title ?? page.name,
-    href: `/desk/workspace/${encodeURIComponent(page.name)}`,
+    href: `${workspaceUrl(page.name)}`,
     icon: page.icon,
     color: page.indicator_color ?? "gray",
     app: (page as { app?: string }).app,
@@ -82,7 +83,7 @@ export function buildNavigationFromWorkspaces(
           return {
             type: "link",
             label: l.label ?? target,
-            href: linkType === "Page" ? `/desk/page/${encodeURIComponent(target)}` : `/desk/query-report/${encodeURIComponent(target)}`,
+            href: linkType === "Page" ? `${pageUrl(target)}` : `/desk/query-report/${encodeURIComponent(target)}`,
             icon: l.icon,
             color: l.color,
           };
@@ -103,7 +104,7 @@ export function buildNavigationFromWorkspaces(
         return {
           type: "link",
           label: l.label ?? target,
-          href: `/desk/doctype/${encodeURIComponent(target)}`,
+          href: `${doctypeUrl(target)}`,
           icon: l.icon,
           color: l.color,
         };
@@ -135,7 +136,7 @@ export const SYSTEM_NAV: NavSection[] = [
     items: [
       { type: "link", label: "Users", href: "/desk/users" },
       { type: "link", label: "Roles", href: "/desk/roles" },
-      { type: "link", label: "Permissions", href: "/desk/page/permission-manager" },
+      { type: "link", label: "Permissions", href: "/desk/permission-manager" },
       { type: "link", label: "Notes", href: "/desk/notes" },
       { type: "link", label: "Assignments", href: "/desk/assignments" },
       { type: "link", label: "Profile", href: "/desk/profile" },
@@ -230,15 +231,15 @@ export function sidebarItemHref(item: Pick<SidebarItem, "link_type" | "link_to" 
   const to = item.link_to ?? "";
   switch (item.link_type) {
     case "DocType":
-      return `/desk/doctype/${encodeURIComponent(to)}`;
+      return `${doctypeUrl(to)}`;
     case "Report":
       return `/desk/query-report/${encodeURIComponent(to)}`;
     case "Workspace":
-      return `/desk/workspace/${encodeURIComponent(to)}`;
+      return `${workspaceUrl(to)}`;
     case "Dashboard":
-      return `/desk/dashboard/${encodeURIComponent(to)}`;
+      return `${dashboardUrl(to)}`;
     case "Page":
-      return `/desk/page/${encodeURIComponent(to)}`;
+      return `${pageUrl(to)}`;
     case "URL":
       return item.url ?? null;
     default:

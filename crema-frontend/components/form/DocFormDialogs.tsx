@@ -9,6 +9,7 @@ import { editableBy, type WorkflowDoc, type WorkflowStatus } from "@/lib/form/wo
 import type { DocTypeMeta } from "@/lib/frappe/types";
 import { jumpableFields, pageErrorText } from "@/components/form/docFormRules";
 import { useBackdropClose } from "@/components/form/useBackdropClose";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 /** Desk pageview.js show_not_permitted / show_not_found */
 export function PageError({ error, doctype, name }: { error: { message: string; status?: number }; doctype: string; name?: string }) {
@@ -17,7 +18,7 @@ export function PageError({ error, doctype, name }: { error: { message: string; 
     <div className="mx-auto max-w-lg p-10 text-center" role="alert">
       <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{heading}</h1>
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{detail}</p>
-      <Link href={`/desk/doctype/${encodeURIComponent(doctype)}`} className="mt-4 inline-block text-sm text-zinc-600 underline">Back to {doctype} list</Link>
+      <Link href={`${doctypeUrl(doctype)}`} className="mt-4 inline-block text-sm text-zinc-600 underline">Back to {doctype} list</Link>
     </div>
   );
 }

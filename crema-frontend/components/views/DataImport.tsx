@@ -30,7 +30,7 @@ export default function DataImport() {
     <div className="mx-auto max-w-5xl space-y-5 p-6">
       <div>
         <div className="text-xs text-zinc-500">
-          <Link href="/desk/doctype/Data%20Import" className="hover:underline">
+          <Link href="/desk/data-import" className="hover:underline">
             Data Import
           </Link>
         </div>

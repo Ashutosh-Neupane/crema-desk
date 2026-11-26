@@ -25,6 +25,7 @@ import {
   type NavSection,
   type NavLinkItem,
 } from "@/lib/navigation";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 interface ModuleDef {
   name: string;
@@ -116,7 +117,7 @@ export async function GET() {
           ? "/desk/customize-form"
           : d.doctype === "System Settings"
             ? "/desk/settings"
-            : `/desk/doctype/${encodeURIComponent(d.doctype)}`,
+            : `${doctypeUrl(d.doctype)}`,
       })),
     ];
     // Probe in parallel (skipped when the boot tree is used) (was one request at a time on every page load)

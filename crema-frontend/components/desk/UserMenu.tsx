@@ -111,7 +111,7 @@ export default function UserMenu({
             <div className="truncate text-xs text-zinc-500">{email}</div>
           </div>
           <div className="py-1">
-            <DropdownMenuItem onClick={close(() => router.push(`/desk/doctype/User/${encodeURIComponent(ctx?.user ?? email ?? "")}`))}>
+            <DropdownMenuItem onClick={close(() => router.push(`/desk/user/${encodeURIComponent(ctx?.user ?? email ?? "")}`))}>
               <User className="h-4 w-4" /> My Settings
             </DropdownMenuItem>
             <DropdownMenuItem onClick={close(() => setSessionDefaults(true))}>

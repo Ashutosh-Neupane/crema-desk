@@ -17,6 +17,7 @@ import { fetchDoctypeMetaClient } from "@/lib/frappe/doctype";
 import { sidebarItemHref } from "@/lib/navigation";
 import type { WorkspaceSidebarItem } from "@/lib/frappe/types";
 import { docHref, parseFrappeDate, stripHtml, type Shortcut, type WorkItem } from "./data";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Row = Record<string, unknown>;
 
@@ -165,7 +166,7 @@ export async function fetchShortcuts(page: WorkspaceSidebarItem): Promise<Shortc
     const type = String(s.type ?? "");
     const href =
       type === "DocType" && s.doc_view === "New"
-        ? `/desk/doctype/${encodeURIComponent(s.link_to ?? "")}/new`
+        ? `${doctypeUrl(s.link_to ?? "")}/new`
         : sidebarItemHref({ link_type: type as never, link_to: s.link_to ?? null, url: s.url ?? null });
     if (!href) continue;
     out.push({ key: `${type}:${s.link_to ?? s.url}:${s.label}`, label: s.label || s.link_to || href, href, external: /^https?:/.test(href), type, doctype: type === "DocType" ? s.link_to : undefined });

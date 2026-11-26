@@ -19,6 +19,7 @@ import { PREFILL_KEY } from "@/lib/form/prefill";
 import { quickFields } from "@/components/form/quickEntryRules";
 import { useBackdropClose } from "@/components/form/useBackdropClose";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export { canQuickEntry } from "@/components/form/quickEntryRules";
 
@@ -77,7 +78,7 @@ export default function QuickEntry({
 
   const fullForm = () => {
     sessionStorage.setItem(PREFILL_KEY(meta.name), JSON.stringify({ ...initial, ...edits }));
-    router.push(`/desk/doctype/${encodeURIComponent(meta.name)}/new`);
+    router.push(`${doctypeUrl(meta.name)}/new`);
   };
 
   return (

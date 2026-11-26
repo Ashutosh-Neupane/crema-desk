@@ -37,7 +37,7 @@ export default function PrintFormatBuilderHost({ name, ui = "crema" }: { name: s
   if (ui === "crema") return <PrintBuilder name={name} deskHref={`${base}?ui=desk`} />;
   const classic = ui === "classic";
   const route = `${classic ? "print-format-builder" : "print-format-builder-beta"}/${encodeURIComponent(name)}`;
-  const formHref = `/desk/doctype/Print%20Format/${encodeURIComponent(name)}`;
+  const formHref = `/desk/print-format/${encodeURIComponent(name)}`;
   return (
     <div className="-mx-gutter -my-stack">
       <LegacyPage

@@ -66,14 +66,14 @@ function ListSettingsMenu({ doctype, meta, systemManager, appItems, onListSettin
         <Settings2 className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push(`/desk/customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
         <DropdownMenuItem onClick={onListSettings}>List settings</DropdownMenuItem>
         {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
         <DropdownMenuItem onClick={onExport}>Export</DropdownMenuItem>
         {/* Desk list_view.js: System Manager only */}
-        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/User%20Permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
-        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/page/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
+        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/user-permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
+        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
         {/* page.add_menu_item from the app's listview_settings */}
         {appItems.length > 0 && <DropdownMenuSeparator />}
         {appItems.map((m) => (

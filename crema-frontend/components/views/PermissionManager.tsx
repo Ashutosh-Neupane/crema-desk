@@ -14,6 +14,7 @@ import { Loader2, Plus, RotateCcw, Users, X } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
 import LinkInput from "@/components/list/LinkInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const PM = "frappe.core.page.permission_manager.permission_manager";
 const enc = encodeURIComponent;
@@ -113,7 +114,7 @@ export default function PermissionManager({ doctype }: { doctype: string }) {
     <div className="space-y-4 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-lg font-semibold text-zinc-900 dark:text-zinc-100">Role Permissions Manager</h1>
-        <Link href="/desk/doctype/User%20Permission" className={btn}>
+        <Link href="/desk/user-permission" className={btn}>
           <Users className="h-4 w-4" aria-hidden /> Set User Permissions
         </Link>
         {doctype && (
@@ -205,7 +206,7 @@ function PermRow({ p, rights, busy, onToggle, onRemove, onUsers }: RowActions & 
   return (
     <tr aria-label={`${p.parent} ${p.role} level ${p.permlevel}`} className="border-t border-zinc-100 align-top dark:border-zinc-800">
       <td className="px-3 py-3">
-        <Link href={`/desk/doctype/${enc(p.parent)}`} className="text-zinc-900 hover:underline dark:text-zinc-100">
+        <Link href={`${doctypeUrl(p.parent)}`} className="text-zinc-900 hover:underline dark:text-zinc-100">
           {p.parent}
         </Link>
       </td>
@@ -321,7 +322,7 @@ function RoleUsers({ role, onClose }: { role: string; onClose: () => void }) {
           <ul className="max-h-72 space-y-1 overflow-auto text-sm" aria-label={`Users with ${role}`}>
             {data.map((u) => (
               <li key={u}>
-                <Link href={`/desk/doctype/User/${enc(u)}`} className="block truncate rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <Link href={`/desk/user/${enc(u)}`} className="block truncate rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                   {u}
                 </Link>
               </li>

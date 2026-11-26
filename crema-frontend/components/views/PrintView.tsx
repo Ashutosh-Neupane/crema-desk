@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import { frappeErrorMessage, parseServerMessages } from "@/lib/frappe/errors";
 import { useDoctype } from "@/lib/hooks/useDoctype";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 const sel = "h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
@@ -94,7 +95,7 @@ export default function PrintView({ doctype, name }: { doctype: string; name: st
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
-        <Link href={`/desk/doctype/${enc(doctype)}/${enc(name)}`} className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
+        <Link href={`${doctypeUrl(doctype)}/${enc(name)}`} className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
           <ArrowLeft className="h-4 w-4" aria-hidden /> {name}
         </Link>
         <h1 className="sr-only">

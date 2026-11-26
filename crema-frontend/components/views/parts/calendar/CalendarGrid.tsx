@@ -5,6 +5,7 @@ import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSe
 import { Plus } from "lucide-react";
 import { weekdayMonthDay } from "../dateLabels";
 import { STYLE, enc, pad, ymd, type CalEvent, type CalendarMode } from "./shared";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -57,7 +58,7 @@ export function CalendarGrid({ doctype, mode, cursor, days, byDay, styleMap, onD
                   id={`ev:${e.id}:${k}`}
                   ev={e}
                   cls={STYLE[styleMap?.[e.status ?? ""] ?? "default"] ?? STYLE.default}
-                  href={`/desk/doctype/${enc(doctype)}/${enc(e.id)}`}
+                  href={`${doctypeUrl(doctype)}/${enc(e.id)}`}
                 />
               ))}
               {mode === "month" && list.length > 4 && (

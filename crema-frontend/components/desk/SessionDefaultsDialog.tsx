@@ -108,7 +108,7 @@ export default function SessionDefaultsDialog({ open, onClose, isSystemManager }
         <DialogFooter className="gap-2 sm:justify-between">
           {isSystemManager ? (
             <Link
-              href="/desk/doctype/Session%20Default%20Settings/Session%20Default%20Settings"
+              href="/desk/session-default-settings/Session%20Default%20Settings"
               onClick={close}
               className="text-sm text-zinc-600 underline-offset-4 hover:underline dark:text-zinc-300"
             >

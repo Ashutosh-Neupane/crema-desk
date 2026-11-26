@@ -18,6 +18,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import type { DocField } from "@/lib/frappe/types";
 import LinkField from "./LinkField";
 import type { FieldControlProps } from "./index";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Row = Record<string, unknown> & { name?: string };
 
@@ -38,7 +39,7 @@ function Pill({ doctype, value, onRemove }: { doctype: string; value: string; on
   const label = (isTitleLink && title) || value;
   return (
     <span data-pill={value} className="inline-flex max-w-full items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-      <Link href={`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(value)}`} title={label !== value ? value : undefined} className="truncate hover:underline">
+      <Link href={`${doctypeUrl(doctype)}/${encodeURIComponent(value)}`} title={label !== value ? value : undefined} className="truncate hover:underline">
         {label}
       </Link>
       {onRemove && (

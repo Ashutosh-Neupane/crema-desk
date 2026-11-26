@@ -6,6 +6,7 @@ import { redirect, RedirectType, useRouter } from "next/navigation";
 import type { DocTypeMeta } from "@/lib/frappe/types";
 import { canQuickEntry } from "@/components/form/QuickEntry";
 import { docHref, newDocHref, type ListSettings } from "@/components/list/listModel";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const hasPrimaryAction = (settings: ListSettings) => typeof settings?.primary_action === "function";
 
@@ -25,7 +26,7 @@ export function useListRedirects({ doctype, meta, settings, view, wantNew }: { d
   }, [wantNew, settings]);
 
   if (meta?.issingle) redirect(docHref(doctype, doctype), RedirectType.replace);
-  if (meta?.is_tree && view !== "list") redirect(`/desk/doctype/${encodeURIComponent(doctype)}/view/tree`, RedirectType.replace);
+  if (meta?.is_tree && view !== "list") redirect(`${doctypeUrl(doctype)}/view/tree`, RedirectType.replace);
   if (wantNew && meta && settings !== undefined && !hasPrimaryAction(settings)) redirect(newDocHref(doctype), RedirectType.push);
 }
 

@@ -12,6 +12,7 @@ import type { Runtime } from "@/lib/desk-runtime";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { SBDialog, type SBRow } from "./SerialBatchDialog";
 import type { ShimOptions } from "./index";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- ERPNext child rows / frm are untyped Desk objects */
 type Fn = (...a: any[]) => any;
@@ -387,7 +388,7 @@ export function install(rt: Runtime, opts: ShimOptions) {
           voucher_type: this.frm.doc.doctype,
         };
         sessionStorage.setItem(PREFILL_KEY(doc.doctype), JSON.stringify(doc));
-        opts.navigate?.(`/desk/doctype/${encodeURIComponent(doc.doctype)}/new`);
+        opts.navigate?.(`${doctypeUrl(doc.doctype)}/new`);
       } else {
         void frappe.set_route("Form", "Serial and Batch Bundle", bundle_id);
       }

@@ -14,6 +14,7 @@ import { INDICATOR_PILL } from "@/lib/list/indicator";
 import type { CustomButton } from "@/lib/form/FormController";
 import type { Transition } from "@/lib/form/workflow";
 import type { PrimaryAction } from "@/components/form/docFormRules";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 const btnCls = "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
@@ -133,7 +134,7 @@ function MoreMenu({ doctype, name, can, allowCopy, canRename, canDelete, isSyste
         <MoreHorizontal className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        {can("create") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}><Plus className="h-4 w-4" /> New {doctype}</DropdownMenuItem>}
+        {can("create") && <DropdownMenuItem onClick={() => router.push(`${doctypeUrl(doctype)}/new`)}><Plus className="h-4 w-4" /> New {doctype}</DropdownMenuItem>}
         {can("create") && allowCopy && <DropdownMenuItem onClick={onDuplicate}><CopyPlus className="h-4 w-4" /> Duplicate</DropdownMenuItem>}
         <DropdownMenuItem onClick={onReload}><RefreshCw className="h-4 w-4" /> Reload</DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push(`/desk/print/${enc(doctype)}/${enc(name)}`)}><Printer className="h-4 w-4" /> Print</DropdownMenuItem>
@@ -145,8 +146,8 @@ function MoreMenu({ doctype, name, can, allowCopy, canRename, canDelete, isSyste
         {isSystemManager && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize%20Form/Customize%20Form?doc_type=${enc(doctype)}`)}><Settings2 className="h-4 w-4" /> Customize</DropdownMenuItem>
-            {developerMode && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}><FileCode className="h-4 w-4" /> Edit DocType</DropdownMenuItem>}
+            <DropdownMenuItem onClick={() => router.push(`/desk/customize-form/Customize%20Form?doc_type=${enc(doctype)}`)}><Settings2 className="h-4 w-4" /> Customize</DropdownMenuItem>
+            {developerMode && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}`)}><FileCode className="h-4 w-4" /> Edit DocType</DropdownMenuItem>}
           </>
         )}
         {canDelete && (

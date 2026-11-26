@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import type { DocTypeMeta } from "@/lib/frappe/types";
 import type { GroupBy } from "@/lib/report/groupBy";
 import GroupByEditor from "./GroupByEditor";
-import { btn, enc, primaryBtn } from "./shared";
+import { btn, primaryBtn } from "./shared";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export function ReportViewHeader({
   doctype,
@@ -47,7 +48,7 @@ export function ReportViewHeader({
     <div className="flex flex-wrap items-center gap-2">
       <div className="min-w-0 flex-1">
         <div className="text-xs text-zinc-500">
-          <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+          <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
             {doctype}
           </Link>
           {" / Report"}
@@ -55,7 +56,7 @@ export function ReportViewHeader({
         <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{reportName ?? `${doctype} Report`}</h1>
       </div>
       <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-        <Link href={`/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
           List
         </Link>
         <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
@@ -80,7 +81,7 @@ export function ReportViewHeader({
           </DropdownMenuItem>
           {reportName && <DropdownMenuItem onClick={onSaveAs}>Save As…</DropdownMenuItem>}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}/new`)}>New {doctype}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push(`${doctypeUrl(doctype)}/new`)}>New {doctype}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

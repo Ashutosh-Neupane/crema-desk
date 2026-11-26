@@ -17,6 +17,7 @@ import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import LinkInput from "@/components/list/LinkInput";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 interface TreeNode {
   value: string;
@@ -143,7 +144,7 @@ export default function TreeView({ doctype }: { doctype: string }) {
   const addChild = (parent: string) => {
     const prefill: Record<string, unknown> = { [parentField]: parent || undefined, ...args };
     sessionStorage.setItem(PREFILL_KEY(doctype), JSON.stringify(prefill));
-    router.push(`/desk/doctype/${enc(doctype)}/new`);
+    router.push(`${doctypeUrl(doctype)}/new`);
   };
 
   const q = query.trim().toLowerCase();
@@ -169,7 +170,7 @@ export default function TreeView({ doctype }: { doctype: string }) {
               {loading.has(n.value) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronRight className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`} />}
             </button>
             {expandable ? (isOpen ? <FolderOpen className="h-4 w-4 text-amber-500" /> : <Folder className="h-4 w-4 text-amber-500" />) : <File className="h-4 w-4 text-zinc-400" />}
-            <Link href={`/desk/doctype/${enc(doctype)}/${enc(n.value)}`} className="min-w-0 flex-1 truncate text-sm text-zinc-800 hover:underline dark:text-zinc-100">
+            <Link href={`${doctypeUrl(doctype)}/${enc(n.value)}`} className="min-w-0 flex-1 truncate text-sm text-zinc-800 hover:underline dark:text-zinc-100">
               {label}
               {label !== n.value && <span className="ml-2 text-xs text-zinc-400">{n.value}</span>}
             </Link>
@@ -192,7 +193,7 @@ export default function TreeView({ doctype }: { doctype: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{String(settings?.title ?? doctype)}</h1>
         <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
-          <Link href={`/desk/doctype/${enc(doctype)}?view=list`} className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">List</Link>
+          <Link href={`${doctypeUrl(doctype)}?view=list`} className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">List</Link>
           <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100">Tree</span>
         </div>
         <button type="button" onClick={() => addChild(root?.value ?? "")} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">

@@ -13,6 +13,7 @@ import type { DocTypeMeta } from "@/lib/frappe/types";
 import { fetchCount, fetchRows, type Filter } from "@/lib/list/api";
 import { fieldLabel } from "@/components/list/filters";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 const PAGE = 40;
@@ -51,7 +52,7 @@ export default function ImageView({ doctype }: { doctype: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-xs text-zinc-500">
-            <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+            <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
               {doctype}
             </Link>
             {" / Images"}
@@ -59,7 +60,7 @@ export default function ImageView({ doctype }: { doctype: string }) {
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{doctype}</h1>
         </div>
         <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-          <Link href={`/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+          <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
             List
           </Link>
           <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
@@ -97,7 +98,7 @@ function ImageCard({ row, doctype, imageField, titleField }: { row: Row; doctype
   const title = String(row[titleField] || row.name);
   return (
     <li>
-      <Link href={`/desk/doctype/${enc(doctype)}/${enc(row.name)}`} className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
+      <Link href={`${doctypeUrl(doctype)}/${enc(row.name)}`} className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
         <div className="flex aspect-square items-center justify-center bg-zinc-50 dark:bg-zinc-800/60">
           {img ? (
             // eslint-disable-next-line @next/next/no-img-element -- served by the Frappe file proxy at runtime

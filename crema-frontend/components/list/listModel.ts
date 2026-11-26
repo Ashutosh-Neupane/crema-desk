@@ -7,6 +7,7 @@ import type { ListColumnSetting } from "@/lib/list/useListViewSettings";
 import type { UserSettings } from "@/lib/list/useUserListState";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { NO_VALUE } from "@/components/list/filterModel";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export type Sort = { field: string; order: "asc" | "desc" };
 export type ListSettings = Record<string, unknown> | undefined;
@@ -29,8 +30,8 @@ const STD_COLUMNS: Record<string, Partial<DocField>> = {
 export const toOrder = (v: unknown): Sort["order"] => (String(v).toLowerCase() === "asc" ? "asc" : "desc");
 export const defaultSortOf = (meta: DocTypeMeta | undefined): Sort => ({ field: String(meta?.sort_field || "modified"), order: toOrder(meta?.sort_order || "desc") });
 export const titleFieldOf = (meta: DocTypeMeta | undefined) => (typeof meta?.title_field === "string" ? meta.title_field : "");
-export const docHref = (doctype: string, name: string) => `/desk/doctype/${enc(doctype)}/${enc(name)}`;
-export const newDocHref = (doctype: string) => `/desk/doctype/${enc(doctype)}/new`;
+export const docHref = (doctype: string, name: string) => `${doctypeUrl(doctype)}/${enc(name)}`;
+export const newDocHref = (doctype: string) => `${doctypeUrl(doctype)}/new`;
 
 /** the list URL for a set of filters: simple equality filters read nicely (?status=Draft), others go in ?filters= */
 export function listUrl(pathname: string, next: Filter[], search: string, view: string | null) {
@@ -127,7 +128,7 @@ export function sortableFields(meta: DocTypeMeta) {
 /** only the views that make sense for the DocType */
 export function listViews(meta: DocTypeMeta | undefined, doctype: string): Array<{ id: string; label: string; href: string }> {
   if (!meta) return [];
-  const base = `/desk/doctype/${enc(doctype)}`;
+  const base = `${doctypeUrl(doctype)}`;
   const v = [
     { id: "list", label: "List", href: `${base}${meta.is_tree ? "?view=list" : ""}` },
     { id: "report", label: "Report", href: `${base}/view/report` },

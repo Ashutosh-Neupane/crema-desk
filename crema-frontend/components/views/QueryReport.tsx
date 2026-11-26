@@ -44,17 +44,11 @@ function makeRenderer(settings: Settings | null, fmtCtx: { currency?: string; da
   };
 }
 
-/** Desk-style /app/<doctype-slug>/<name> → Crema's /desk/doctype/<DocType>/<name> */
+/** A Desk link (`/app/<slug>/<name>`, Desk's old prefix) → the same Desk URL under /desk, which Crema serves */
 function deskHref(href: string): string | null {
   if (href.startsWith("/desk/")) return href;
   const m = href.match(/^\/app\/(.+)$/);
-  if (!m) return null;
-  const [slug, ...rest] = m[1].split("/");
-  const dt = slug
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-  return `/desk/doctype/${enc(dt)}${rest.length ? `/${rest.join("/")}` : ""}`;
+  return m ? `/desk/${m[1]}` : null;
 }
 
 function downloadCsv(name: string, rows: ReportRow[], columns: ReportColumn[]) {

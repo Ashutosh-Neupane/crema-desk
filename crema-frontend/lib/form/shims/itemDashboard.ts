@@ -9,6 +9,7 @@
 import type { Runtime } from "@/lib/desk-runtime";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import type { ShimOptions } from "./index";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Row = {
   item_code: string;
@@ -50,7 +51,7 @@ export function install(rt: Runtime, opts: ShimOptions) {
         const doc = (r as { message?: Record<string, unknown> }).message;
         if (!doc?.doctype) return;
         sessionStorage.setItem(PREFILL_KEY(String(doc.doctype)), JSON.stringify(doc));
-        opts.navigate?.(`/desk/doctype/${encodeURIComponent(String(doc.doctype))}/new`);
+        opts.navigate?.(`${doctypeUrl(String(doc.doctype))}/new`);
       },
     });
   erpnext.make_stock_entry = makeStockEntry;
@@ -146,7 +147,7 @@ export function install(rt: Runtime, opts: ShimOptions) {
         if (!a) return;
         const name = a.dataset.name ?? "";
         const doctype = a.dataset.type === "warehouse" ? "Warehouse" : "Item";
-        opts.navigate?.(`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`);
+        opts.navigate?.(`${doctypeUrl(doctype)}/${encodeURIComponent(name)}`);
       });
     }
 

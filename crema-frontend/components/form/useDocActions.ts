@@ -20,6 +20,7 @@ import type { DocTypeMeta } from "@/lib/frappe/types";
 import { META_EDITORS, copyForNew } from "@/components/form/docFormRules";
 import type { ConfirmKind } from "@/components/form/DocFormDialogs";
 import type { Loaded } from "@/components/form/useDocForm";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 type Busy = null | "save" | "submit" | "cancel" | "delete";
@@ -89,7 +90,7 @@ export function useDocActions({
       afterSave();
       toast.success(action === "Submit" ? "Submitted" : action === "Update" ? "Updated" : "Saved");
       if (wasNew) {
-        router.replace(`/desk/doctype/${enc(doctype)}/${enc(saved.name)}`);
+        router.replace(`${doctypeUrl(doctype)}/${enc(saved.name)}`);
         return;
       }
       // docinfo (versions, comments) came back with the save; the controller already holds the saved doc
@@ -141,7 +142,7 @@ export function useDocActions({
           ...(list.sort_order ? { sort_order: list.sort_order } : {}),
         });
         const next = typeof env.message === "string" ? env.message : "";
-        if (next) router.push(`/desk/doctype/${enc(doctype)}/${enc(next)}${window.location.hash}`);
+        if (next) router.push(`${doctypeUrl(doctype)}/${enc(next)}${window.location.hash}`);
         else toast.info(messages[0] ?? "No further records");
       } catch (e) {
         toastError(e, "Could not open the next document");
@@ -158,7 +159,7 @@ export function useDocActions({
     [
       { keys: "mod+s", description: "Save", group: "Form", allowInInput: true, action: () => docstatusNow() === 0 && void run("save", "Save") },
       { keys: "mod+j", description: "Jump to field", group: "Form", allowInInput: true, action: () => setJumpOpen(true) },
-      { keys: "mod+b", description: `New ${doctype}`, group: "Form", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) },
+      { keys: "mod+b", description: `New ${doctype}`, group: "Form", allowInInput: true, action: () => router.push(`${doctypeUrl(doctype)}/new`) },
       { keys: "shift+mod+d", description: "Delete", group: "Form", action: () => savedDoc() && docstatusNow() !== 1 && setConfirm("delete") },
       { keys: "shift+r", description: "Reload", group: "Form", action: () => void load() },
       { keys: "shift+mod+>", description: "Next document", group: "Form", action: () => void navigate(false) },
@@ -203,7 +204,7 @@ export function useDocActions({
       await deleteDoc(doctype, c.docname);
       toast.success(`${doctype} ${c.docname} deleted`);
       qc.invalidateQueries({ queryKey: ["list", doctype] });
-      router.push(`/desk/doctype/${enc(doctype)}`);
+      router.push(`${doctypeUrl(doctype)}`);
     } catch (e) {
       toastError(e, "Delete failed", { duration: 10000 });
       setBusy(null);
@@ -226,7 +227,7 @@ export function useDocActions({
     const copy = copyForNew(meta, c.getDoc());
     if (amend) copy.amended_from = c.docname;
     sessionStorage.setItem(PREFILL_KEY(doctype), JSON.stringify(copy));
-    router.push(`/desk/doctype/${enc(doctype)}/new`);
+    router.push(`${doctypeUrl(doctype)}/new`);
   };
 
   return { busy, confirm, setConfirm, confirmed, missing, setMissing, run, navigate, openCopy, jumpOpen, setJumpOpen };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { DONE, contentKeys, enc, strip, type LogRow, type Status } from "./shared";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 /** "Row 2, 3" from the log's JSON row_indexes */
 function rowLabel(l: LogRow) {
@@ -46,7 +47,7 @@ export function ImportProgress({ status, logs, doctype, di }: { status: Status; 
           {status.total_records ? ` of ${status.total_records}` : ""}
         </span>
         {done && doctype && (
-          <Link href={`/desk/doctype/${enc(doctype)}`} className="ml-auto text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
+          <Link href={`${doctypeUrl(doctype)}`} className="ml-auto text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
             Open {doctype} list
           </Link>
         )}
@@ -68,7 +69,7 @@ export function ImportProgress({ status, logs, doctype, di }: { status: Status; 
           Created:{" "}
           {created.map((l, i) => (
             <span key={l.docname}>
-              <Link href={`/desk/doctype/${enc(doctype)}/${enc(String(l.docname))}`} className="underline">
+              <Link href={`${doctypeUrl(doctype)}/${enc(String(l.docname))}`} className="underline">
                 {l.docname}
               </Link>
               {i < created.length - 1 ? ", " : ""}
@@ -77,7 +78,7 @@ export function ImportProgress({ status, logs, doctype, di }: { status: Status; 
         </p>
       )}
       {di && (
-        <Link href={`/desk/doctype/Data%20Import/${enc(di)}`} className="text-xs text-zinc-500 underline">
+        <Link href={`/desk/data-import/${enc(di)}`} className="text-xs text-zinc-500 underline">
           View Data Import record
         </Link>
       )}

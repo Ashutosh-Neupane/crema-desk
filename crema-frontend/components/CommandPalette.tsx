@@ -20,6 +20,7 @@ import { useUIStore } from "@/lib/stores/ui.store";
 import type { AwesomebarIndex } from "@/app/api/awesomebar/route";
 import { calculate } from "@/lib/search/calculator";
 import { newDoctypeQuery, score, searchInQuery } from "@/lib/search/awesomebar";
+import { doctypeUrl, workspaceUrl } from "@/lib/navigation/deskUrl";
 
 const MAX_PER_GROUP = 8;
 
@@ -104,7 +105,7 @@ export default function CommandPalette() {
       listEntries.push({
         id: `list:${d.name}`,
         label: d.single ? d.name : `${d.name} List`,
-        href: d.single ? `/desk/doctype/${enc(d.name)}/${enc(d.name)}` : `/desk/doctype/${enc(d.name)}`,
+        href: d.single ? `${doctypeUrl(d.name)}/${enc(d.name)}` : `${doctypeUrl(d.name)}`,
         icon: d.single ? Settings2 : List,
         key: d.name,
       });
@@ -113,7 +114,7 @@ export default function CommandPalette() {
         createEntries.push({
           id: `new:${d.name}`,
           label: `New ${d.name}`,
-          href: `/desk/doctype/${enc(d.name)}/new`,
+          href: `${doctypeUrl(d.name)}/new`,
           icon: Plus,
           key: d.name,
         });
@@ -131,7 +132,7 @@ export default function CommandPalette() {
       id: `ws:${w.name}`,
       label: w.name,
       hint: w.module,
-      href: `/desk/workspace/${enc(w.name)}`,
+      href: `${workspaceUrl(w.name)}`,
       icon: LayoutGrid,
       key: w.name,
     }));
@@ -145,7 +146,7 @@ export default function CommandPalette() {
     const inQuery = searchInQuery(search);
     const findEntries: Entry[] = inQuery
       ? rank(
-          (index?.doctypes ?? []).filter((d) => !d.single).map((d) => ({ id: `find:${d.name}`, label: `Find ${inQuery.text} in ${d.name}`, href: `/desk/doctype/${enc(d.name)}?q=${enc(inQuery.text)}`, icon: Search, key: d.name })),
+          (index?.doctypes ?? []).filter((d) => !d.single).map((d) => ({ id: `find:${d.name}`, label: `Find ${inQuery.text} in ${d.name}`, href: `${doctypeUrl(d.name)}?q=${enc(inQuery.text)}`, icon: Search, key: d.name })),
           inQuery.target.toLowerCase(),
         )
       : [];
@@ -260,7 +261,7 @@ export default function CommandPalette() {
                       <Command.Item
                         key={`doc:${r.doctype}:${r.name}`}
                         value={`doc:${r.doctype}:${r.name}`}
-                        onSelect={() => r.doctype && r.name && go(`/desk/doctype/${enc(r.doctype)}/${enc(r.name)}`)}
+                        onSelect={() => r.doctype && r.name && go(`${doctypeUrl(r.doctype)}/${enc(r.name)}`)}
                         className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-zinc-100 dark:data-[selected=true]:bg-zinc-800"
                       >
                         <FileText className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />

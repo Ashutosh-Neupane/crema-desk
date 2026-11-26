@@ -14,6 +14,7 @@ import { deskCall } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { MultiSelectDialog, type MultiSelectOptions } from "@/lib/desk-runtime/multiSelect";
 import { installShims } from "./shims";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 /** A fresh copy of a filters / query object per call, like JSON.parse(JSON.stringify(x)) did: undefined and functions
  * are dropped and Dates become strings, so a script mutating the returned filters never changes the original */
@@ -165,7 +166,7 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
     const doc = env.message as Record<string, unknown> | undefined;
     if (!doc?.doctype) return;
     sessionStorage.setItem(PREFILL_KEY(String(doc.doctype)), JSON.stringify(doc));
-    opts.navigate?.(`/desk/doctype/${encodeURIComponent(String(doc.doctype))}/new`);
+    opts.navigate?.(`${doctypeUrl(String(doc.doctype))}/new`);
   };
   // erpnext.utils.map_current_doc — "Get Items From → Sales Order" etc. (ERPNext bundle: public/js/utils.js):
   // pick sources in MultiSelectDialog, then frappe.model.mapper.map_docs onto this unsaved doc
@@ -228,6 +229,6 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
     };
   }
   frappe.model.can_set_user_permissions = () => false;
-  (frappe.ui.form as Record<string, unknown>).make_quick_entry = (dt: string) => opts.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`);
+  (frappe.ui.form as Record<string, unknown>).make_quick_entry = (dt: string) => opts.navigate?.(`${doctypeUrl(dt)}/new`);
   installShims(rt, opts);
 }

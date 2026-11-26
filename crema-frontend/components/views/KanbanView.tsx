@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { PAGE, useKanbanBoard, type Board, type BoardColumn, type Card } from "./parts/kanban/useKanbanBoard";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 const btn = "inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800";
@@ -61,13 +62,13 @@ export function KanbanBoards({ doctype }: { doctype: string }) {
   // one board → open it straight away (Desk remembers the last board); the skeleton below stays up meanwhile
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/nextjs-no-client-side-redirect -- the board list only exists after a client query (Desk session), so there is nothing to redirect on server-side
-    if (only) router.replace(`/desk/doctype/${enc(doctype)}/view/kanban/${enc(only)}`);
+    if (only) router.replace(`${doctypeUrl(doctype)}/view/kanban/${enc(only)}`);
   }, [only, doctype, router]);
 
   return (
     <div className="mx-auto max-w-xl space-y-4 p-6">
       <div className="text-xs text-zinc-500">
-        <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+        <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
           {doctype}
         </Link>
         {" / Kanban"}
@@ -79,7 +80,7 @@ export function KanbanBoards({ doctype }: { doctype: string }) {
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {boards?.map((b) => (
             <li key={b.name}>
-              <Link href={`/desk/doctype/${enc(doctype)}/view/kanban/${enc(b.name)}`} className="block px-4 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              <Link href={`${doctypeUrl(doctype)}/view/kanban/${enc(b.name)}`} className="block px-4 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                 {b.name}
               </Link>
             </li>
@@ -105,7 +106,7 @@ function NewBoardDialog({ open, onClose, meta }: { open: boolean; onClose: () =>
       const { env } = await deskCall("frappe.desk.doctype.kanban_board.kanban_board.quick_kanban_board", { doctype: meta.name, board_name: name.trim(), field_name: field });
       const b = env.message as { name: string };
       onClose();
-      router.push(`/desk/doctype/${enc(meta.name)}/view/kanban/${enc(b.name)}`);
+      router.push(`${doctypeUrl(meta.name)}/view/kanban/${enc(b.name)}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create board", { duration: 8000 });
     }
@@ -164,7 +165,7 @@ export default function KanbanView({ doctype, boardName }: { doctype: string; bo
   const addCard = (col: string) => {
     if (!board) return;
     sessionStorage.setItem(PREFILL_KEY(doctype), JSON.stringify({ [board.field_name]: col }));
-    router.push(`/desk/doctype/${enc(doctype)}/new`);
+    router.push(`${doctypeUrl(doctype)}/new`);
   };
 
   const error = metaError ?? kb.boardError;
@@ -248,21 +249,21 @@ function BoardHeader({
     <div className="flex flex-wrap items-center gap-2">
       <div className="min-w-0 flex-1">
         <div className="text-xs text-zinc-500">
-          <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+          <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
             {doctype}
           </Link>
           {" / "}
-          <Link href={`/desk/doctype/${enc(doctype)}/view/kanban`} className="hover:underline">
+          <Link href={`${doctypeUrl(doctype)}/view/kanban`} className="hover:underline">
             Kanban
           </Link>
         </div>
         <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{board.name}</h1>
       </div>
       <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-        <Link href={`/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
           List
         </Link>
-        <Link href={`/desk/doctype/${enc(doctype)}/view/report`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <Link href={`${doctypeUrl(doctype)}/view/report`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
           Report
         </Link>
         <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
@@ -285,7 +286,7 @@ function BoardHeader({
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Kanban%20Board/${enc(board.name)}`)}>Board settings</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push(`/desk/kanban-board/${enc(board.name)}`)}>Board settings</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -415,7 +416,7 @@ function KanbanCard({
   return (
     <article className="group rounded-lg border border-zinc-200 bg-white p-3 text-sm shadow-sm hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700">
       <div className="flex items-start gap-2">
-        <Link href={`/desk/doctype/${enc(doctype)}/${enc(card.name)}`} className="min-w-0 flex-1 font-medium text-zinc-900 hover:underline dark:text-zinc-100" onPointerDown={(e) => e.stopPropagation()}>
+        <Link href={`${doctypeUrl(doctype)}/${enc(card.name)}`} className="min-w-0 flex-1 font-medium text-zinc-900 hover:underline dark:text-zinc-100" onPointerDown={(e) => e.stopPropagation()}>
           {title}
         </Link>
         <DropdownMenu>

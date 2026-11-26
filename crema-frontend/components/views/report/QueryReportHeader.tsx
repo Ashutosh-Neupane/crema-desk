@@ -3,7 +3,8 @@
 /** Query report page header: breadcrumb, title, report JS inner buttons and the Desk menu actions (query_report.js). */
 import Link from "next/link";
 import { BarChart3, Download, FileText, RefreshCw, Save } from "lucide-react";
-import { enc, type InnerButton, type PreparedState } from "./queryReportTypes";
+import { type InnerButton, type PreparedState } from "./queryReportTypes";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const outline = "inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 gap-1.5 border border-zinc-200 bg-white px-3 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 const solid = "inline-flex items-center justify-center rounded-lg font-medium disabled:opacity-50 h-8 gap-1.5 bg-zinc-900 px-3 text-sm text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white";
@@ -18,7 +19,7 @@ function Breadcrumb({ name, refDoctype }: { name: string; refDoctype?: string })
         {refDoctype && (
           <>
             {" / "}
-            <Link href={`/desk/doctype/${enc(refDoctype)}`} className="hover:underline">
+            <Link href={`${doctypeUrl(refDoctype)}`} className="hover:underline">
               {refDoctype}
             </Link>
           </>
