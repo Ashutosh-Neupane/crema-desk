@@ -10,12 +10,36 @@ import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useAnchoredPosition } from "@/lib/hooks/useAnchoredPosition";
 import type { FieldControlProps } from "./index";
-import { useMultiOptions } from "./multiOptions";
+import { multiValues, useMultiOptions } from "./multiOptions";
 
-export function multiValues(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
-  return [];
+function boxClass(readOnly: boolean, error: unknown) {
+  if (readOnly) return "border-transparent bg-zinc-100 dark:bg-zinc-800/70";
+  return error ? "border-red-500" : "border-zinc-300 focus-within:border-zinc-500 dark:border-zinc-700";
+}
+
+function Pill({ value, label, onRemove }: { value: string; label: string; onRemove?: () => void }) {
+  return (
+    <span data-pill={value} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+      {label}
+      {onRemove && (
+        <button type="button" aria-label={`Remove ${label}`} onClick={onRemove} className="rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700">
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+type KeyActions = { count: number; setActive: (f: (a: number) => number) => void; pick: () => void; removeLast: () => void; close: () => void };
+
+// the suggestion box's keys (Desk awesomplete): arrows move, Enter takes, Backspace in the empty box drops the last pill
+function onSuggestKey(e: React.KeyboardEvent<HTMLInputElement>, k: KeyActions) {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") e.preventDefault();
+  if (e.key === "ArrowDown") k.setActive((a) => Math.min(a + 1, k.count - 1));
+  else if (e.key === "ArrowUp") k.setActive((a) => Math.max(a - 1, 0));
+  else if (e.key === "Enter") k.pick();
+  else if (e.key === "Backspace" && !e.currentTarget.value) k.removeLast();
+  else if (e.key === "Escape") k.close();
 }
 
 export default function MultiselectField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
@@ -46,17 +70,10 @@ export default function MultiselectField({ field, inputId, value, onChange, disa
     <div
       ref={anchor}
       data-fieldname={field.fieldname}
-      className={`flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 ${readOnly ? "border-transparent bg-zinc-100 dark:bg-zinc-800/70" : error ? "border-red-500" : "border-zinc-300 focus-within:border-zinc-500 dark:border-zinc-700"} bg-white dark:bg-zinc-900`}
+      className={`flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 ${boxClass(readOnly, error)} bg-white dark:bg-zinc-900`}
     >
       {selected.map((v) => (
-        <span key={v} data-pill={v} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pl-2 pr-1 text-xs text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-          {labelOf(v)}
-          {!readOnly && (
-            <button type="button" aria-label={`Remove ${labelOf(v)}`} onClick={() => emit(selected.filter((s) => s !== v))} className="rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700">
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </span>
+        <Pill key={v} value={v} label={labelOf(v)} onRemove={readOnly ? undefined : () => emit(selected.filter((s) => s !== v))} />
       ))}
       {readOnly && !selected.length && <span className="text-sm text-zinc-400">—</span>}
       {!readOnly && (
@@ -79,19 +96,15 @@ export default function MultiselectField({ field, inputId, value, onChange, disa
             setOpen(true);
             setActive(0);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              setActive((a) => Math.min(a + 1, offered.length - 1));
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setActive((a) => Math.max(a - 1, 0));
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              if (offered[active]) add(offered[active].value);
-            } else if (e.key === "Backspace" && !txt && selected.length) emit(selected.slice(0, -1));
-            else if (e.key === "Escape") setOpen(false);
-          }}
+          onKeyDown={(e) =>
+            onSuggestKey(e, {
+              count: offered.length,
+              setActive,
+              pick: () => offered[active] && add(offered[active].value),
+              removeLast: () => selected.length && emit(selected.slice(0, -1)),
+              close: () => setOpen(false),
+            })
+          }
           className="min-w-[8rem] flex-1 bg-transparent px-1 py-1 text-sm text-zinc-900 focus:outline-none dark:text-zinc-100"
         />
       )}

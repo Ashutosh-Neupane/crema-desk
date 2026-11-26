@@ -6,6 +6,13 @@
 import { useEffect, useState } from "react";
 import type { DocField } from "@/lib/frappe/types";
 
+/** a multi-value field's value as a list: an array, or MultiSelect's comma-separated "a, b" */
+export function multiValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
 export interface MultiOption {
   label: string;
   value: string;

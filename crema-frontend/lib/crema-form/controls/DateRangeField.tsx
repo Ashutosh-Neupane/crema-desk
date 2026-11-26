@@ -9,7 +9,7 @@ import { useState } from "react";
 import DatePicker from "@/components/form/DatePicker";
 import type { FieldControlProps } from "./index";
 
-export function parseDateRange(value: unknown): [string, string] {
+function parseDateRange(value: unknown): [string, string] {
   let v: unknown = value;
   if (typeof v === "string") {
     const t = v.trim();

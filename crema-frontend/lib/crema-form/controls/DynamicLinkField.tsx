@@ -69,9 +69,9 @@ export default function DynamicLinkField({ field, inputId, value, onChange, disa
       )}
       {showDropdown && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-          {results.map((item, i) => (
+          {results.map((item) => (
             <button
-              key={i}
+              key={item.value}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => selectResult(item)}

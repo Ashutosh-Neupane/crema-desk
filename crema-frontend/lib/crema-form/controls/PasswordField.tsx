@@ -19,23 +19,45 @@ const STRENGTH: Array<[string, string, number]> = [
   ["Excellent", "bg-green-500", 100],
 ];
 
-export default function PasswordField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
-  const str = value == null ? "" : String(value);
-  const [show, setShow] = useState(false);
-  const [score, setScore] = useState<{ for: string; score: number } | null>(null);
-  const readOnly = disabled || !!field.read_only;
-  const masked = str.includes("*");
+type Strength = (typeof STRENGTH)[number];
 
+/** test_password_strength for what was typed, debounced 500 ms; null for a masked / empty / read-only value */
+function usePasswordStrength(str: string, enabled: boolean): Strength | null {
+  const [score, setScore] = useState<{ for: string; score: number } | null>(null);
   useEffect(() => {
-    if (!str || masked || readOnly) return;
+    if (!enabled) return;
     const t = setTimeout(() => {
       void frappeMethod<{ score?: number }>("frappe.core.doctype.user.user.test_password_strength", { new_password: str })
         .then((r) => typeof r?.score === "number" && setScore({ for: str, score: r.score }))
         .catch(() => undefined);
     }, 500);
     return () => clearTimeout(t);
-  }, [str, masked, readOnly]);
-  const strength = score && score.for === str && str && !masked ? STRENGTH[Math.max(0, Math.min(4, score.score))] : null;
+  }, [str, enabled]);
+  if (!enabled || score?.for !== str) return null;
+  return STRENGTH[Math.max(0, Math.min(4, score.score))];
+}
+
+function StrengthMeter({ strength: [label, colour, width] }: { strength: Strength }) {
+  return (
+    <div className="mt-1.5" data-password-strength={label}>
+      <div className="text-xs text-zinc-600 dark:text-zinc-400">{label}</div>
+      <div role="progressbar" aria-label="Password strength" aria-valuenow={width} aria-valuemin={0} aria-valuemax={100} className="mt-0.5 h-1 w-full rounded bg-zinc-200 dark:bg-zinc-700">
+        <div className={`h-1 rounded ${colour}`} style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
+
+const inputClass = (error: unknown, readOnly: boolean) =>
+  `w-full rounded-lg border px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 dark:bg-zinc-900 dark:text-zinc-100 ${error ? "border-red-500 focus:ring-red-500/20" : "border-zinc-300 focus:border-zinc-500 focus:ring-zinc-900/10 dark:border-zinc-700"} ${readOnly ? "cursor-not-allowed bg-zinc-100 dark:bg-zinc-800" : "bg-white"}`;
+
+export default function PasswordField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
+  const str = value == null ? "" : String(value);
+  const [show, setShow] = useState(false);
+  const readOnly = disabled || !!field.read_only;
+  const masked = str.includes("*");
+  const editable = !masked && !readOnly;
+  const strength = usePasswordStrength(str, editable && !!str);
 
   return (
     <div>
@@ -51,9 +73,9 @@ export default function PasswordField({ field, inputId, value, onChange, disable
           onChange={(e) => onChange(e.target.value || null)}
           disabled={readOnly}
           placeholder={String(field.placeholder ?? "")}
-          className={`w-full rounded-lg border px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 dark:bg-zinc-900 dark:text-zinc-100 ${error ? "border-red-500 focus:ring-red-500/20" : "border-zinc-300 focus:border-zinc-500 focus:ring-zinc-900/10 dark:border-zinc-700"} ${readOnly ? "cursor-not-allowed bg-zinc-100 dark:bg-zinc-800" : "bg-white"}`}
+          className={inputClass(error, readOnly)}
         />
-        {!masked && !readOnly && (
+        {editable && (
           <button
             aria-label={show ? "Hide password" : "Show password"}
             type="button"
@@ -64,14 +86,7 @@ export default function PasswordField({ field, inputId, value, onChange, disable
           </button>
         )}
       </div>
-      {strength && (
-        <div className="mt-1.5" data-password-strength={strength[0]}>
-          <div className="text-xs text-zinc-600 dark:text-zinc-400">{strength[0]}</div>
-          <div role="progressbar" aria-label="Password strength" aria-valuenow={strength[2]} aria-valuemin={0} aria-valuemax={100} className="mt-0.5 h-1 w-full rounded bg-zinc-200 dark:bg-zinc-700">
-            <div className={`h-1 rounded ${strength[1]}`} style={{ width: `${strength[2]}%` }} />
-          </div>
-        </div>
-      )}
+      {strength && <StrengthMeter strength={strength} />}
     </div>
   );
 }

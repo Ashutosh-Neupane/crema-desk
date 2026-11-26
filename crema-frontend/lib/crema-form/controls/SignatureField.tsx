@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import type { FieldControlProps } from "./index";
 import { Button } from "@/components/shadcn/button";
 
 export default function SignatureField({ field, value, onChange, disabled }: FieldControlProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
+  /** mid-stroke; a ref, since nothing on screen depends on it */
+  const drawing = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,7 +39,7 @@ export default function SignatureField({ field, value, onChange, disabled }: Fie
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
     if (disabled || field.read_only) return;
-    setDrawing(true);
+    drawing.current = true;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
@@ -48,7 +49,7 @@ export default function SignatureField({ field, value, onChange, disabled }: Fie
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!drawing || disabled || field.read_only) return;
+    if (!drawing.current || disabled || field.read_only) return;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
@@ -59,8 +60,8 @@ export default function SignatureField({ field, value, onChange, disabled }: Fie
   };
 
   const endDraw = () => {
-    if (!drawing) return;
-    setDrawing(false);
+    if (!drawing.current) return;
+    drawing.current = false;
     const canvas = canvasRef.current;
     if (canvas) {
       onChange(canvas.toDataURL("image/png"));
