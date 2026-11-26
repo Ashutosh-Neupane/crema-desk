@@ -5,8 +5,8 @@ import { start, BASE } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
-// any Sales Order and Letter Head on the site; skipped when there is none
-const SO = (await api("api/resource/Sales%20Order?limit_page_length=1&order_by=creation%20desc")).data?.[0]?.name;
+// any Sales Order that may be printed (Print Settings can refuse cancelled ones) and Letter Head; skipped when there is none
+const SO = (await api(`api/resource/Sales%20Order?limit_page_length=1&order_by=creation%20desc&filters=${encodeURIComponent(JSON.stringify([["docstatus", "<", 2]]))}`)).data?.[0]?.name;
 const LH = (await api("api/resource/Letter%20Head?limit_page_length=1")).data?.[0]?.name;
 const formats = ((await api(`api/resource/Print%20Format?filters=${encodeURIComponent(JSON.stringify([["doc_type", "=", "Sales Order"], ["disabled", "=", 0]]))}&limit_page_length=20`)).data ?? []).map((f) => f.name);
 if (!SO) {
