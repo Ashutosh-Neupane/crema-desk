@@ -41,8 +41,8 @@ export default function Breadcrumbs() {
     const isData = index >= 2 && ((DATA_ROUTES.has(segments[1]) && !ROUTE_WORDS.has(label)) || !isSlug);
     const display = LABEL_OVERRIDES[label] || (isData ? label : label.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
 
-    return { href, label: display, isLast };
-  });
+    return { href, label: display, isLast, skip: segment === "view" && index >= 2 };
+  }).filter((i) => !i.skip); // "/view/" only joins a doctype and its view ("Event / Calendar"); /desk/event/view is no page
 
   if (items.length === 0) return null;
 
