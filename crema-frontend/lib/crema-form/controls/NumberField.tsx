@@ -9,12 +9,10 @@
 import { useState } from "react";
 import type { FieldControlProps } from "./index";
 import { formatCell } from "@/lib/list/format";
-import { flt, getFieldCurrency, getFieldPrecision } from "@/lib/frappe/format";
+import { flt, getFieldPrecision } from "@/lib/frappe/format";
+import { currencyFor } from "./currency";
 
-/** frappe.meta.get_field_currency — the field's currency field, "Company:company:default_currency", or the default */
-export function currencyFor(field: FieldControlProps["field"], doc?: Record<string, unknown>): string | undefined {
-  return getFieldCurrency(field, doc, (doc?.currency as string) || undefined);
-}
+export { currencyFor } from "./currency";
 
 export default function NumberField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
   const [editing, setEditing] = useState<string | null>(null);

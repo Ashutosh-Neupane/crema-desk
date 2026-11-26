@@ -34,9 +34,10 @@ export default function TableField({ field, value, onChange, disabled }: FieldCo
   }, [meta]);
 
   const addRow = useCallback(() => {
-    const newRow: Record<string, unknown> = { idx: rows.length };
+    // frappe.model.add_child: a local row named "new-<doctype>-<random>", which also keys it here
+    const newRow: Record<string, unknown> = { idx: rows.length, name: `new-${childDoctype.toLowerCase().replace(/\s+/g, "-")}-${crypto.randomUUID().slice(0, 10)}`, __islocal: 1 };
     onChange([...rows, newRow]);
-  }, [rows, onChange]);
+  }, [rows, onChange, childDoctype]);
 
   const removeRow = useCallback((index: number) => {
     onChange(rows.filter((_, i) => i !== index));
@@ -83,7 +84,7 @@ export default function TableField({ field, value, onChange, disabled }: FieldCo
               </tr>
             ) : (
               rows.map((row, i) => (
-                <tr key={String(row.name) || i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <tr key={String(row.name)} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                   <td className="px-3 py-2 text-sm text-zinc-500">{i + 1}</td>
                   {childFields.map((f) => (
                     <td key={f.fieldname} className="px-3 py-2">

@@ -176,17 +176,46 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* States */}
+        <StatesCard
+          states={config.states}
+          onAdd={addState}
+          onEdit={(state) => {
+            setEditingState(state);
+            setStateDialogOpen(true);
+          }}
+          onRemove={removeState}
+        />
+        <TransitionsCard transitions={config.transitions} onAdd={addTransition} onRemove={removeTransition} />
+      </div>
+
+      <WorkflowDiagram states={config.states} />
+
+      <StateDialog open={stateDialogOpen} onOpenChange={setStateDialogOpen} state={editingState} setState={setEditingState} states={config.states} onSave={saveState} />
+
+      <TransitionDialog
+        open={transitionDialogOpen}
+        onOpenChange={setTransitionDialogOpen}
+        transition={editingTransition}
+        setTransition={setEditingTransition}
+        states={config.states}
+        onSave={saveTransition}
+      />
+    </div>
+  );
+}
+
+function StatesCard({ states, onAdd, onEdit, onRemove }: { states: WorkflowState[]; onAdd: () => void; onEdit: (state: WorkflowState) => void; onRemove: (name: string) => void }) {
+  return (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">States</h3>
-            <Button variant="outline" size="sm" onClick={addState}>
+            <Button variant="outline" size="sm" onClick={onAdd}>
               <Plus className="h-3 w-3 mr-1" />
               Add State
             </Button>
           </div>
           <div className="space-y-2">
-            {config.states.map((state) => (
+            {states.map((state) => (
               <div
                 key={state.name}
                 className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
@@ -218,10 +247,7 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0"
-                    onClick={() => {
-                      setEditingState(state);
-                      setStateDialogOpen(true);
-                    }}
+                    onClick={() => onEdit(state)}
                   >
                     <GripVertical className="h-3 w-3" />
                   </Button>
@@ -229,30 +255,33 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 text-red-500"
-                    onClick={() => removeState(state.name)}
+                    onClick={() => onRemove(state.name)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               </div>
             ))}
-            {config.states.length === 0 && (
+            {states.length === 0 && (
               <p className="text-sm text-zinc-500 text-center py-4">No states defined</p>
             )}
           </div>
         </Card>
+  );
+}
 
-        {/* Transitions */}
+function TransitionsCard({ transitions, onAdd, onRemove }: { transitions: WorkflowTransition[]; onAdd: () => void; onRemove: (name: string) => void }) {
+  return (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Transitions</h3>
-            <Button variant="outline" size="sm" onClick={addTransition}>
+            <Button variant="outline" size="sm" onClick={onAdd}>
               <Plus className="h-3 w-3 mr-1" />
               Add Transition
             </Button>
           </div>
           <div className="space-y-2">
-            {config.transitions.map((trans) => (
+            {transitions.map((trans) => (
               <div
                 key={trans.name}
                 className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
@@ -266,24 +295,26 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
                   variant="ghost"
                   size="sm"
                   className="h-7 w-7 p-0 text-red-500"
-                  onClick={() => removeTransition(trans.name)}
+                  onClick={() => onRemove(trans.name)}
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
             ))}
-            {config.transitions.length === 0 && (
+            {transitions.length === 0 && (
               <p className="text-sm text-zinc-500 text-center py-4">No transitions defined</p>
             )}
           </div>
         </Card>
-      </div>
+  );
+}
 
-      {/* Visual workflow diagram */}
+function WorkflowDiagram({ states }: { states: WorkflowState[] }) {
+  return (
       <Card className="p-6">
         <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-4">Workflow Diagram</h3>
         <div className="flex items-center justify-center gap-2 flex-wrap">
-          {config.states.map((state, i) => (
+          {states.map((state, i) => (
             <div key={state.name} className="flex items-center gap-2">
               <div className="flex flex-col items-center gap-1">
                 <div
@@ -295,37 +326,56 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
                 {state.isInitial && <span className="text-[10px] text-blue-500">START</span>}
                 {state.isFinal && <span className="text-[10px] text-green-500">END</span>}
               </div>
-              {i < config.states.length - 1 && (
+              {i < states.length - 1 && (
                 <ArrowRight className="h-5 w-5 text-zinc-400" />
               )}
             </div>
           ))}
         </div>
-        {config.states.length === 0 && (
+        {states.length === 0 && (
           <p className="text-sm text-zinc-500 text-center">Add states to see the workflow diagram</p>
         )}
       </Card>
+  );
+}
 
-      {/* State dialog */}
-      <Dialog open={stateDialogOpen} onOpenChange={setStateDialogOpen}>
+type Setter<T> = React.Dispatch<React.SetStateAction<T | null>>;
+
+function StateDialog({
+  open,
+  onOpenChange,
+  state,
+  setState,
+  states,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  state: WorkflowState | null;
+  setState: Setter<WorkflowState>;
+  states: WorkflowState[];
+  onSave: () => void;
+}) {
+  return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingState && config.states.some(s => s.name === editingState.name) ? "Edit State" : "Add State"}</DialogTitle>
+            <DialogTitle>{state && states.some(s => s.name === state.name) ? "Edit State" : "Add State"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Name</Label>
               <Input
-                value={editingState?.name ?? ""}
-                onChange={(e) => setEditingState((prev) => prev ? { ...prev, name: e.target.value } : null)}
+                value={state?.name ?? ""}
+                onChange={(e) => setState((prev) => prev ? { ...prev, name: e.target.value } : null)}
                 className="mt-1"
               />
             </div>
             <div>
               <Label>Title</Label>
               <Input
-                value={editingState?.title ?? ""}
-                onChange={(e) => setEditingState((prev) => prev ? { ...prev, title: e.target.value } : null)}
+                value={state?.title ?? ""}
+                onChange={(e) => setState((prev) => prev ? { ...prev, title: e.target.value } : null)}
                 className="mt-1"
               />
             </div>
@@ -333,8 +383,8 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               <Label>Color</Label>
               <input aria-label="State color"
                 type="color"
-                value={editingState?.color ?? "#3b82f6"}
-                onChange={(e) => setEditingState((prev) => prev ? { ...prev, color: e.target.value } : null)}
+                value={state?.color ?? "#3b82f6"}
+                onChange={(e) => setState((prev) => prev ? { ...prev, color: e.target.value } : null)}
                 className="mt-1 h-10 w-full rounded-lg border border-zinc-300 p-1 dark:border-zinc-700"
               />
             </div>
@@ -342,8 +392,8 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={editingState?.isInitial ?? false}
-                  onChange={(e) => setEditingState((prev) => prev ? { ...prev, isInitial: e.target.checked } : null)}
+                  checked={state?.isInitial ?? false}
+                  onChange={(e) => setState((prev) => prev ? { ...prev, isInitial: e.target.checked } : null)}
                   className="rounded border-zinc-300"
                 />
                 Initial State
@@ -351,8 +401,8 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={editingState?.isFinal ?? false}
-                  onChange={(e) => setEditingState((prev) => prev ? { ...prev, isFinal: e.target.checked } : null)}
+                  checked={state?.isFinal ?? false}
+                  onChange={(e) => setState((prev) => prev ? { ...prev, isFinal: e.target.checked } : null)}
                   className="rounded border-zinc-300"
                 />
                 Final State
@@ -360,14 +410,31 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStateDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveState}>Save</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={onSave}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+  );
+}
 
-      {/* Transition dialog */}
-      <Dialog open={transitionDialogOpen} onOpenChange={setTransitionDialogOpen}>
+function TransitionDialog({
+  open,
+  onOpenChange,
+  transition,
+  setTransition,
+  states,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transition: WorkflowTransition | null;
+  setTransition: Setter<WorkflowTransition>;
+  states: WorkflowState[];
+  onSave: () => void;
+}) {
+  return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Transition</DialogTitle>
@@ -376,8 +443,8 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             <div>
               <Label>Action</Label>
               <Input
-                value={editingTransition?.action ?? ""}
-                onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, action: e.target.value } : null)}
+                value={transition?.action ?? ""}
+                onChange={(e) => setTransition((prev) => prev ? { ...prev, action: e.target.value } : null)}
                 className="mt-1"
               />
             </div>
@@ -385,11 +452,11 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               <div>
                 <Label>From State</Label>
                 <select aria-label="From state"
-                  value={editingTransition?.fromState ?? ""}
-                  onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, fromState: e.target.value } : null)}
+                  value={transition?.fromState ?? ""}
+                  onChange={(e) => setTransition((prev) => prev ? { ...prev, fromState: e.target.value } : null)}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
                 >
-                  {config.states.map((s) => (
+                  {states.map((s) => (
                     <option key={s.name} value={s.name}>{s.title}</option>
                   ))}
                 </select>
@@ -397,11 +464,11 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
               <div>
                 <Label>To State</Label>
                 <select aria-label="To state"
-                  value={editingTransition?.toState ?? ""}
-                  onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, toState: e.target.value } : null)}
+                  value={transition?.toState ?? ""}
+                  onChange={(e) => setTransition((prev) => prev ? { ...prev, toState: e.target.value } : null)}
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
                 >
-                  {config.states.map((s) => (
+                  {states.map((s) => (
                     <option key={s.name} value={s.name}>{s.title}</option>
                   ))}
                 </select>
@@ -410,8 +477,8 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             <div>
               <Label>Condition (optional)</Label>
               <Input
-                value={editingTransition?.condition ?? ""}
-                onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, condition: e.target.value } : null)}
+                value={transition?.condition ?? ""}
+                onChange={(e) => setTransition((prev) => prev ? { ...prev, condition: e.target.value } : null)}
                 placeholder="e.g. doc.total > 0"
                 className="mt-1"
               />
@@ -419,19 +486,18 @@ export function WorkflowBuilder({ doctype, initialConfig, onSave }: WorkflowBuil
             <div>
               <Label>Allowed Roles (comma-separated)</Label>
               <Input
-                value={editingTransition?.allowedRoles?.join(", ") ?? ""}
-                onChange={(e) => setEditingTransition((prev) => prev ? { ...prev, allowedRoles: e.target.value.split(",").map(r => r.trim()) } : null)}
+                value={transition?.allowedRoles?.join(", ") ?? ""}
+                onChange={(e) => setTransition((prev) => prev ? { ...prev, allowedRoles: e.target.value.split(",").map(r => r.trim()) } : null)}
                 placeholder="e.g. System Manager, Accounts Manager"
                 className="mt-1"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTransitionDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveTransition}>Save</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={onSave}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
   );
 }

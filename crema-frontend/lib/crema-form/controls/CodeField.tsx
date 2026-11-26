@@ -15,206 +15,69 @@
  */
 import { useState } from "react";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
-import { autocompletion, type CompletionContext } from "@codemirror/autocomplete";
-import { javascript } from "@codemirror/lang-javascript";
-import { python } from "@codemirror/lang-python";
-import { html } from "@codemirror/lang-html";
-import { css } from "@codemirror/lang-css";
-import { json } from "@codemirror/lang-json";
-import { sql } from "@codemirror/lang-sql";
-import { markdown } from "@codemirror/lang-markdown";
-import type { Extension } from "@codemirror/state";
 import { Check, Copy } from "lucide-react";
 import { useResolvedTheme } from "@/lib/hooks/useResolvedTheme";
 import { markdownToHtml } from "@/lib/frappe/markdown";
 import { sanitizeHtml } from "@/lib/report/columns";
-import { uploadFile } from "@/lib/frappe/upload";
 import type { FieldControlProps } from "./index";
+import { codeSizing, completionsFrom, jsonParseError, languageFor, markdownImageDrop, warnUnknownLanguage } from "./codeEditor";
 
-/** code.js set_language language_map (Desk's option names, exact case); Golang has no CodeMirror mode here */
-const LANGUAGES: Record<string, () => Extension[]> = {
-  Javascript: () => [javascript()],
-  JS: () => [javascript()],
-  Python: () => [python()],
-  Py: () => [python()],
-  PythonExpression: () => [python()],
-  HTML: () => [html()],
-  Jinja: () => [html()],
-  CSS: () => [css()],
-  SCSS: () => [css()],
-  Markdown: () => [markdown()],
-  JSON: () => [json()],
-  SQL: () => [sql()],
-};
+const SMALL_BUTTON =
+  "rounded-md border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
 
-/** the option name for a field: HTML Editor forces HTML, Markdown Editor defaults to Markdown, JSON is JSON */
-export function languageOption(options: unknown, fieldtype?: string): string {
-  if (fieldtype === "HTML Editor") return "HTML";
-  if (fieldtype === "JSON") return "JSON";
-  const o = typeof options === "string" ? options.trim() : "";
-  if (fieldtype === "Markdown Editor" && !o) return "Markdown";
-  return o;
-}
-
-export function languageFor(options: unknown, fieldtype?: string): Extension[] {
-  return LANGUAGES[languageOption(options, fieldtype)]?.() ?? [];
-}
-
-type Completion = string | { value: string; caption?: string; meta?: string; score?: number };
-type CompletionGetter = (ctx: { prefix: string }) => Completion[];
-
-/** code.js setup_autocompletion: items (or getters) offered once a word has been started */
-function completionsFrom(source: unknown): Extension[] {
-  if (!source || (Array.isArray(source) && source.length === 0)) return [];
-  const getters: CompletionGetter[] = (Array.isArray(source) && source.every((s) => typeof s === "function") ? source : [source]).map((g) =>
-    typeof g === "function" ? (g as CompletionGetter) : () => g as Completion[],
-  );
-  return [
-    autocompletion({
-      override: [
-        (ctx: CompletionContext) => {
-          const word = ctx.matchBefore(/[\w.$]+/);
-          if (!word || word.from === word.to) return null;
-          const prefix = word.text;
-          const items = getters.flatMap((g) => {
-            try {
-              return g({ prefix }) ?? [];
-            } catch {
-              return [];
-            }
-          });
-          return {
-            from: word.from,
-            options: items.map((a) => (typeof a === "string" ? { label: a } : { label: a.value, displayLabel: a.caption, detail: a.meta, boost: a.score })),
-            validFor: /^[\w.$]*$/,
-          };
-        },
-      ],
-    }),
-  ];
-}
-
-export default function CodeField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
-  const theme = useResolvedTheme();
-  const text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 4);
-  const readOnly = disabled || !!field.read_only;
-  const ft = field.fieldtype;
-  const previewKind = ft === "Markdown Editor" ? "markdown" : ft === "HTML Editor" ? "html" : null;
-  const [preview, setPreview] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+/** read-only Code: Copy to Clipboard (code.js) */
+function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  const [dropMsg, setDropMsg] = useState<string | null>(null);
-  const docRef = { doctype: doc?.doctype as string | undefined, name: doc?.name as string | undefined, isNew: !!doc?.__islocal };
-  const label = field.label || field.fieldname;
-
-  const opt = languageOption(field.options, ft);
-  if (opt && !LANGUAGES[opt] && opt !== "Golang" && opt !== "Go") {
-    console.warn(`Invalid language option provided for field "${label}". Valid options are ${Object.keys(LANGUAGES).join(", ")}, Golang, Go.`);
-  }
-  const autocompletions = (field as { autocompletions?: unknown }).autocompletions;
-  const wrap = !!field.wrap || !!previewKind;
-  const imageDrop =
-    ft === "Markdown Editor" && !readOnly
-      ? [
-          EditorView.domEventHandlers({
-            drop(e, view) {
-              const files = e.dataTransfer?.files;
-              if (!files?.length) return false;
-              e.preventDefault();
-              if (!files[0].type.includes("image")) {
-                setDropMsg("You can only insert images in Markdown fields");
-                return true;
-              }
-              setDropMsg("Uploading…");
-              const at = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head;
-              uploadFile(files[0], { folder: "Home/Attachments", ...(docRef.doctype && docRef.name && !docRef.isNew ? { doctype: docRef.doctype, docname: docRef.name } : {}) })
-                .then((f) => {
-                  view.dispatch({ changes: { from: at, insert: `![](${encodeURI(f.file_url)})` } });
-                  setDropMsg(null);
-                })
-                .catch((err: unknown) => setDropMsg(err instanceof Error ? err.message : "Upload failed"));
-              return true;
-            },
-          }),
-        ]
-      : [];
-  const extensions = [...languageFor(field.options, ft), ...completionsFrom(autocompletions), ...(wrap ? [EditorView.lineWrapping] : []), ...imageDrop];
-
-  // code.js: fixed 300px with Expand (600px) unless the field sizes itself
-  const lines = (n: unknown) => (Number(n) > 0 ? `${Math.round(Number(n) * 19.5 + 8)}px` : undefined);
-  const sized = !!(field.max_lines || field.min_lines || field.max_height);
-  const height = sized ? undefined : expanded ? "600px" : "300px";
-  const minHeight = sized ? lines(field.min_lines) : undefined;
-  const maxHeight = sized ? (typeof field.max_height === "string" && field.max_height ? field.max_height : lines(field.max_lines)) : undefined;
-
-  let jsonError: string | null = null;
-  if (ft === "JSON" && text.trim()) {
+  const copy = async () => {
+    if (!navigator.clipboard) return;
     try {
-      JSON.parse(text);
-    } catch (e) {
-      jsonError = e instanceof Error ? e.message : "Invalid JSON";
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard refused (permissions / insecure context): nothing to show
     }
-  }
-
-  const previewHtml = preview ? (previewKind === "markdown" ? markdownToHtml(text) : sanitizeHtml(text)) : "";
-
+  };
   return (
-    <div className="relative space-y-1.5" data-code-field={field.fieldname}>
-      {previewKind && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setPreview((p) => !p)}
-            className="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            {preview ? "Edit" : "Preview"}
-          </button>
-        </div>
-      )}
-      {preview ? (
-        <div
-          role="document"
-          aria-label={`${label} preview`}
-          className="crema-rich min-h-[120px] rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
-          dangerouslySetInnerHTML={{ __html: previewHtml || "<p class='text-zinc-400'>Nothing to preview</p>" }}
-        />
-      ) : (
-        <div
-          data-fieldname={field.fieldname}
-          className={[
-            "overflow-hidden rounded-lg border text-[13px]",
-            error || jsonError ? "border-red-500" : "border-zinc-300 focus-within:border-zinc-500 dark:border-zinc-700 dark:focus-within:border-zinc-500",
-            readOnly ? "opacity-90" : "",
-          ].join(" ")}
-        >
-          <CodeMirror
-            id={inputId ?? field.fieldname}
-            aria-label={label}
-            value={text}
-            onChange={(v) => onChange(v)}
-            extensions={extensions}
-            theme={theme}
-            editable={!readOnly}
-            readOnly={readOnly}
-            height={height}
-            minHeight={minHeight}
-            maxHeight={maxHeight}
-            placeholder={String(field.placeholder ?? "")}
-            basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: !readOnly, autocompletion: true, tabSize: 4 }}
-          />
-        </div>
-      )}
-      {readOnly && ft === "Code" && text && (
-        <button
-          type="button"
-          title="Copy to Clipboard"
-          aria-label="Copy to Clipboard"
-          onClick={() => void navigator.clipboard?.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}
-          className="absolute right-2 top-2 rounded-md border border-zinc-200 bg-white p-1 text-zinc-500 hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-zinc-200"
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
-      )}
+    <button
+      type="button"
+      title="Copy to Clipboard"
+      aria-label="Copy to Clipboard"
+      onClick={() => void copy()}
+      className="absolute right-2 top-2 rounded-md border border-zinc-200 bg-white p-1 text-zinc-500 hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-zinc-200"
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+/** Markdown / HTML Editor preview: markdown via frappe.markdown, HTML with script / style removed */
+function CodePreview({ kind, text, label }: { kind: "markdown" | "html"; text: string; label: string }) {
+  const previewHtml = kind === "markdown" ? markdownToHtml(text) : sanitizeHtml(text);
+  return (
+    <div
+      role="document"
+      aria-label={`${label} preview`}
+      className="crema-rich min-h-[120px] rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
+      dangerouslySetInnerHTML={{ __html: previewHtml || "<p class='text-zinc-400'>Nothing to preview</p>" }}
+    />
+  );
+}
+
+function previewKindOf(fieldtype: string): "markdown" | "html" | null {
+  if (fieldtype === "Markdown Editor") return "markdown";
+  if (fieldtype === "HTML Editor") return "html";
+  return null;
+}
+
+function codeText(value: unknown): string {
+  if (value == null) return "";
+  return typeof value === "string" ? value : JSON.stringify(value, null, 4);
+}
+
+function StatusLines({ dropMsg, jsonError }: { dropMsg: string | null; jsonError: string | null }) {
+  return (
+    <>
       {dropMsg && (
         <p role="status" className="text-xs text-zinc-500">
           {dropMsg}
@@ -225,8 +88,117 @@ export default function CodeField({ field, inputId, value, onChange, disabled, e
           Invalid JSON: {jsonError}
         </p>
       )}
+    </>
+  );
+}
+
+// the editor's language, completions, wrapping and (Markdown) image drop for this field
+function codeExtensions(field: FieldControlProps["field"], readOnly: boolean, wrap: boolean, onDropMsg: (m: string | null) => void, doc: FieldControlProps["doc"]) {
+  const ft = field.fieldtype;
+  const autocompletions = (field as { autocompletions?: unknown }).autocompletions;
+  return [
+    ...languageFor(field.options, ft),
+    ...completionsFrom(autocompletions),
+    ...(wrap ? [EditorView.lineWrapping] : []),
+    ...(ft === "Markdown Editor" && !readOnly ? [markdownImageDrop(onDropMsg, doc)] : []),
+  ];
+}
+
+function editorClass(invalid: boolean, readOnly: boolean) {
+  return [
+    "overflow-hidden rounded-lg border text-[13px]",
+    invalid ? "border-red-500" : "border-zinc-300 focus-within:border-zinc-500 dark:border-zinc-700 dark:focus-within:border-zinc-500",
+    readOnly ? "opacity-90" : "",
+  ].join(" ");
+}
+
+function PreviewToggle({ preview, onToggle }: { preview: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      >
+        {preview ? "Edit" : "Preview"}
+      </button>
+    </div>
+  );
+}
+
+type EditorProps = Pick<FieldControlProps, "field" | "inputId" | "onChange" | "doc"> & {
+  text: string;
+  readOnly: boolean;
+  invalid: boolean;
+  wrap: boolean;
+  expanded: boolean;
+  onDropMsg: (m: string | null) => void;
+};
+
+function CodeEditor({ field, inputId, onChange, doc, text, readOnly, invalid, wrap, expanded, onDropMsg }: EditorProps) {
+  const theme = useResolvedTheme();
+  const label = field.label || field.fieldname;
+  const { height, minHeight, maxHeight } = codeSizing(field, expanded);
+  return (
+    <div data-fieldname={field.fieldname} className={editorClass(invalid, readOnly)}>
+      <CodeMirror
+        id={inputId ?? field.fieldname}
+        aria-label={label}
+        value={text}
+        onChange={(v) => onChange(v)}
+        extensions={codeExtensions(field, readOnly, wrap, onDropMsg, doc)}
+        theme={theme}
+        editable={!readOnly}
+        readOnly={readOnly}
+        height={height}
+        minHeight={minHeight}
+        maxHeight={maxHeight}
+        placeholder={String(field.placeholder ?? "")}
+        basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: !readOnly, autocompletion: true, tabSize: 4 }}
+      />
+    </div>
+  );
+}
+
+export default function CodeField({ field, inputId, value, onChange, disabled, error, doc }: FieldControlProps) {
+  const text = codeText(value);
+  const readOnly = disabled || !!field.read_only;
+  const ft = field.fieldtype;
+  const previewKind = previewKindOf(ft);
+  const [preview, setPreview] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [dropMsg, setDropMsg] = useState<string | null>(null);
+  const label = field.label || field.fieldname;
+
+  warnUnknownLanguage(field, label);
+  const { sized } = codeSizing(field, expanded);
+  const jsonError = jsonParseError(ft, text);
+  const showPreview = preview && !!previewKind;
+  const canCopy = readOnly && ft === "Code" && !!text;
+
+  return (
+    <div className="relative space-y-1.5" data-code-field={field.fieldname}>
+      {previewKind && <PreviewToggle preview={preview} onToggle={() => setPreview((p) => !p)} />}
+      {showPreview ? (
+        <CodePreview kind={previewKind} text={text} label={label} />
+      ) : (
+        <CodeEditor
+          field={field}
+          inputId={inputId}
+          onChange={onChange}
+          doc={doc}
+          text={text}
+          readOnly={readOnly}
+          invalid={!!(error || jsonError)}
+          wrap={!!field.wrap || !!previewKind}
+          expanded={expanded}
+          onDropMsg={setDropMsg}
+        />
+      )}
+      {canCopy && <CopyButton text={text} />}
+      <StatusLines dropMsg={dropMsg} jsonError={jsonError} />
       {!sized && !preview && (
-        <button type="button" onClick={() => setExpanded((x) => !x)} className="rounded-md border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <button type="button" onClick={() => setExpanded((x) => !x)} className={SMALL_BUTTON}>
           {expanded ? "Collapse" : "Expand"}
         </button>
       )}

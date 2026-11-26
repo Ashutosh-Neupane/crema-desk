@@ -26,7 +26,7 @@ const MAP_DEFAULTS = {
 type GeoJSON = { type: string; features?: unknown[]; [k: string]: unknown };
 
 /** the stored value as GeoJSON (Desk's format), or a legacy { lat, lng } as a point */
-export function toGeoJSON(value: unknown): GeoJSON | null {
+function toGeoJSON(value: unknown): GeoJSON | null {
   let v: unknown = value;
   if (typeof v === "string") {
     if (!v.trim()) return null;

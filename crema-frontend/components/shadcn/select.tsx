@@ -20,13 +20,17 @@ function useSelect() {
 export function Select({ value, onValueChange, children, open: controlledOpen, onOpenChange }: { value: string; onValueChange: (v: string) => void; children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const open = controlledOpen ?? internalOpen;
-  const setOpen = (v: boolean) => {
-    setInternalOpen(v);
-    onOpenChange?.(v);
-  };
+  const setOpen = React.useCallback(
+    (v: boolean) => {
+      setInternalOpen(v);
+      onOpenChange?.(v);
+    },
+    [onOpenChange],
+  );
+  const contextValue = React.useMemo(() => ({ value, onValueChange, open, setOpen }), [value, onValueChange, open, setOpen]);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
+    <SelectContext.Provider value={contextValue}>
       <div className="relative">{children}</div>
     </SelectContext.Provider>
   );

@@ -117,16 +117,19 @@ export default function AddressField({ field, inputId, value, onChange, disabled
           className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
         >
           {suggestions.map((p) => (
-            <li key={p.place_id} role="option" aria-selected={inputVal === p.description}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => select(p.description)}
-                className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-              >
-                <span className="mt-0.5 text-zinc-400" aria-hidden="true">📍</span>
-                {p.description}
-              </button>
+            <li
+              key={p.place_id}
+              role="option"
+              aria-selected={inputVal === p.description}
+              // mousedown, not click: the input keeps focus (the same pattern as the other suggestion lists)
+              onMouseDown={(e) => {
+                e.preventDefault();
+                select(p.description);
+              }}
+              className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+            >
+              <span className="mt-0.5 text-zinc-400" aria-hidden="true">📍</span>
+              {p.description}
             </li>
           ))}
         </ul>

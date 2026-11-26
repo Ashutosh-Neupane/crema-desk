@@ -25,8 +25,12 @@ export default function RatingField({ field, value, onChange, disabled }: FieldC
     // update_rating: the same value again clears it (not when mandatory)
     onChange(next === stars && !field.reqd ? 0 : next / outOf);
   };
-  const at = (e: React.MouseEvent<HTMLElement>, i: number) => {
-    const r = e.currentTarget.getBoundingClientRect();
+  /** the star (or half star) under the pointer; a star's left half is i - 0.5 */
+  const at = (e: React.MouseEvent<HTMLElement>): number | null => {
+    const star = (e.target as Element).closest<HTMLElement>("[data-rating]");
+    if (!star) return null;
+    const i = Number(star.dataset.rating);
+    const r = star.getBoundingClientRect();
     return e.clientX - r.left < r.width / 2 ? i - 0.5 : i;
   };
 
@@ -47,22 +51,22 @@ export default function RatingField({ field, value, onChange, disabled }: FieldC
         e.preventDefault();
         onChange(Math.max(0, Math.min(outOf, stars + step)) / outOf);
       }}
+      // a star's halves need the pointer position; the keyboard is handled above
+      onMouseMove={readOnly ? undefined : (e) => {
+        const s = at(e);
+        if (s != null) setHover(s);
+      }}
+      onClick={readOnly ? undefined : (e) => {
+        const s = at(e);
+        if (s != null) set(s);
+      }}
       onMouseLeave={() => setHover(null)}
       className="inline-flex items-center gap-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
     >
       {Array.from({ length: outOf }, (_, k) => k + 1).map((i) => {
         const fill = shown >= i ? "full" : shown >= i - 0.5 ? "half" : "none";
         return (
-          // the slider above handles the keyboard; a star's halves need the pointer position
-          // eslint-disable-next-line jsx-a11y/click-events-have-key-events
-          <span
-            key={i}
-            data-rating={i}
-            data-fill={fill}
-            onMouseMove={readOnly ? undefined : (e) => setHover(at(e, i))}
-            onClick={readOnly ? undefined : (e) => set(at(e, i))}
-            className={readOnly ? "" : "cursor-pointer"}
-          >
+          <span key={i} data-rating={i} data-fill={fill} className={readOnly ? "" : "cursor-pointer"}>
             <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
               <defs>
                 <clipPath id={`half-${field.fieldname}-${i}`}>

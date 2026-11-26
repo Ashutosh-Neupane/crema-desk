@@ -5,11 +5,29 @@
  * or "N values selected"; inside, a search box (passed to `get_data(txt)`), the options with a tick, Select All and
  * Clear All. The value is an array of values.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { FieldControlProps } from "./index";
 import { useMultiOptions } from "./multiOptions";
-import { multiValues } from "./MultiselectField";
+import { multiValues } from "./multiOptions";
+
+// Desk multiselect_list.js update_status: nothing, the one label, or "N values selected"
+function statusText(selected: string[], options: Array<{ value: string; label: string }>) {
+  if (selected.length === 0) return "";
+  if (selected.length > 1) return `${selected.length} values selected`;
+  return options.find((o) => o.value === selected[0])?.label ?? selected[0];
+}
+
+function useCloseOnOutsideClick(box: React.RefObject<HTMLElement | null>, open: boolean, close: () => void) {
+  const onOutside = useEffectEvent((e: MouseEvent) => {
+    if (!box.current?.contains(e.target as Node)) close();
+  });
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+}
 
 export default function MultiselectListField({ field, inputId, value, onChange, disabled, error }: FieldControlProps) {
   const selected = multiValues(value);
@@ -22,14 +40,8 @@ export default function MultiselectListField({ field, inputId, value, onChange, 
   // with get_data the search is the server's; otherwise filter here
   const hasGetData = typeof (field as { get_data?: unknown }).get_data === "function";
   const shown = hasGetData || !txt ? options : options.filter((o) => `${o.label}${o.value}`.toLowerCase().includes(txt.toLowerCase()));
-  const status = selected.length === 0 ? "" : selected.length === 1 ? (options.find((o) => o.value === selected[0])?.label ?? selected[0]) : `${selected.length} values selected`;
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  const status = statusText(selected, options);
+  useCloseOnOutsideClick(box, open, () => setOpen(false));
 
   const picked = new Set(selected);
   const set = (vals: string[]) => onChange(vals);
@@ -65,8 +77,8 @@ export default function MultiselectListField({ field, inputId, value, onChange, 
             {shown.map((o) => {
               const on = picked.has(o.value);
               return (
-                <li key={o.value} role="option" aria-selected={on}>
-                  <button type="button" onClick={() => toggle(o.value)} className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                <li key={o.value} role="none">
+                  <button type="button" role="option" aria-selected={on} onClick={() => toggle(o.value)} className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
                     <span>
                       <span className="font-medium text-zinc-900 dark:text-zinc-100">{o.label}</span>
                       {o.description && <span className="block text-xs text-zinc-500">{o.description}</span>}

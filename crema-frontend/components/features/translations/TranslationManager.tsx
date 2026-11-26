@@ -32,6 +32,12 @@ interface TranslationDoc {
   modified: string;
 }
 
+/** frappe.client.get_list is a read: GET with JSON-encoded arguments */
+function getList(args: Record<string, unknown>) {
+  const params = new URLSearchParams(Object.entries(args).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)]));
+  return fetch(`/api/frappe/api/method/frappe.client.get_list?${params}`, { credentials: "include" });
+}
+
 interface LanguageDoc {
   name: string;
   language_name: string;
@@ -49,15 +55,11 @@ export function TranslationManager() {
 const { data: languages = [] } = useQuery({
     queryKey: ["languages"],
     queryFn: async () => {
-      const res = await fetch(`/api/frappe/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Language",
-          fields: ["name", "language_name", "language_code", "enabled"],
-          filters: { enabled: 1 },
-          limit: 200,
-        }),
+      const res = await getList({
+        doctype: "Language",
+        fields: ["name", "language_name", "language_code", "enabled"],
+        filters: { enabled: 1 },
+        limit_page_length: 200,
       });
       if (!res.ok) return [];
       const json = await res.json();
@@ -67,20 +69,17 @@ const { data: languages = [] } = useQuery({
   });
 
   const { data: translations = [], isLoading, refetch } = useQuery({
-    queryKey: ["translations", selectedLanguage, searchQuery],
+    // the search box filters the loaded rows below; only the language is a server filter
+    queryKey: ["translations", selectedLanguage],
     queryFn: async () => {
       const filters: Record<string, unknown> = {};
       if (selectedLanguage) filters.language = selectedLanguage;
-      const res = await fetch(`/api/frappe/frappe.client.get_list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Translation",
-          filters,
-          fields: ["name", "language", "source_text", "translated_text", "modified"],
-          limit: 500,
-          order_by: "modified desc",
-        }),
+      const res = await getList({
+        doctype: "Translation",
+        filters,
+        fields: ["name", "language", "source_text", "translated_text", "modified"],
+        limit_page_length: 500,
+        order_by: "modified desc",
       });
       if (!res.ok) return [];
       const json = await res.json();
@@ -91,13 +90,11 @@ const { data: languages = [] } = useQuery({
 
   const saveMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      const res = await fetch(`/api/frappe/frappe.client.insert`, {
+      const res = await fetch("/api/frappe/api/method/frappe.client.insert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctype: "Translation",
-          ...data,
-        }),
+        credentials: "include",
+        body: JSON.stringify({ doc: { doctype: "Translation", ...data } }),
       });
       if (!res.ok) throw new Error("Failed to save");
       return res.json();
@@ -107,9 +104,10 @@ const { data: languages = [] } = useQuery({
 
   const updateMutation = useMutation({
     mutationFn: async (data: { name: string; translated_text: string }) => {
-      const res = await fetch(`/api/frappe/frappe.client.set_value`, {
+      const res = await fetch("/api/frappe/api/method/frappe.client.set_value", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           doctype: "Translation",
           name: data.name,

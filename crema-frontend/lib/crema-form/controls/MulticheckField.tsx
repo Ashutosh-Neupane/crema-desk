@@ -9,7 +9,7 @@
 import { useEffect, useRef } from "react";
 import type { FieldControlProps } from "./index";
 import { useMultiOptions } from "./multiOptions";
-import { multiValues } from "./MultiselectField";
+import { multiValues } from "./multiOptions";
 
 function gridColumns(columns: unknown): string | undefined {
   if (columns == null || columns === "") return undefined;
@@ -29,6 +29,8 @@ export default function MulticheckField({ field, value, onChange, disabled }: Fi
     if (seeded.current || value != null || !raw.length) return;
     seeded.current = true;
     const start = raw.filter((o) => o.checked).map((o) => o.value);
+    // Desk writes the checked options into the doc on load, so the parent must get them (not just render them)
+    // react-doctor-disable-next-line no-pass-data-to-parent, no-pass-live-state-to-parent
     if (start.length) onChange(start);
   }, [raw, value, onChange]);
 
