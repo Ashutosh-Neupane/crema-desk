@@ -150,6 +150,7 @@ export function useBuilder(name: string) {
   const flush = useCallback(async () => {
     if (timer.current) {
       clearTimeout(timer.current);
+      timer.current = null;
       await saveDraft();
     } else if (inflight.current) await inflight.current;
   }, [saveDraft]);
