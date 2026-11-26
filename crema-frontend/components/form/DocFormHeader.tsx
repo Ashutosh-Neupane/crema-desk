@@ -45,7 +45,8 @@ export function CustomButtons({ buttons }: { buttons: CustomButton[] }) {
           </DropdownMenu>
         ) : (
           btns.map((b) => (
-            <button key={b.label} type="button" onClick={() => void b.action()} className={btnCls}>
+            // a script that adds btn-primary to its button (Desk) gets the dark primary style
+            <button key={b.label} type="button" onClick={() => void b.action()} className={b.primary ? `rounded-lg border border-transparent px-3 py-2 text-sm ${darkBtn}` : btnCls}>
               {b.label}
             </button>
           ))
