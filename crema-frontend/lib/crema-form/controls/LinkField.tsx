@@ -55,7 +55,7 @@ function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; 
     // no quick entry for this DocType → full form in a new tab (Desk routes away; a tab keeps this form)
     if (meta && !canQuickEntry(meta) && !opened.current) {
       opened.current = true;
-      window.open(newDocUrl(doctype), "_blank");
+      window.open(newDocUrl(doctype), "_blank", "noopener,noreferrer");
       onClose();
     }
   }, [meta, doctype, onClose]);
