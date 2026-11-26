@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FilePlus2, Upload } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
-import { BottomBar, DensitySwitch, EmptyState, LayoutSwitch, PageHeader, Section, SidePanel, StatusPill, Stepper, type Step } from "@/components/crema-ui";
+import { BottomBar, DensitySwitch, EmptyState, Kbd, LayoutSwitch, notify, PageHeader, Section, SidePanel, StatusPill, Stepper, Tooltip, type Step } from "@/components/crema-ui";
 import { useDensity, useNewLayout, type Density } from "@/lib/ui/newLayout";
 
 const STEPS: Step[] = [
@@ -52,6 +52,22 @@ function DensityDemo({ density }: { density: Density }) {
             </StatusPill>
           ))}
           <StatusPill indicator="green">Completed</StatusPill>
+        </div>
+      </Section>
+
+      <Section title={`Tooltip, shortcut and toast (${name})`} description="Icon-only buttons name themselves and show their shortcut.">
+        <div className="flex flex-wrap items-center gap-3">
+          <Tooltip label="Search" shortcut="Mod+K">
+            <Button variant="outline" className={btnCls} aria-label={`Search (${name})`}>
+              ⌕
+            </Button>
+          </Tooltip>
+          <span className="text-sm text-[var(--ink-muted)]">
+            Open search with <Kbd keys="Mod+K" />
+          </span>
+          <Button variant="outline" className={btnCls} onClick={() => notify.undoable(`Row deleted (${name})`, () => notify.success("Row restored"))}>
+            Delete a row ({name})
+          </Button>
         </div>
       </Section>
 

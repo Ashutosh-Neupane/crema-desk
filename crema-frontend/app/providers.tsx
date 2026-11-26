@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/frappe/auth";
 import { useMemo } from "react";
 import { ErrorDetailsHost } from "@/components/desk/ErrorDetails";
+import { TooltipProvider } from "@/components/crema-ui/Tooltip";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = useMemo(() => {
@@ -22,7 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        <TooltipProvider>{children}</TooltipProvider>
         {/* phones: clear the form's bottom action bar */}
         <Toaster position="bottom-right" richColors mobileOffset={{ bottom: "4.5rem" }} />
         <ErrorDetailsHost />

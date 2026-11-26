@@ -8,3 +8,6 @@ export { BottomBar } from "./BottomBar";
 export { Stepper, type Step, type StepState } from "./Stepper";
 export { LayoutSwitch } from "./LayoutSwitch";
 export { DensitySwitch } from "./DensitySwitch";
+export { Kbd, formatKeys } from "./Kbd";
+export { Tooltip, TooltipProvider } from "./Tooltip";
+export { notify } from "./Toast";
