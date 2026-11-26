@@ -1,6 +1,7 @@
 # Phase 2 — design and delivery plan
 
-Status: plan, 2026-11-26. Source of the intent: [GAPS.md § 3](GAPS.md#3-phase-2--reimagining-the-frontend-uiux-plan).
+Status: plan, 2026-11-26 (updated the same day: dynamic role-based home § 4.1, AI tiers § 5.0 and § 5.14–5.20,
+research § 10, new build order § 8). Source of the intent: [GAPS.md § 3](GAPS.md#3-phase-2--reimagining-the-frontend-uiux-plan).
 This file turns § 3 into decisions a developer can build from, screen by screen, PR by PR.
 
 Ground rules (from GAPS § 3 and CLAUDE.md, repeated because every section depends on them):
@@ -18,11 +19,12 @@ Contents
 2. [Design system](#2-design-system)
 3. [App shell and navigation](#3-app-shell-and-navigation)
 4. [Screens](#4-screens)
-5. [AI assistant UI](#5-ai-assistant-ui)
+5. [AI assistant](#5-ai-assistant)
 6. [Performance plan](#6-performance-plan)
 7. [Accessibility plan](#7-accessibility-plan)
 8. [Delivery plan (PR list)](#8-delivery-plan-pr-list)
 9. [Risks and open questions](#9-risks-and-open-questions)
+10. [Research: Frappe's own newer frontends](#10-research-frappes-own-newer-frontends)
 
 ---
 
@@ -130,9 +132,9 @@ To add (each one file in `components/crema-ui/`, exported from `index.ts`, shown
 
 | Component | Purpose | Built on | First used in |
 |---|---|---|---|
-| `Rail` | Docked, non-modal right region with tabs (Preview / Assistant / Activity), resizer, overlay mode under the dock threshold | new; resize ported from Desk `ui/side_panel.js` `setup_resize` | PR 1 |
-| `Resizer` | `role="separator"` drag + arrow keys, double-click reset | new | PR 1 |
-| `Sheet` | Phone bottom sheet with snap points (50 % / 92 %), drag handle, modal | SidePanel's sheet mode, split out | PR 1 |
+| `Rail` | Docked, non-modal right region with tabs (Preview / Assistant / Activity), resizer, overlay mode under the dock threshold | new; resize ported from Desk `ui/side_panel.js` `setup_resize` | PR 2a |
+| `Resizer` | `role="separator"` drag + arrow keys, double-click reset | new | PR 2a |
+| `Sheet` | Phone bottom sheet with snap points (50 % / 92 %), drag handle, modal | SidePanel's sheet mode, split out | PR 2a |
 | `Field` | Label + control + help + error + "required" marker, one layout for every fieldtype; wraps `lib/crema-form` controls without changing them | new | PR 5 |
 | `FieldGroup` | Grid of Fields, columns by container width (1/2/3) | new | PR 5 |
 | `SummaryCard` | Key facts of a record (§ 4.3) | Card | PR 5 |
@@ -145,7 +147,7 @@ To add (each one file in `components/crema-ui/`, exported from `index.ts`, shown
 | `InlineEdit` | Click / Enter to edit a cell, Esc cancels, Enter saves | Field | PR 7 |
 | `Toast` | Success / undo / error toasts, `aria-live` | sonner | PR 1 |
 | `Tooltip` + `Kbd` | Tooltip with shortcut keys shown in the OS form (⌘ / Ctrl) — as Desk `ui/components/tooltip.js` | `@radix-ui/react-tooltip` | PR 1 |
-| `Banner` | Page / form-level notice (info, warning, danger) | new | PR 5 |
+| `Banner` | Page / form-level notice (info, warning, danger) | new | PR 2a |
 | `NumberCard`, `ChartCard` | Dashboard cards on the site's Number Card / Dashboard Chart | existing `components/desk/Widgets.tsx`, `DeskChart.tsx` | PR 2b |
 | `CardGrid` | Draggable / resizable grid with keyboard move | `@dnd-kit` (already a dependency) | PR 2b |
 | `SegmentedControl`, `Switch`, `Progress`, `ScrollArea` | small primitives | Radix (installed) | as needed |
@@ -316,23 +318,7 @@ right panel, `mod+shift+.` toggle the left pane (list filters / form outline).
 
 ### 3.8 Wide screens: home, list and form at 1920+ px
 
-**Home at 1920** (8 card columns + a fixed My work column; at 2560 the grid has 12 columns and charts get 6):
-
-```
-┌ header ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-├ sidebar 240 ┬ My work 360 ──────────────┬ Dashboard grid (8 cols) ─────────────────────────────────────────────────────────┤
-│ ⌂ Home      │ Waiting on me (4)         │ Selling ▾  Good morning, Asha                    🔍 Filter this page…  [Edit ✎]  │
-│ ✓ My work 4 │ ● SO-0042 Approve   2h    │ ┌ Sales ─┐┌ Orders ┐┌ To del ┐┌ Overdue┐┌ AR ────┐┌ Margin ┐┌ Returns┐┌ New cus┐  │
-│ ★ Pinned    │ ● PI-0101 Review    1d    │ │ 1.2M ▲ ││ 38   ▼ ││ 12     ││ 3   ⚠  ││ 4.5M   ││ 21 %   ││ 4.1 %  ││ 9      │  │
-│   …         │ ToDos (3)                 │ └────────┘└────────┘└────────┘└────────┘└────────┘└────────┘└────────┘└────────┘  │
-│ Selling     │ ○ Call Ravi        today  │ ┌ Sales trend (12 mo) ─────────────────────┐┌ Top customers ──────────────────────┐ │
-│ Buying      │ My drafts (5)             │ │ ▁▂▃▅▆▇█▇▆▅▆▇                              ││ Acme ███████████  1.1M               │ │
-│ Stock       │ ◌ SINV-0110 Acme  1h      │ └──────────────────────────────────────────┘└──────────────────────────────────────┘ │
-│ Accounts    │ Recent                    │ ┌ Quick list: Overdue invoices ────────────┐┌ Shortcuts ──────────────────────────┐ │
-│ …           │ SO-0042 · Item ABC · …    │ │ SINV-0091 Acme 12,000 31 d               ││ + Sales Order  + Customer  Stock Bal │ │
-│ ⚙ Settings  │ [Ask anything… ✦]         │ └──────────────────────────────────────────┘└──────────────────────────────────────┘ │
-└─────────────┴───────────────────────────┴──────────────────────────────────────────────────────────────────────────────────┘
-```
+**Home at 1920**: see § 4.1.9 (the dynamic home's wireframes at 1920, 1280 and 390).
 
 **List at 1920** (filters pane + table + preview; each pane toggles; ↑/↓ moves the preview):
 
@@ -383,88 +369,245 @@ scroll, no input wider than `--field-max`, prose ≤ 75ch, panes remembered afte
 Each spec lists: layout, behaviour to port (with Desk source), states, and the suite. Wireframes: desktop at 1600,
 phone at 390.
 
-### 4.1 Home / dashboard (GAPS 3.7; `/desk`)
+### 4.1 Home: dynamic and role-based (GAPS 3.7; `/desk`)
 
-**Which home opens.** In this order, as Desk does (`frappe/apps.py` `get_default_path`, `frappe/boot.py` `app_home`
-hook, user `default_workspace`):
-1. User's `default_app` → that app's `app_home` route; 2. System Settings `default_app`; 3. the user's default
-workspace; 4. the Crema dashboard below. If the resolved route is a Desk workspace, Crema shows the dashboard **built
-from that workspace** (its number cards, charts, shortcuts, quick lists) plus My work. If it is an app route outside
-Desk (`/helpdesk`, a white-label app's page), Crema navigates there (passthrough, as today). Classic `/desk` keeps the
-current apps grid.
+Owner's brief: everything this user may need and may do is on the home, nothing is static, and it learns what the user
+actually uses. So the home is **a ranked list of cards worked out from data on every load**. No card, DocType, route
+or role name is hard-coded. The same algorithm gives a clerk, a storekeeper and a System Manager different homes.
+
+#### 4.1.1 Which home opens
+
+Same order as Desk (`frappe/apps.py` `get_default_path`, `frappe/boot.py` `app_home` hook, user `default_workspace`):
+1. the user's `default_app` → that app's `app_home` route; 2. System Settings `default_app`; 3. otherwise the dynamic
+home below. If the route is outside Desk (`/helpdesk`, an app's own page), Crema goes there (passthrough, as today).
+A user's default workspace no longer replaces the home. It becomes the home's **context**: its cards rank first and
+its title is the page title (§ 4.1.4). Classic `/desk` keeps the current apps grid.
+
+#### 4.1.2 Starting point: a white-label app's desk home
+
+A white-label Frappe app on the local bench replaces `/desk` with its own home (`app_home = "desk"` in `hooks.py`,
+`www/desk.py` builds the page context on the server, `desk_dashboard.py` / `desk/api/dashboard.py` gather the data,
+`public/js/*_dashboard.js` renders it, tokens in `public/css/*/_tokens.scss`).
+
+| Kept (it works) | Fixed (it is static or wrong) | How Crema does it |
+|---|---|---|
+| Data is computed on the server and cached for 60 s per user (`frappe.cache().set_value(…, expires_in_sec=60)`) | The cache is never cleared, so a saved document stays missing for up to a minute | Same 60 s cache, plus it is cleared when the user saves, submits or acts on a workflow (§ 4.1.7) |
+| Status label precedence `workflow_state` → `status` → `docstatus` (`_get_status_label`) | Tone is guessed from English keywords (`APPROVED_KEYWORDS`, `PENDING_KEYWORDS`) | Same precedence. Tone comes from Desk's own indicator (`frappe.get_indicator` port, `lib/ui/status.ts`) |
+| Recent activity from Activity Log; recent documents of the user | Candidate DocTypes are a fixed list (`["Sales Order", "Purchase Order", …]`, `FALLBACK_DOCTYPES`) | Candidates come from the user's permissions and usage (§ 4.1.3) |
+| A role-aware greeting and workspace ordering | The "profile" is a substring match on role names (`getDeskProfile`: "purchase", "sales", "account", …) plus keyword lists per profile (`getProfileKeywords`) | No role-name parsing. Role → DocPerm / Module Profile / Workspace roles decides what is possible, usage decides the order |
+| KPI tiles that link to lists | KPIs ("approved", "pending", "draft") are counted from the 6 recent documents, so they look like totals but aren't | Counts come from `frappe.client.get_count` / Number Cards over the real filter, with a link to the same filter |
+| Workspace map grouped by module; type-to-filter tiles; Ctrl+K to the awesomebar | Workspace access only checks `Workspace` read (`_has_workspace_access`): it ignores the workspace's `roles` table and the Module Profile. Routes are hard-coded as `/app/<slug>` | Workspaces come from boot `workspaces` / `module_sidebars`, which Desk already filters by roles and blocked modules |
+| Branding through tokens; theme synced to `User.desk_theme` | `!important` overrides of Desk CSS; emoji icons | Tokens only (§ 2.1); site icons (§ 2.4) |
+
+#### 4.1.3 What feeds the home (all from data Frappe already has)
+
+**A. What the user may do** (permissions; recomputed when roles change):
+
+| Signal | Source (Frappe) | Used for |
+|---|---|---|
+| DocTypes readable / creatable | boot `user.can_read`, `user.can_create`, `can_write`, `can_submit` (`frappe/boot.py` → `frappe.utils.user.get_user`) | Candidate set. Nothing outside `can_read` is ever shown |
+| Modules and workspaces | boot `module_sidebars`, `workspaces` (already filtered by Workspace `roles`, Module Profile / Block Module) | "All workspaces" card, and the context workspace's cards |
+| Number Cards the user may see | `Number Card` `get_permission_query_conditions` (`desk/doctype/number_card/number_card.py`: Report cards need an allowed report, DocType cards need read, module must be allowed) | KPI cards |
+| Dashboard Charts | `Dashboard Chart` `has_permission` / query conditions (chart `roles` table, else DocType read) | Chart cards |
+| Reports the user can run | `DeskViews.get_allowed_report_names` (Report `roles`, Role Permission for Page and Report) | "Your reports" card |
+| Workflow work | `Workflow Action` (status Open, `Workflow Action Permitted Role` ∩ user roles: `workflow_action.py` `get_permission_query_conditions`) and `Workflow` transitions whose `allowed` role the user has | "Needs you": documents in a state the user can move, with the action names |
+| Assignments, ToDos, mentions | `ToDo` (`allocated_to = user`, open), `Notification Log` (`for_user`, unread) | "Needs you", bell count |
+| Today | `Event` (owner / participant / public, today and next 7 days), ToDo `date` | "Today" card |
+| Drafts | `docstatus = 0`, `owner = user`, in the user's top DocTypes | "Continue" card |
+
+**B. What the user actually uses** (usage; the learning part):
+
+| Signal | Source | Weight | Notes |
+|---|---|---|---|
+| Created / submitted a document | `Version` rows by the user written on insert (`version.py` `for_insert`, data has `creation`) or with docstatus 0→1 | 3 | Strongest sign of "my work" |
+| Edited a document | `Version` (`owner = user`, `ref_doctype`) | 2 | |
+| Acted on a workflow | `Version` with `workflow_state` change by the user, `Workflow Action` completed by user | 3 | |
+| Opened a form / list / report | `Route History` (`route`, `user`), `View Log` (`viewed_by`), `Access Log` (report exports) | 1 | Route strings are parsed as in `components/phase2/home/data.ts` `parseDeskRoute` |
+| Logged activity | `Activity Log` (`user`, `reference_doctype`) | 1 | |
+| Desk's own top 5 | boot `frequently_visited_links` (`route_history.py`) | used for cold start only | Available to every user without extra permission |
+
+Two facts decide where this is computed:
+- **Normal users can't read these logs.** Route History, Activity Log, View Log, Access Log and Version have one
+  DocPerm, System Manager (checked in the v16 JSON). Only `frequently_visited_links` (top 5, own rows) is open.
+  So the usage profile is computed by a **whitelisted method in the Crema Frappe app** (§ 5.14). It reads these
+  tables with `ignore_permissions`, but **only rows where the user column is the session user**, returns only
+  aggregates per DocType / report, and drops any DocType the user can no longer read.
+- **Crema must write Route History.** Desk writes it from the browser (`public/js/frappe/router_history.js` → 
+  `route_history.deferred_insert`, debounced 10 s). Crema's router does the same, with Desk's route strings
+  (`List/Sales Order/List`, `Form/Sales Order/SO-0001`, `query-report/General Ledger`) so Desk's own
+  `frequently_visited_links` improves too. Desk skips `Form` routes (`routes_to_skip`); Crema logs them, because
+  opening records is the main usage signal.
+
+Retention: Activity Log and Route History are cleared after 90 days (`frappe/hooks.py` `default_log_clearing_doctypes`),
+so the window is 90 days.
+
+#### 4.1.4 Ranking
+
+For each candidate (a DocType, report, workspace or Number Card / chart) and the session user:
 
 ```
-desktop 1600
-┌ header ─────────────────────────────────────────────────────────────────────────────────────┐
-├ sidebar ┬─────────────────────────────────────────────────────────────────────────────────────┤
-│         │ Good morning, Asha                                   [Selling ▾ workspace] [Edit ✎] │
-│         │ ┌ Waiting on me (4) ───────────┐ ┌ Number ┐ ┌ Number ┐ ┌ Number ┐ ┌ Number ┐       │
-│         │ │ ● SO-0042 Approve  Acme  2h  │ │ 1.2M   │ │ 38     │ │ 12     │ │ 4.1%   │       │
-│         │ │ ● PI-0101 Review   Zen   1d  │ │ Sales  │ │ Orders │ │ To     │ │ Returns│       │
-│         │ │ ○ ToDo: call Ravi        3d  │ │ ▲ 8%   │ │ ▼ 2    │ │ deliver│ │        │       │
-│         │ │            See all in My work│ └────────┘ └────────┘ └────────┘ └────────┘       │
-│         │ └──────────────────────────────┘ ┌ Chart: Sales trend (12 mo) ───────────────────┐ │
-│         │ ┌ Shortcuts ───────────────────┐ │  ▁▂▃▅▆▇█▇▆                                     │ │
-│         │ │ + Sales Order  + Customer    │ │                         [This year ▾] [⋯]      │ │
-│         │ │ Stock Balance  AR report     │ └────────────────────────────────────────────────┘ │
-│         │ └──────────────────────────────┘ ┌ Quick list: Overdue invoices ─────────────────┐ │
-│         │ ┌ Recent ──────────────────────┐ │ SINV-0091  Acme   12,000  31 days             │ │
-│         │ │ SO-0042, Item ABC, …         │ │ …                                              │ │
-│         │ └──────────────────────────────┘ └────────────────────────────────────────────────┘ │
-└─────────┴─────────────────────────────────────────────────────────────────────────────────────┘
+usage(x)  = Σ over events e on x in the last 90 days:  weight(e) · 0.5 ^ (age_days(e) / 14)
+            (half-life 14 days: an event from 2 weeks ago counts half, 30 days ≈ a quarter, 90 days ≈ 1 %)
+prior(x)  = role prior: share of users with the same role set who used x in 30 days (aggregate counts only)
+            + 1 if x is a shortcut / card of the user's context workspace
+            + 1 if the user can create x and it is submittable or has a workflow (a transaction, not a master)
+n         = number of usage events of the user (90 days)
+λ         = min(1, n / 30)                          cold start: new users lean on the prior
+score(x)  = λ · norm(usage(x)) + (1 − λ) · norm(prior(x))
+```
 
-phone 390
+- **Cards inherit scores.** A Number Card scores as its `document_type` (or its report), a chart as its source,
+  "Quick create" picks the top 6 creatable DocTypes by create-weighted usage, "Your reports" the top 6 reports.
+- **Needs you always comes first** when it has items; it is about obligations, not habits. Inside it: overdue first,
+  then by age.
+- **Decay** is the half-life above; nothing has to be "unlearned". A user who moves from Selling to Buying sees the
+  home follow in about two weeks.
+- **Cold start** (new user, `n = 0`): the role prior. If the role set is new too, the prior is the context
+  workspace's cards + the DocTypes the user can create, in workspace order. The home is never empty: "Needs you"
+  shows "All clear", and Quick create always has the user's creatable transactions.
+- **Role prior** is computed once a day per distinct role set (hash of sorted roles), cached in Redis, from the same
+  log tables grouped by DocType. Only counts leave the method; no record names, no other users' names.
+- **Stable order.** Ranks are recomputed at most every 10 minutes and a card moves only if its rank changes by ≥ 2
+  places, so the home doesn't shuffle under the user's mouse.
+
+#### 4.1.5 Card catalogue (types, not instances)
+
+Every card on the home is one of these types, filled from the sources above. A card with no data is left out (no
+zero tiles), except Needs you.
+
+| Card type | Content | Size (12-col grid) | Shown when |
+|---|---|---|---|
+| Needs you | Workflow actions, assignments, overdue ToDos, mentions; one-click Approve / Reject where the transition has no extra fields (Desk `workflow.js` rules) | 4 × tall | Always (top-left) |
+| Quick create | `+ <DocType>` buttons, top 6 creatable by usage | 4 | User can create anything |
+| Continue | My drafts and documents I edited in the last 7 days, with status pills | 4 | Has drafts / edits |
+| KPI | One permitted Number Card (`number_card.get_result`, trend vs previous period) | 2 | Score in top N |
+| Auto KPI | Open count per status for a top DocType that has a `status` / `workflow_state` field and no Number Card (`get_count` grouped) | 2 | Top-3 DocType has no Number Card |
+| Chart | Permitted Dashboard Chart (`dashboard_chart.get`) | 6 | Score in top N |
+| Quick list | 5 rows of a top DocType with the user's last list filters (from `user_settings`) | 6 | Top DocType |
+| Your reports | Top reports by usage, with last-used filters | 4 | Has used reports |
+| Today | Events and ToDos due today / this week | 4 | Has any |
+| Recent | Last 8 opened records (Route History) | 4 | Always after first use |
+| Workspaces | Modules and workspaces from boot, ranked | 12, collapsed | Always (bottom) |
+| Ask AI | Composer + 3 suggestions built from the cards above ("Summarise what's waiting on me") | 4 | Assistant enabled for the user (§ 5.11) |
+| Onboarding | Module Onboarding steps not done (§ 4.10) | 4 | Incomplete onboarding |
+
+Packing: cards in score order into the grid, left to right, row by row, with a 12-col dense packing (CSS grid
+`grid-auto-flow: dense`). Width decides how many cards fit before "Show more" (≈ 8 cards at 1280, 14 at 1920).
+
+#### 4.1.6 Same algorithm, different homes (examples only, nothing here is configured)
+
+| User (roles) | What the data gives them (top of the home) |
+|---|---|
+| Sales clerk (Sales User) | Needs you: 2 assigned Quotations. Quick create: Sales Order, Quotation, Customer (most created). Continue: 3 draft Sales Orders. KPI: Sales Orders to deliver (Number Card), auto KPI "Quotations by status". Quick list: Sales Orders, last filter "My open". Reports: Sales Analytics |
+| Storekeeper (Stock User) | Needs you: Material Requests in "Pending" (workflow). Quick create: Stock Entry, Delivery Note, Purchase Receipt. Chart: Stock Value by warehouse. Reports: Stock Balance, Stock Projected Qty. Today: none, so no card |
+| Accountant (Accounts User) | Quick create: Payment Entry, Journal Entry, Sales Invoice. KPI: Receivables, Payables. Chart: Cash flow. Reports: General Ledger (last party filter), Accounts Receivable |
+| Approver (role in Purchase Order workflow transitions) | Needs you fills the first column: 7 Purchase Orders "Pending Approval" with Approve / Reject. Little else ranks, because they mostly approve |
+| Sales manager (Sales Manager) | Charts rank above lists (they open dashboards and reports more than forms): Sales trend, Top customers. Needs you: discount approvals. Quick list: Overdue invoices |
+| System Manager | Needs you: Error Log count since last visit (if they open Error Log), failed jobs. Quick create: DocType, Custom Field, User (from usage). Reports: System Health Report. Workspaces card expanded |
+
+#### 4.1.7 Server and client split, performance
+
+```
+Browser ── GET /api/desk/home ──► Crema server (RSC + route)  ──► Frappe: crema.api.home.get_home  (one call)
+                                    cache per sid 60 s              │ usage profile   (Redis, 10 min, per user)
+                                                                    │ role prior      (Redis, 24 h, per role set)
+                                                                    │ needs-you, drafts, today, counts (60 s, per user)
+                                                                    └ card data for the first 8 cards
+                                  ◄── { cards: [{type, id, score, size, data | lazy}], layout, context }
+```
+
+- **One call.** `crema.api.home.get_home()` (Crema Frappe app, § 5.14) returns the ranked card list and the data for
+  the first screen. Charts below the fold come back `lazy` and load on scroll (`dashboard_chart.get`, existing
+  `app/api/desk/chart` route).
+- **Permission-safe.** Lists use `frappe.get_list` / `get_count` (permission queries apply), Number Cards and charts
+  their own permission hooks, reports `get_allowed_report_names`. Log tables are read only for the session user and
+  only as aggregates.
+- **Cache invalidation.** `doc_events` `on_update` / `on_submit` / `on_cancel` and workflow actions delete the
+  user's 60 s key (`crema:home:<user>`); role changes (`User` `on_update`) delete the usage and prior keys.
+- **Without the app** (a site that hasn't installed it): Crema computes a reduced home on its server from standard
+  endpoints (today's My work: `components/phase2/home/api.ts`, boot `frequently_visited_links`, Number Cards,
+  workspace shortcuts) with the same card types, no usage learning, and a System Manager hint "Install the Crema app
+  for a home that learns". This keeps § 1 G3 / G7 testable on any site.
+- **Server**: candidates, permissions, scores, counts, first-screen data. **Client**: grid packing by width, user
+  layout overrides, filter-this-page, edit mode, lazy cards, chart rendering.
+- **Budget**: `get_home` ≤ 150 ms p75 warm, ≤ 600 ms cold on the local bench (measured in `p2.home`); one browser
+  request for the first screen; Lighthouse home ≥ 98 desktop.
+
+#### 4.1.8 Per-user customisation and role defaults
+
+- **Edit ✎**: pin (card always shown, keeps its place), hide (never shown; "Hidden cards (3)" at the bottom to
+  restore), drag to reorder, resize (1 / 2 / 4 widths), "+ Add card" from every permitted card (catalogue grouped
+  by type, search). Keyboard: focus card, Space to pick up, arrows move, Shift+arrows resize, Space drops
+  (WCAG 2.5.7).
+- **Stored** in `__UserSettings` via `frappe.model.utils.user_settings.save("Crema Home", …)`:
+  `{pinned: [{card, x, y, w}], hidden: [card], sizes: {card: w}}`. Pinned cards keep their place; learned cards
+  fill the remaining slots in score order. "Reset" clears it.
+- **Role defaults**: a System Manager in edit mode picks "Publish as default for role…". Stored in a DocType
+  `Crema Home Default` (role, layout JSON, priority) in the Crema app, so it is versioned and editable in Desk.
+  Frappe CRM does the same (`crm/fcrm/doctype/crm_dashboard/home_layout.py` `RoleDefault`). Precedence:
+  **user pins / hides > role default (highest-priority matching role) > learned order**. A role default is
+  pins and hides, not a frozen page: learned cards still fill the gaps.
+
+#### 4.1.9 Wireframes
+
+```
+1920 (sidebar 240 · grid 12 cols · ~14 cards before "Show more")
+┌ header ── ⌂ Home ─────────────────────── 🔍 Search or ask ⌘K ───────────────────────── ✦  🔔 3  (AN) ┐
+├ sidebar ┬ Good morning, Asha · Selling                              Filter this page…   [Edit ✎]   │
+│ ⌂ Home  │ ┌ Needs you (6) ──────────────┐┌ Quick create ───────────────┐┌ Ask AI ✦ ─────────────────┐ │
+│ ★ Pins  │ │ ● PO-0112 Approve  Zen   2h ││ + Sales Order  + Quotation  ││ Ask about your data…      │ │
+│ Recent  │ │   [Approve] [Reject]        ││ + Customer     + Payment    ││ [What's waiting on me?]   │ │
+│ ─────── │ │ ● SO-0042 Assigned Acme  1d ││ + Delivery Note + Item      ││ [Overdue invoices]        │ │
+│ Selling │ │ ○ ToDo Call Ravi    overdue ││                             │└───────────────────────────┘ │
+│ Buying  │ │ … See all 6                 │└─────────────────────────────┘┌ Continue ─────────────────┐ │
+│ Stock   │ └─────────────────────────────┘┌ To deliver ┐┌ Quotations ┐ │ ◌ SO-0051 draft     1h    │ │
+│ …       │ ┌ Sales trend (12 mo) ─────────────────────────┐│ 12   ▼ 2   ││ Open 9     │ │ ◌ QTN-031 draft     3h    │ │
+│         │ │ ▁▂▃▅▆▇█▇▆▅▆▇                     [This year ▾]││            ││ Lost 2     │ └───────────────────────────┘ │
+│         │ └──────────────────────────────────────────────┘└────────────┘└────────────┘┌ Today ────────────────────┐ │
+│         │ ┌ Sales Orders · My open ───────────────────────┐┌ Your reports ────────────┐│ 10:00 Call with Zen       │ │
+│         │ │ SO-0042 Acme  ● To deliver  24,500            ││ Sales Analytics  ·  AR   ││ ToDo: send price list     │ │
+│         │ └───────────────────────────────────────────────┘└──────────────────────────┘└───────────────────────────┘ │
+│         │ ▸ All workspaces (14)                                                    Show more (3)                     │
+└─────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+1280 (sidebar rail 56 or 240 · grid 12 cols · ~8 cards)
+┌ header ───────────────────────────────────────────── ✦ 🔔 (AN) ┐
+├ sb ┬ Good morning, Asha · Selling       Filter…  [Edit ✎]       │
+│    │ ┌ Needs you (6) ─────────┐┌ Quick create ──┐┌ Continue ───┐ │
+│    │ │ ● PO-0112 Approve   2h ││ + Sales Order  ││ ◌ SO-0051   │ │
+│    │ │   [Approve] [Reject]   ││ + Quotation    ││ ◌ QTN-031   │ │
+│    │ │ ● SO-0042 Assigned  1d ││ + Customer     │└─────────────┘ │
+│    │ └────────────────────────┘└────────────────┘┌ To del ┐┌ QTN ┐│
+│    │ ┌ Sales trend ───────────────────────┐      │ 12     ││ 9   ││
+│    │ │ ▁▂▃▅▆▇█▇▆▅▆▇                        │      └────────┘└─────┘│
+│    │ └────────────────────────────────────┘ ┌ Your reports ──────┐ │
+│    │ ▸ All workspaces · Show more (6)       └────────────────────┘ │
+└────┴────────────────────────────────────────────────────────────────┘
+
+390 (one column; order = score; KPIs as a swipe row)
 ┌──────────────────────────┐
 │ ☰  Home          ✦  (AN) │
-│ Waiting on me (4)      › │
-│ ● SO-0042 Approve    2h  │
-│ ● PI-0101 Review     1d  │
-│ ┌ 1.2M ─┐ ┌ 38 ───┐  ←→  │  number cards scroll horizontally (snap)
-│ │ Sales │ │ Orders│      │
-│ Sales trend  ▁▂▃▅▆▇█     │
-│ Shortcuts (2 × n grid)   │
-│ Recent                   │
+│ Good morning, Asha       │
+│ Needs you (6)          › │
+│ ● PO-0112 Approve    2h  │  swipe left on a row: Approve / Reject (only no-field transitions)
+│ ● SO-0042 Assigned   1d  │
+│ ┌ 12 ───┐ ┌ 9 ────┐  ←→  │  KPI cards scroll horizontally (snap)
+│ │To del.│ │Quotes │      │
+│ Quick create (2 × 3)     │
+│ Continue · Today · Recent│  each a collapsible card
+│ [Ask anything… ✦]        │
 ├──────────────────────────┤
-│ ⌂   🔍   ＋   🔔   👤    │
+│ ⌂   🔍   ＋   🔔   👤    │  ＋ = the Quick create list as a sheet
 └──────────────────────────┘
 ```
 
-**Learned from a white-label app's desk home.** A white-label Frappe app on the local bench replaces `/desk` with its
-own home (`app_home = "desk"` in `hooks.py`, a `www/desk.py` context that loads the data server-side, a client
-renderer in `public/js/*_dashboard.js`, tokens in `public/css/*/_tokens.scss`). What it does well, and how Crema
-adopts each point **generically**:
-
-| It does well | How it does it (there) | Crema adopts it as (no per-app code) |
-|---|---|---|
-| Home is fast and complete on first paint | Data loaded in the page context on the server (`www/desk.py` → `get_desk_dashboard_data`), cached 60 s per user | Home is a Server Component fed by one batched call (S3), cached per user 60 s on the Next server; skeleton only for slow cards |
-| A greeting with the user's role context ("Sales command center") | Guesses a profile from role names containing "sales", "purchase", … | Title = the resolved workspace's title ("Selling") and the user's first name; no role-name guessing |
-| A row of clickable KPI cards that lead to lists | Counts of open / overdue ToDos, unread notifications, drafts / pending / approved | Row 1 = **My work counts** (waiting on me, overdue ToDos, my drafts, unread notifications), each a link to the filtered list; then the workspace's own Number Cards. Vanity counts (number of workspaces, number of shortcuts) are not shown |
-| "Your recent documents" with a clear status | Recent docs with a status label from `workflow_state` → `status` → `docstatus`, and a tone | Same order of precedence for the label (it matches Desk's `frappe.get_indicator`), StatusPill tones; doctypes come from the user's recent activity, not a fixed list |
-| Recent activity feed | Activity Log for the user, last 30 days | "Recent" card from the user's Activity Log / Version entries, grouped by day |
-| Workspace map grouped by module with counts | Public workspaces grouped by `module` | "All workspaces" card (collapsed by default) from boot `workspaces` / `module_sidebars`, grouped by module, permission-filtered as Desk does |
-| Quick jumps | A fixed list of six DocTypes | Workspace shortcuts + the user's pinned items (§ 3.2) + "New <DocType>" for the 4 DocTypes the user creates most |
-| Type-to-filter on the home itself, ⌘K for global search | A search field that hides non-matching tiles instantly; Ctrl+K opens Desk's awesomebar | "Filter this page…" field in the home header filters cards and lists client-side; Enter or ⌘K hands the text to ⌘K (§ 4.8) |
-| Branding everywhere | `app_logo_url`, splash image, brand tokens (primary green scale, warm neutrals, low green-tinted shadows), theme synced to `User.desk_theme` | Logo from Navbar Settings / `app_logo_url` hook (boot), accent token from the site (§ 9 Q3), theme stored in `User.desk_theme` as Desk does; the token file is the only place a brand changes |
-| Sidebar that collapses to a rail; mobile drawer | Custom sidebar, 52 px collapsed | Same pattern (§ 3.2) |
-
-Not adopted: hard-coded DocType lists and routes, role-name keyword matching, emoji icons, `!important` overrides of
-Desk CSS, and metrics computed from only the last few recent documents (they look like KPIs but aren't).
-
-- **Grid:** `CardGrid`, 12 columns; card spans 3 (number), 6 (chart / list), 12 (wide chart). Columns collapse 12 → 6 →
-  1 by container width. On wide screens the grid **adds** card columns rather than widening cards: number cards are
-  ≥ 180 px and ≤ 280 px wide, so 1280 shows 4 per row, 1600 six, 1920 eight (§ 3.8), 2560 twelve. Card data from the site's own Number Card / Dashboard Chart / workspace quick lists
-  (`frappe.desk.doctype.number_card.number_card.get_result`, `dashboard_chart.get`; existing `app/api/desk/number-card`
-  and `chart` routes). Date range and filters on the card's ⋯ menu.
-- **Edit mode** (Edit ✎): drag to move, handle to resize (1 / 2 / 4 width steps), × to hide, "+ Add card" picks from
-  the workspace's cards and the site's Number Cards / Charts the user can read. Keyboard: focus a card, Space to
-  pick up, arrows to move, Shift+arrows to resize, Space to drop (WCAG 2.5.7 dragging alternative). Saved per user in
-  `user_settings` key `Crema Home:<workspace>`; "Reset to workspace layout".
-- **Role layouts:** a System Manager gets "Publish for role…" in edit mode; stored as a `Crema Home:<workspace>` value
-  on a role-level default (§ 9 Q2 on storage). User layout wins over role layout.
-- **States:** loading = card-shaped skeletons in the saved layout (no shift); a card error shows inside the card
-  ("Couldn't load · Retry") — the page never fails as a whole; no permission on a card's DocType → the card is left out.
-- Suite: `e2e/p2.home.mjs` (site home respected for user default app / system default app / workspace; pin, move,
-  resize saved and reloaded; screenshots 390 / 1280 / 1600 / 2560).
+- **States:** loading = card skeletons in the last layout (stored with the cache, no shift); a card error stays
+  inside the card ("Couldn't load · Retry"); a card whose permission disappears is dropped on the next load.
+- Suite `e2e/p2.home.mjs`: site home resolution; two seeded users with different roles get different first 5 cards;
+  a user who creates 5 Stock Entries sees Stock Entry in Quick create after cache expiry; pin / hide / reorder /
+  resize saved and reloaded; role default published and applied; no card for a DocType outside `can_read`;
+  screenshots 390 / 1280 / 1920 / 2560. Python tests in the app: ranking (decay, cold start, stability), log reads
+  limited to the session user.
 
 ### 4.2 List (`/desk/doctype/[doctype]`; Desk `list/list_view.js`, `base_list.js`, `list_filter.js`, `bulk_operations.js`)
 
@@ -786,13 +929,82 @@ Suite: `e2e/p2.doctypebuilder.mjs` (DocType with a table and a Link, permissions
 
 ---
 
-## 5. AI assistant UI
+## 5. AI assistant
 
-Backend and rules are in [GAPS 3.9](GAPS.md#39-ai-assistant-inside-crema) (Claude via `/api/ai/chat`, tool calls through
-Frappe's MCP at `/api/v2/mcp` with the user's session, reads run, creates open a filled form, other writes need a
-confirm card, setup goes through builders). This section is the UI.
+**Can it…? (owner's questions, 2026-11-26)**
 
-References studied: Frappe CRM's "Flow" assistant (`frontend/src/components/FlowChat/*` in github.com/frappe/crm —
+- **Can a chat box inside Crema use my own Claude subscription through MCP?** No. MCP goes one way: Claude calls the
+  site's tools during a chat the user started in Claude. There is no API through which a website can send messages
+  into a person's claude.ai subscription, and Anthropic's consumer terms keep a subscription for that person's own
+  use in Claude's apps. An in-page chat box powered by a personal subscription is not possible. What comes closest:
+  1. **"Ask in Claude" hand-off**: a Crema button opens Claude with the question and the record's context. The
+     desktop link `claude://claude.ai/new?q=…` (prompt prefilled, ~14,000 characters max) is documented
+     ([Claude Desktop links](https://support.claude.com/en/articles/14729294-open-claude-desktop-with-a-link),
+     [mobile](https://support.claude.com/en/articles/14898120-open-the-claude-mobile-app-with-a-link)); the web
+     `claude.ai/new?q=` isn't officially documented and reports conflict, so on the web Crema copies the prompt to
+     the clipboard and opens `claude.ai/new`. With the connector, Claude's answer comes back as a draft in Crema with
+     a link.
+  2. **Claude in Chrome**: Anthropic's browser extension, generally available since 2026-08-26 on paid plans (Pro,
+     Max, Ultra, Team, Enterprise; not Free; desktop Chrome and Edge; on Enterprise an admin enables it and can limit
+     domains) ([announcement](https://claude.com/resources/articles/claude-in-chrome-generally-available),
+     [help](https://support.claude.com/en/articles/12012173-get-started-with-claude-in-chrome)). It runs on the
+     user's own plan in a side panel, reads the open Crema page and can click and type in it as the user. No Crema
+     work needed; Crema's stable labels and `aria-*` (§ 7) help it.
+  3. **Claude Desktop / Claude Code with the site's MCP** (tier 0 and tier 0-local, § 5.14).
+- **Is the Claude connector like an API?** No API key and no per-token bill for the company. During the user's chat,
+  Claude's cloud (or, for tier 0-local, the user's computer) calls the site's `/api/v2/mcp` endpoint with that user's
+  OAuth token. The site only answers tool calls; the model's work counts against that user's Claude plan limits.
+- **Can the in-app chat use any router?** Yes. OpenRouter is the default, and the provider setting accepts **any
+  OpenAI-compatible base URL + key + model** (other routers, DeepSeek, OpenAI, Groq, Together, a self-hosted vLLM /
+  Ollama), plus native Anthropic and Gemini (§ 5.16).
+- **Is there a router with ~1 billion free tokens a month?** Not verified. The closest found: OpenRouter's own
+  comparison says Mistral's free "Experiment" tier gives roughly 1 billion tokens a month **only if you opt into
+  data training** ([OpenRouter blog](https://openrouter.ai/blog/tutorials/free-llm-apis-compared/)), and open-source
+  aggregators claim 1.6–7.4 billion by pooling many providers' free tiers (unverified marketing figures). Such free
+  tiers have rate limits, may log or train on prompts, and change often (some disappeared in 2026). Crema offers
+  them only as a **"Free / test provider" preset** in AI Settings, marked unsuitable for real company data.
+
+**Every form of AI chat, side by side**
+
+| Form | Where the chat lives | Who pays | Setup | Images | Public site needed | Editor shown | Delivered in |
+|---|---|---|---|---|---|---|---|
+| In-Crema chat, OpenRouter (default) | Crema panel, ⌘I | Company, per token (≈ $2 / active user / month, § 5.17) | AI Settings: key + model slots | Yes (vision slot) | No (outbound HTTPS) | The user | PR 4a, 4b, 4e |
+| In-Crema chat, any router / provider | Crema panel | Company, per token (or free preset, test only) | AI Settings: base URL + key + model | If the model has vision, else OCR | No | The user | PR 4a (adapters), 4f |
+| In-Crema chat, own model | Crema panel | Company hardware | Admin runs vLLM / Ollama; AI Settings: URL | Vision model needed | No | The user | PR 4a, 4f |
+| Claude connector (claude.ai web / Desktop / mobile) | Claude | Each user's Claude plan (or Team / Enterprise seats) | Connect Claude page + add connector in Claude | Yes | **Yes** (public HTTPS, port 443) | The user | PR C1, C2 |
+| Claude Desktop / Claude Code, local MCP | Claude on one computer | That user's plan | "On this computer" tab: copy command / config | Yes (Desktop) | No | The user | PR C1 (+ C2 tools) |
+| Claude in Chrome | Chrome side panel over Crema | That user's paid plan | Install the extension | Reads the page / screenshots | No | The user (it acts in their browser session) | Nothing to build; § 7 accessibility helps |
+| "Ask in Claude" hand-off | Claude | That user's plan | None | Paste / attach in Claude | No (yes if the result should come back through the connector) | The user | PR C1 (button), PR 10 (⌘K row) |
+
+### 5.0 Two tiers, one tool layer (decision)
+
+Owner's direction (2026-11-26): no expensive API by default; it should work "like normal Claude"; an in-app chat may
+use any provider (e.g. DeepSeek) to keep costs low. A claude.ai subscription (Free / Pro / Max / Team / Enterprise)
+is for that one person's own use in Claude's apps. Even the top Max plan can't be used by Crema's server to call the
+model for other users (Anthropic's consumer terms; apps use API keys), so it can't power a chatbot inside Crema. Hence
+two tiers (tier 0 also has a one-computer variant) that share **one tool layer** in the Crema Frappe app (§ 5.15) and the same review rules (drafts only,
+confirm cards, the user submits).
+
+| | **Tier 0: Claude connector (default)** | Tier 0-local: Claude on one computer | Tier 1: chat inside Crema, any provider |
+|---|---|---|---|
+| How | Each user adds the site as a custom connector in Claude (claude.ai, Desktop, mobile). Claude calls the site's MCP endpoint `/api/v2/mcp` with that user's OAuth token | Claude Code or Claude Desktop on the user's machine connects to the site's `/api/v2/mcp` directly (Desktop through a local bridge), so a site on `localhost` or a private network works (§ 5.14 "On this computer") | The Crema app runs the chat loop in Frappe against the provider set in AI Settings. **Default: OpenRouter** (one key, many models, a model per task); also Anthropic, other OpenAI-compatible APIs (DeepSeek, OpenAI, Groq, Together, self-hosted Ollama / vLLM) or Google Gemini (§ 5.16) |
+| Cost to the company | **$0**: each user's own Claude plan (or Team / Enterprise seats) | $0: that person's own plan (personal use) | Pay per token: ≈ $0.35–2 per active user per month on the cheap models at 20 requests / day (§ 5.17); hardware if self-hosted |
+| Setup | Browser: Connect Claude page (§ 5.14) + Claude settings. Needs a public HTTPS site URL | Copy one command (Claude Code) or one config snippet (Desktop) from Connect Claude → On this computer | Browser: AI Settings → provider, model, API key (Password field) |
+| Where the chat lives | **In Claude**, not in Crema. Crema shows the results (drafts, links, activity) | In Claude Code / Desktop on that computer | Crema panel (§ 5.1–5.13), ⌘I, "Create from document" |
+| Images / PDFs | Yes, read by Claude in the chat | Yes in Claude Desktop (drop the photo in the chat) | Through the "vision model" slot (§ 5.16), or OCR first |
+| Who is the editor | The user (Frappe sets the session user from the OAuth token) | The user (OAuth token or that user's API key) | The user (session) |
+| Data goes to | Anthropic, under the user's plan terms | Anthropic, under the user's plan terms (the site itself stays private) | The chosen provider (§ 5.16 privacy), or nowhere if self-hosted |
+| Private network | No: Anthropic's servers must reach the site | **Yes**: only the user's computer must reach the site; one user per setup | Outbound HTTPS only; nothing if self-hosted |
+
+**Recommended default: tier 0** (no company bill, Frappe v16 already has every protocol piece, § 5.14). Tier 1 is a
+later PR for teams that want the chat inside Crema; its recommended provider is in § 5.17.
+
+Sections 5.1–5.13 describe the **Crema panel** (tier 1). Tier 0's chat is Claude's own UI; § 5.14 covers what Crema
+adds around it.
+
+### Crema panel (tier 1)
+
+Backend and rules: § 5.16 and [GAPS 3.9](GAPS.md#39-ai-assistant-inside-crema). References studied: Frappe CRM's "Flow" assistant (`frontend/src/components/FlowChat/*` in github.com/frappe/crm —
 one shared chat opened from Home and the command palette, approval cards with Approve / Deny / Approve all, chat
 history popover with search, states idle / working / needs_you / answered / error, a removable record-context chip);
 Microsoft 365 Copilot (chat pane on the right of the document; F6 reaches it —
@@ -1016,11 +1228,11 @@ buttons that fill and send.
 |---|---|
 | Assistant off for the site, or no API key | No ✦ button, no ⌘I, no "Ask AI" in ⌘K. System Managers see "Set up the AI assistant" in ⌘K and in My settings → Assistant, linking to AI Settings |
 | On, but the user's role is not allowed | Same as off (no teasing), except My settings → Assistant says "Your administrator hasn't enabled the assistant for your role." |
-| Frappe MCP disabled (System Settings → AI Agents) | Panel opens with a Banner "The site's AI tools are off. A System Manager can turn on MCP in System Settings." (link shown to System Managers only) |
+| Frappe MCP disabled (System Settings → AI Agents) | Tier 0 stops working; Connect Claude shows the check in red. The Crema panel (tier 1) is unaffected: its tools run in-process (§ 5.16) |
 | Limit reached | § 5.6 |
 | Provider down | Error card + Retry; the rest of Crema unaffected |
 
-**AI Settings page** (System Manager, `/desk/ai-settings`, a settings page per § 4.7): on/off, API key (write-only
+**AI Settings page** (System Manager, `/desk/ai-settings`, the app's `Crema AI Settings`, § 5.16): tier, on/off, API key (write-only
 field, shows "set · ends with …abcd"), model, roles allowed, per-user daily limit, "what is sent" text (shown to users
 via the footer link), link to Frappe's "Agent Instructions" (System Settings → AI Agents), activity log.
 
@@ -1040,8 +1252,8 @@ via the footer link), link to Frappe's "Agent Instructions" (System Settings →
 
 ### 5.13 Assistant suites
 
-All use a **stub model** (GAPS 3.9: tests cost nothing): `/api/ai/chat` honours `CREMA_AI_STUB=1` and replays scripted
-turns.
+All use a **stub model** (GAPS 3.9: tests cost nothing): the Crema app's stub client (§ 5.18) replays
+scripted turns against the real tools.
 - `e2e/p2.ai.panel.mjs` (4a): open by button / ⌘I / ⌘K Tab / record menu; Esc and ✕ close; focus returns; state
   remembered; docked at 1600, overlay at 1024, sheet at 390; coexistence with Preview tab; read-only answer with
   tool lines and links; Stop; error + Retry; off / no-role states.
@@ -1049,6 +1261,377 @@ turns.
   check, confirm runs, list refreshes, timeline note; submit card separate.
 - `e2e/p2.ai.setup.mjs` (4c): "create a DocType Vehicle…" → builder draft → save → cleanup.
 - `e2e/p2.ai.log.mjs` (4d): activity log rows, daily limit banner.
+
+
+### 5.14 Tier 0: Claude connected to the site (default)
+
+**What Frappe v16 already provides** (read in the bench's source):
+
+| Piece | Where | Default |
+|---|---|---|
+| MCP endpoint, Streamable HTTP (POST, JSON responses, no session store), protocol `2026-07-28` and `2025-11-25` | `frappe/api/v2.py` rule `/mcp` → `frappe/mcp/transport.py` `handle_request`, `frappe/mcp/protocol.py` | On: System Settings → AI Agents → `enable_mcp` |
+| 13 tools: search DocTypes / methods, DocType / method schema, document methods, list / get / count / create / update / delete documents, call a whitelisted method, call a document method | `frappe/mcp/tools/{discover,documents,methods}.py` | All, filtered by the user's permissions (REST v2 checks) |
+| Only desk users | `transport.py`: `SYSTEM_USER_ROLE` required, else 403 | Website users can't connect |
+| Server instructions sent to the client on `initialize` | `mcp/server.py` `server_configuration` → System Settings → AI Agents → `agent_instructions` | Empty |
+| OAuth authorization server metadata (RFC 8414): code flow, PKCE `S256`, refresh tokens, revocation, introspection, public clients (`none`) | `frappe/integrations/oauth2.py` `_get_authorization_server_metadata`, `/.well-known/oauth-authorization-server` | On (OAuth Settings `show_auth_server_metadata`) |
+| Protected resource metadata (RFC 9728) and `WWW-Authenticate: Bearer resource_metadata=…` on 401 / 403 | `oauth2.py` `_get_protected_resource_metadata`, `frappe/app.py` `set_authenticate_headers` | On (`show_protected_resource_metadata`) |
+| Dynamic client registration (RFC 7591), guest-accessible; redirect URIs must be HTTPS outside developer mode | `oauth2.py` `register_client`, `integrations/utils.py` `validate_dynamic_client_metadata` | **On** (`enable_dynamic_client_registration`) |
+| Bearer token → session user | `frappe/auth.py` `validate_oauth` → `frappe.set_user(<token's user>)` | Every change is made and versioned as that user |
+| OAuth Client restrictions | `OAuth Client.allowed_roles`, `skip_authorization` | — |
+| A user's connected apps with revoke | `/third_party_apps` (`frappe/www/third_party_apps.py`, `delete_client`) | — |
+
+Not supported: Client ID Metadata Documents (a URL as `client_id`). So in Claude's connector settings the "published
+identity" option won't work; use "Register automatically" or "Use your own OAuth client".
+
+**What Claude needs** ([custom connectors help](https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp),
+[MCP authorization spec](https://modelcontextprotocol.io/specification/latest/basic/authorization)):
+- Plans: Free (one custom connector), Pro, Max, Ultra, Team, Enterprise. Works in claude.ai, Claude Desktop, Cowork
+  and the mobile apps. On Team only Owners / Primary Owners add an organisation connector (Enterprise: also a custom
+  role with "Manage access to Libraries"); each member then connects (signs in) individually. Pro / Max users add it
+  themselves under Customize → Connectors.
+- The URL is reached **from Anthropic's cloud**: public internet, HTTPS on port 443 (no custom port), not behind a
+  VPN or firewall unless Anthropic's IP ranges are allowed
+  ([IP addresses](https://platform.claude.com/docs/en/api/ip-addresses)). A bench on `localhost` needs a tunnel
+  (e.g. Cloudflare Tunnel) or a hosted site; Frappe Cloud sites already qualify.
+- OAuth: Claude discovers the server via `WWW-Authenticate` → protected-resource metadata → authorization-server
+  metadata, uses PKCE, and either registers itself (DCR) or uses a client ID / secret entered in "Advanced". The
+  callback to register is `https://claude.ai/api/mcp/auth_callback`.
+
+**Decision: a dedicated OAuth Client, DCR off.** Crema's Connect Claude page creates one OAuth Client "Claude"
+(redirect `https://claude.ai/api/mcp/auth_callback`, grant Authorization Code, response Code, scopes `all openid`,
+`allowed_roles` = the roles the admin picks). Then it turns DCR off, because `register_client` is open to guests and
+would let anyone on the internet create OAuth Clients on the site. One known client also lets the Crema app tell
+"via Claude" changes apart (below).
+
+**Minimal path** (works on a v16 site as installed, no Crema app needed): DCR is on by default and the
+`/.well-known/oauth-*` endpoints answer (checked on the bench), so a user pastes `https://<site>/api/v2/mcp` into
+Claude's "Add custom connector", leaves OAuth on "Register automatically", connects and signs in. The site only needs
+a public HTTPS URL. The steps below are the recommended, hardened version.
+
+**Setup, all in the browser** (after the Crema Frappe app is installed, § 5.15; on Frappe Cloud that's also a
+browser step):
+
+| # | Who | Where | Step |
+|---|---|---|---|
+| 1 | System Manager | Crema → ⌘K "Connect Claude" (`/desk/connect-claude`) | The page runs the checks below and fixes what it can with one click each |
+| 2 | System Manager | same | Pick the roles allowed to connect → **Create Claude client**. Copy the **Connector URL** (`https://<site>/api/v2/mcp`), **Client ID**, **Client secret** (shown once) |
+| 3 | Team / Enterprise Owner (or each Pro / Max user) | claude.ai → Settings / Customize → Connectors → Add custom connector ("Open Claude settings" button on the page links there) | Name "<Company> ERP", paste the URL; Advanced → "Use your own OAuth client" → Client ID + secret; Authentication "Sign in when needed" |
+| 4 | Each user | Claude → Connectors → the ERP connector → Connect | A Frappe login page opens (Crema's login if the site uses it); sign in; Frappe shows "Allow Claude to access your account" → Allow. Done |
+| 5 | Each user | Crema → My settings → Connected apps | Sees "Claude · connected 26 Nov · last used 2 h ago" with **Revoke** |
+
+Checks on the Connect Claude page (green / red, each with a fix button where possible):
+
+| Check | How | Fix |
+|---|---|---|
+| Site URL is HTTPS and public | Crema's server fetches `https://<site>/.well-known/oauth-protected-resource` through the public host name and compares `resource`. A `localhost` / private IP / non-443 port fails with an explanation and a link to tunnel docs | — |
+| MCP enabled | System Settings `enable_mcp` | Turn on |
+| OAuth metadata published | OAuth Settings `show_auth_server_metadata`, `show_protected_resource_metadata` | Turn on |
+| Claude client exists with the right callback | OAuth Client where `redirect_uris` contains the Claude callback | Create |
+| DCR off | OAuth Settings `enable_dynamic_client_registration` | Turn off |
+| Agent Instructions set | System Settings `agent_instructions` | Fill with the recommended text: use `crema.ai.tools.*` for matching and drafts, never submit, reply with the Crema link for each draft (Crema's base URL included) |
+| Drafts-only guard on | Crema AI Settings `mcp_drafts_only` (default on) | Turn on |
+
+Per-user status: "My connected apps" (any user; same data and `delete_client` revoke as Frappe's
+`/third_party_apps`). System Managers also get **Connections**: every OAuth Bearer Token of the Claude client (user,
+created, expires, last used, status) with Revoke and "Revoke all".
+
+**What Crema (with its Frappe app) adds around Claude's chat:**
+- **Tools that make the use cases reliable** (§ 5.15): item / supplier matching, "create draft from lines", price and
+  stock, reorder and trend analysis. Frappe's MCP lets Claude find and call any whitelisted method
+  (`search_methods` → `get_method_schema` → `call_method`), so these need no change to Frappe.
+- **Drafts only, enforced on the server.** A `doc_events` hook on `before_submit`, `before_cancel` and `on_trash`
+  throws "Submit / cancel / delete this in Crema" when the request is an MCP request (`frappe.local.mcp_request` is
+  set by `mcp/transport.py`) and `mcp_drafts_only` is on. Claude's own "allow this tool?" prompt is a second,
+  weaker layer.
+- **"via Claude" on the timeline.** An `after_insert` / `on_update` hook adds a Comment "Created / Updated via Claude"
+  when the request is MCP and the bearer token belongs to the Claude client (Frappe itself records only the user).
+- **AI activity** (System Manager list, and per-user in My settings): one row per MCP tool call (user, tool,
+  DocType / method, document, result, time), written by a `before_request` / `after_request` hook on `/api/v2/mcp`.
+- **Links back.** Draft-creating tools return the Crema URL of the draft, and the Agent Instructions tell Claude to
+  show it, so the user taps from Claude into Crema to review and submit. Crema's form shows the "Created via Claude,
+  check and Submit" banner (§ 5.8) for drafts with that comment.
+- **Home**: "Drafts from Claude (3)" appears in Needs you / Continue (§ 4.1.5) through the normal ranking.
+
+**Use cases on tier 0:**
+
+| Ask (in Claude) | What happens | Tools |
+|---|---|---|
+| Photo of a supplier quote: "make a PO for this" | Claude reads the photo itself (vision, in the user's plan). Calls `match_lines(lines, supplier_hint)` → gets matched / check / unmatched lines. Asks the user in the chat about the unclear ones (shows the 3 candidates). Calls `draft_purchase_order(supplier, lines, schedule_date)` → a **draft** PO (ERPNext's validate fills UOM, price list rate, taxes, warehouse). Replies with the totals and "Open in Crema ↗" | `crema.ai.tools.match_lines`, `match_party`, `draft_purchase_order` (or MCP `create_document`, which works but costs Claude many `list_documents` calls to match items) |
+| "10 A4 paper, 5 blue pens for Acme, deliver Friday" | `match_party("Acme", "Customer")`, `match_lines`, `price_and_stock(items, customer)` shows rate, stock and projected qty; `draft_sales_order` → link | same + `price_and_stock`, `draft_sales_order` / `draft_quotation` |
+| "What should I buy this week?" | `reorder_suggestions(days=7)` returns a computed table (projected qty, reorder level, average outflow, lead time, suggested qty). Claude explains it and offers "Create a draft Material Request with these?" → `draft_material_request(lines)` → link | `reorder_suggestions`, `draft_material_request` |
+| "Which customers are slowing down?" / "Sales trend for item X" | `customer_slowdown(months=3)` / `item_sales_trend(item)`; Claude can draw a chart in its own UI from the returned rows | analysis tools |
+| Submit / cancel / delete | Refused by the drafts-only guard with "Do this in Crema" and the link | — |
+
+**Limits (said plainly in the page and in the docs):**
+- The conversation is in Claude. Crema can't show it, continue it or search it; it sees only the tool calls (AI
+  activity) and the resulting drafts.
+- A subscription can't be driven by Crema's server, so there is no ✦ panel, no "drop a photo on the PO list", no
+  ⌘I on tier 0. Crema's "Ask AI" entry points instead hand off to Claude: the desktop link
+  `claude://claude.ai/new?q=…` opens Claude Desktop with the prompt prefilled; on the web Crema copies a ready prompt
+  ("About Sales Order SO-0042 on <site>: …") to the clipboard and opens `claude.ai/new`.
+- The uploaded photo stays in Claude. If the user wants it on the PO, they attach it in Crema (the banner offers
+  "Attach the original document").
+- Usage limits are the user's plan limits. Free has one custom connector.
+- The site must be reachable from Anthropic's IP ranges over public HTTPS.
+
+#### Tier 0-local: Claude on one computer, site not public
+
+For one person using their own Claude plan on their own machine (personal use, allowed by the plan) against a site
+that isn't on the public internet, e.g. a bench at `http://mysite.localhost:8000`. The connection starts on that
+computer, so Anthropic's cloud never needs to reach the site.
+
+| Client | How it connects | Auth |
+|---|---|---|
+| **Claude Code** | `claude mcp add --transport http frappe http://mysite.localhost:8000/api/v2/mcp` then `claude mcp login frappe` (commands from Frappe's MCP guide, docs.frappe.io/framework/guides-integration/mcp). Runs locally, so `localhost` works | OAuth: browser opens Frappe's login, then Allow. Frappe accepts `http://localhost` / loopback redirect URIs for dynamic registration even outside developer mode (`integrations/utils.py` `_is_secure_redirect_uri`) |
+| **Claude Desktop** | Its "Add custom connector" is called from Anthropic's cloud, so `localhost` fails there. Instead add a **local MCP server** in `claude_desktop_config.json` that bridges stdio to the site's HTTP endpoint with the [`mcp-remote`](https://github.com/geelen/mcp-remote) package (`npx -y mcp-remote <url>`). For a plain-`http` URL that isn't loopback, `mcp-remote` needs `--allow-http` | Either OAuth through the bridge (it opens the browser and uses a localhost callback), or, simplest for one user, Frappe's API key: header `Authorization: token <api_key>:<api_secret>` passed with `--header-file` (keeps the secret out of the process list) |
+
+Claude Desktop snippet that Crema generates (token variant):
+
+```json
+{
+  "mcpServers": {
+    "frappe": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://mysite.localhost:8000/api/v2/mcp",
+               "--header-file", "/Users/<you>/.config/crema/frappe-mcp-headers.txt"]
+    }
+  }
+}
+```
+`frappe-mcp-headers.txt` holds one line: `Authorization: token <api_key>:<api_secret>`.
+
+**What Crema adds: Connect Claude → "On this computer" tab** (every allowed user, not only System Managers):
+- Detects the site URL Crema talks to and shows the exact **Claude Code commands** and the **Claude Desktop
+  snippet** for it, with Copy buttons and the config file location per OS.
+- **Create / regenerate my API key** (token variant): a Crema app method that calls Frappe's key generation for the
+  **session user only** (Frappe's own `generate_keys` is System Manager-only); the secret is shown once, with
+  "Download headers file". **Revoke** clears the secret. Allowed only for roles ticked in AI Settings.
+- Security note on the tab: "This key acts as you, with all your permissions, until you revoke it. Keep the file
+  private; don't paste it into chats." The drafts-only guard and AI activity log apply to these requests too (they
+  are MCP requests).
+- Photo → PO works in Claude Desktop exactly as in tier 0 (drop the photo, Claude calls `match_lines` and
+  `draft_purchase_order`); Claude Code is better for typed and analysis asks.
+
+### 5.15 The shared tool layer (Crema Frappe app)
+
+One Frappe app named **`crema`** (not `crema_ai`), installed on the site. Phase 3 adds the frontend to the same app,
+so sites never install a second one. Modules: `Crema Home` (§ 4.1.7) and `Crema AI`. Every tool is a whitelisted
+Python method with type hints and a docstring (Frappe's discovery reads them for `get_method_schema`), runs as the
+session user without `ignore_permissions`, and returns compact JSON plus a `crema_url` for anything created.
+
+| Tool (`crema.ai.tools.*`) | Does | Reads (permission-checked) | Writes |
+|---|---|---|---|
+| `match_lines(lines, supplier=None, customer=None)` | Matches free-text lines to Items in order: barcode (`Item Barcode`), supplier part no. (`Item Supplier`), item code, then link search on description (`frappe.desk.search.search_widget`, Item search fields + permission query); score, top 3 candidates for unclear lines | Item | — |
+| `match_party(text, party_type)` | Supplier / Customer by tax id, name search, Contact email / phone → Dynamic Link | Supplier / Customer, Contact | — |
+| `price_and_stock(items, customer=None, supplier=None, company=None)` | Rate, UOM, `actual_qty`, `projected_qty` via ERPNext `get_item_details` (pricing rules, price list) | Item, Bin, Item Price | — |
+| `draft_purchase_order`, `draft_purchase_invoice`, `draft_material_request`, `draft_sales_order`, `draft_quotation` | `frappe.new_doc` → set party and rows → `insert()` (docstatus 0; controller validate fills item details) | — | **Draft only**; never submits |
+| `reorder_suggestions(warehouse=None, item_group=None, days=7)` | Projected qty, reorder level / qty (`Item Reorder`), average daily outflow 30 / 90 days (`Stock Ledger Entry`), lead time (Item `lead_time_days`, else median PO → Purchase Receipt days), days of cover, suggested qty | Bin, Item Reorder, SLE, PO, PR | — |
+| `item_sales_trend(item, months=12)` | Qty and amount per month vs last year | Sales Invoice Item (submitted) | — |
+| `customer_slowdown(months=3)` | Per customer: last N vs previous N months, days since last order vs usual gap, drop > 30 % flagged | Sales Invoice | — |
+| `run_report(name, filters)` | Any report the user may run | `frappe.desk.query_report.run` | — |
+
+The numbers are computed in SQL / Python, so a model only explains them. Results are capped at 50 rows with a total
+line. Python tests run each tool on seeded data (`crema/ai/tests`).
+
+### 5.16 Tier 1: chat inside Crema, any provider
+
+**Where it runs.** In the Crema Frappe app, not on Crema's Next server: the key sits in a Frappe **Password** field
+(encrypted in `__Auth`, readable only by `frappe.utils.password.get_decrypted_password` on the server, shown as `*****`
+to everyone including System Managers), tools run in-process as the session user, and Desk could use the same method
+later. Frappe Builder stores its AI key the same way (`builder/ai/llm.py` `settings_api_key`).
+
+**AI Settings** (single DocType `Crema AI Settings`, System Manager only):
+
+| Field | Notes |
+|---|---|
+| Tier 0 options | `mcp_drafts_only` (default on), links to Connect Claude |
+| Chat enabled, roles allowed | Boot flag per user: enabled ∧ role allowed ∧ key set |
+| **Provider**: OpenRouter (default) / Anthropic / OpenAI-compatible / Gemini; base URL (prefilled: `https://openrouter.ai/api/v1`, `https://api.deepseek.com`, `http://<host>:11434/v1` for Ollama, …); API key (**Password**) | One key for all slots on OpenRouter; a slot can override provider + key |
+| **Chat model** | Used for every turn |
+| **Test mode** (OpenRouter `:free` models) | For trying the panel without paying (§ 5.17 limits); a red "Test mode" badge shows in the panel; blocked when any user outside System Manager is allowed |
+| **Vision model** (optional slot: same four fields) | Used to read photos / PDFs when the chat model has no image input. Empty → OCR route (below) |
+| **Analysis model** (optional slot) | Used when the user presses "Ask a stronger model" or for analysis tools' explanations |
+| **Fallback model** (optional slot) | Retried once when the provider errors (5xx, timeout, 429 after retries) |
+| Per-user daily limit (default 50 requests), **monthly budget cap** (currency amount; at 80 % System Managers get a notification, at 100 % the chat pauses until next month or the cap is raised) | Prices per million tokens are fields per slot (input, cached input, output) so the log can estimate cost for any provider |
+| Data rules: **blocked DocTypes** and **blocked fields** (Table: DocType, field) | Tool results drop these before anything is sent; tools refuse to read blocked DocTypes; default blocks Salary Slip, Employee bank / tax fields, User, OAuth / Password-type fields |
+| "What is sent" notice, upload limits (10 MB, PDF ≤ 20 pages), concurrency cap (2), delivery (stream / realtime), `stub_mode` (developer mode only) | |
+
+**One adapter layer.** Tools are defined once (name, description, JSON Schema of inputs, Python handler). A
+provider adapter converts tools, messages, tool calls, tool results, images and streaming events:
+
+| Adapter | API | Tools | Streaming | Images | Caching |
+|---|---|---|---|---|---|
+| `anthropic` | Messages API, official `anthropic` SDK (`client.messages.stream(...)`) | `tools` with `input_schema`, `strict: true`; `tool_use` / `tool_result` blocks | SDK event stream | `image` / `document` blocks | `cache_control` on tools + system |
+| `openai_compatible` | Chat Completions with `tools` (`type: function`), official `openai` SDK with `base_url` (**OpenRouter**, DeepSeek, OpenAI, Groq, Together, Ollama, vLLM). OpenRouter extras sent in the body: provider routing (`data_collection: deny`, ZDR) and `models` fallback list | `tool_calls` / `role: tool` messages | `stream: true` deltas, tool-call arguments assembled from chunks | `image_url` content parts when the model supports them | Provider-side automatic prefix caching where offered (DeepSeek, OpenAI); keep the prefix stable |
+| `gemini` | Gemini API, official `google-genai` SDK | function declarations / function responses | streamed generate | inline image / PDF parts | explicit context cache (billed per hour of storage, so used only above a traffic threshold) |
+
+One loop for all: send → stream text to the panel → for each tool call, validate → run → append result → repeat
+(max 8 tool calls per turn, 90 s per turn). Fallback model on provider error.
+
+**Streaming without background workers.** The method returns a werkzeug `Response` with a generator
+(`frappe/handler.py` passes `Response` objects through). Frappe closes the request with a `ClosingIterator` that
+calls `frappe.destroy` only after the body is sent (`frappe/app.py` `after_response_wrapper`), so the session and DB
+stay valid while streaming; log writes commit explicitly. Headers `text/event-stream`, `Cache-Control: no-cache`,
+`X-Accel-Buffering: no`. Crema's generic proxy buffers (`lib/frappe/proxy.ts` `arrayBuffer()`), so `/api/ai/chat` is
+its own pass-through route. Each answer holds a gunicorn worker: 90 s cap (bench default timeout 120 s), per-site
+concurrency cap; fallback delivery through `frappe.publish_realtime` (socketio, no workers).
+
+**The model gets no write tools.** It gets reads plus `propose_document` (→ open a filled form, § 5.8) and
+`propose_update` / `propose_action` (→ confirm card, § 5.7). Confirm calls `crema.ai.api.confirm(card_id)`, which
+re-checks `modified` and runs the write as the user. The `draft_*` tools create drafts only.
+
+**Photos and PDFs** ("Create from document"):
+1. Vision slot set (or the chat model accepts images): the image (downscaled to ≤ 2,000 px) goes to that model with a
+   strict JSON schema for header + lines.
+2. No vision model: **OCR first, on the server**: text PDFs through `pypdf` (already in a bench), images through
+   Tesseract (`pytesseract`, needs the `tesseract` binary on the server, a hosting step) → the chat model structures
+   the OCR text into lines with the same schema. Handwriting is poor with OCR; the card says "Couldn't read reliably
+   — check every line" when OCR confidence is low.
+3. Matching, review card and filled form as in § 5.18.
+
+**Privacy.** ERP data goes to the provider the admin chose. On OpenRouter: prompts and completions are not logged by default; the account's privacy settings should be **"ZDR only" and model training off**, and Crema sends `provider.data_collection = "deny"` on every request so a model whose hosts log or train is not used (the request fails instead). The underlying host still sees the data: Anthropic and OpenAI (US), Google (Gemini paid tier: not
+used to improve products, per its pricing page), DeepSeek (servers in China, under Chinese law), OpenRouter (routes to
+many hosts; pick hosts and data policy in its settings), or nowhere when self-hosted (Ollama / vLLM on the company's
+own machine; a model that reads documents and calls tools well needs a GPU with roughly 24–48 GB memory; CPU-only is
+too slow for chat). What is sent: the question, context chips, **only the tool results the model asked for**
+(capped at 50 rows, blocked DocTypes / fields removed), and uploads. Never whole tables, never the key, never other
+users' chats. The AI Settings page shows the provider's region next to its name, and the panel footer shows "Answers
+by <provider · model>".
+
+**Guardrails that matter more with cheap models:**
+- **Strict validation**: every tool call's arguments are validated against the JSON Schema (pydantic) before running;
+  on failure the error goes back as the tool result once, then the turn stops with "The assistant couldn't form a
+  valid request".
+- **Small tool set per task**: the panel sends 5–8 tools chosen by context (form: record tools; document drop:
+  extraction + matching + draft; analysis question: analysis tools), not all 25.
+- **Numbers computed on the server** (§ 5.15); the model only explains. Every number in an answer must appear in a
+  tool result; answers with numbers not found in tool results get a "check these figures" marker.
+- **Drafts only + confirm cards** (above); never auto-submit.
+- **Eval set before switching provider**: `crema/ai/evals/` holds ~30 real tasks from the bench (5 photo → PO, 5 typed
+  lines → SO, 5 "what should I buy", 5 summaries, 5 lookups, 5 refusals / permission cases), each with an automatic
+  check (draft lines match, right tool chosen, no write without a card, numbers from tools). `bench --site … execute
+  crema.ai.evals.run --kwargs "{'slot': 'chat'}"` prints pass rate, cost and latency per provider; a provider is
+  switched only if it passes ≥ 90 % of the set.
+
+### 5.17 Providers and cost (checked 2026-11-26)
+
+Prices per million tokens from the providers' pricing pages on 2026-11-26
+([Anthropic](https://platform.claude.com/docs/en/about-claude/pricing),
+[DeepSeek](https://api-docs.deepseek.com/quick_start/pricing),
+[Google](https://aistudio.google.com/docs/pricing), [OpenAI](https://developers.openai.com/api/docs/pricing)).
+Recheck before choosing; they change often.
+
+| Provider · model | Input | Cached input | Output | Images | Tools | Notes |
+|---|---|---|---|---|---|---|
+| Anthropic · Claude Haiku 5.5 (prompts ≤ 100k) | 0.10 | 0.01 | 0.50 | Yes | Yes | 1M context; same vendor as tier 0 |
+| DeepSeek · `deepseek-flash` (V4.1 Flash) | 0.15 off-peak / 0.30 peak | 0.003 / 0.006 | 0.60 / 1.20 | Yes | Yes | 1M context; peak = 01–04 and 06–10 UTC weekdays; data in China |
+| DeepSeek · `deepseek-v4-pro` | 0.66 / 1.32 | 0.022 / 0.044 | 1.98 / 3.96 | No | Yes | Analysis slot only |
+| Google · `gemini-3.1-flash-lite` | 0.25 | 0.025 (+ storage per hour) | 1.50 | Yes | Yes | |
+| OpenAI · `gpt-5-nano` | 0.05 | 0.005 | 0.40 | Not stated on the pricing page | Yes | Cheapest listed; quality to be shown by the eval set |
+| Anthropic · Claude Sonnet 5.5 | 2.00 | 0.10 | 10.00 | Yes | Yes | Analysis / fallback slot |
+| Open model, self-hosted (Ollama / vLLM) | — | — | — | model-dependent | model-dependent | Hardware cost only |
+
+**OpenRouter (the default provider)** ([FAQ](https://openrouter.ai/docs/faq), [limits](https://openrouter.ai/docs/limits),
+checked 2026-11-26): one key reaches all the models above at the **provider's own token price** (no markup); the
+cost is a **5.5 % fee on credit purchases** (min. $0.80). OpenAI-compatible API, streaming, tool calls, images and
+PDFs as base64; automatic fallback to the next host when one errors; variant `:exacto` routes to hosts with the
+most reliable tool calling. Prompts and completions are not logged by default; Crema requires the account set to
+ZDR-only with training off (§ 5.16 privacy).
+- **Free models (`:free`) = test mode only.** Capped at 20 requests / minute and 50 requests / day for accounts that
+  have bought less than $10 of credits, 1,000 / day after $10; hosts may throttle further. There is no large free
+  token allowance. Free models are often served only by hosts that log or train on prompts, so they need the
+  training toggle on. Fine for trying the panel with demo data; not for a company's daily use or real data.
+- **Recommended paid trio on OpenRouter** (by today's price and tool-calling quality; the eval set confirms):
+
+  | Slot | Model | Why |
+  |---|---|---|
+  | Chat | Claude Haiku 5.5 | Lowest price among strong tool callers; reads images; cached prefix at $0.01 / M |
+  | Vision (photo / PDF → lines) | Claude Haiku 5.5 (same model, so no extra slot); alternative Gemini 3.1 Flash-Lite | Both read images; escalate a bad read to the analysis model |
+  | Analysis / fallback | DeepSeek V4 Pro (cheap, strong reasoning, no images), or Claude Sonnet 5.5 where data must not be processed by a host in China | Explains computed tables; second opinion when the chat model fails |
+
+Typical requests (tokens are rough; "cached" = the stable tools + system prefix):
+
+| Request | Uncached in | Cached in | Out |
+|---|---|---|---|
+| Question from 1–2 reads | 4k | 18k | 0.6k |
+| Typed lines → Sales Order | 6k | 18k | 0.8k |
+| Photo of a quote → PO (one page, 2 turns) | 8k (image ≈ 3k) | 6k | 2k |
+| "What should I buy this week?" | 20k | 12k | 1.2k |
+
+| USD | Question | Text → SO | Photo → PO | What to buy | Per user per month* |
+|---|---|---|---|---|---|
+| Claude Haiku 5.5 | 0.0009 | 0.0012 | 0.0019 | 0.0027 | **≈ 0.57** |
+| DeepSeek flash (peak; off-peak ≈ half) | 0.0020 | 0.0029 | 0.0048 | 0.0075 | ≈ 1.41 (0.71) |
+| Gemini 3.1 Flash-Lite | 0.0024 | 0.0032 | 0.0052 | 0.0071 | ≈ 1.52 |
+| GPT-5 nano | 0.0005 | 0.0007 | 0.0012 | 0.0015 | ≈ 0.34 |
+| Claude Sonnet 5.5 (for comparison) | 0.016 | 0.022 | 0.037 | 0.053 | ≈ 10.6 |
+| **OpenRouter trio** (Haiku 5.5 chat + vision, DeepSeek V4 Pro for analysis, + 5.5 % credit fee) | 0.0009 | 0.0012 | 0.0019 | ≈ 0.032 (peak) | **≈ 1.9** (≈ 1.2 off-peak) |
+| OpenRouter `:free` (test mode) | $0 | $0 | $0 | $0 | $0, but max 50–1,000 requests / day for the whole account |
+
+\* 20 requests / working day × 22 days = 440 requests: 50 % questions, 25 % text → order, 15 % photos, 10 %
+analysis. Thinking / reasoning tokens and retries can multiply output 2–3×, so budget **≈ $1–2 per active user per
+month** on the cheap models. Every request's real tokens and cost go to `Crema AI Log`.
+
+**Default (owner's choice): OpenRouter with the trio above.** One key and one bill, a model per task, switchable in
+AI Settings without code, and the 5.5 % fee is small next to the token prices. Haiku 5.5 does the daily chat and
+reads photos, so photo → PO needs no OCR. The analysis slot only runs for analysis questions. Other providers stay
+selectable: Anthropic direct (no fee, prompt caching under our control), DeepSeek direct (cheapest off-peak; data
+processed in China), Gemini, OpenAI (GPT-5 nano is the cheapest listed; run it through the eval set), self-hosted.
+The eval set decides, not the price table.
+
+AI analysis cost (2026-11-26): the analysis column with DeepSeek V4 Pro at peak is 20k × 1.32 + 12k × 0.044 + 1.2k ×
+3.96 per million ≈ $0.032 before thinking; with the request mix above the trio costs ≈ $1.9 / user / month including the fee, about
+$1.2 off-peak.
+
+**Tests**: the stub provider (`crema.ai.stub.StubClient`, `stub_mode`) replays scripted turns in either message
+shape; adapter unit tests convert a fixture conversation (text, tool call, tool result, image) to and from each
+provider format; no test calls a paid API.
+
+**DocTypes** (answers § 9 Q1): `Crema AI Settings` (above), `Crema AI Chat` (owner-only), `Crema AI Log` (tier 0
+MCP tool calls and tier 1 requests: user, provider, model, tools, tokens, estimated cost, result; System Manager read).
+
+### 5.18 Capabilities: flows, review step, tests
+
+The same four capabilities on every tier; only where the chat happens differs.
+
+| Capability | Flow | Review step before anything is saved | Tests (no real model) |
+|---|---|---|---|
+| **A. Photo / PDF → Purchase Order / Invoice / Material Request** | Read the document (Claude vision on tier 0; the vision slot or OCR on tier 1) → `match_party` + `match_lines` → user resolves unclear lines (tier 0: in Claude's chat; tier 1: review card with ⚠ rows, 3 candidates, "Create item" quick entry) → `draft_*` (tier 0) or filled form (tier 1, rows set through the form engine so ERPNext's `item_code` trigger fetches price / UOM / tax as for a typed row) | Draft PO opens in Crema with the "Created via Claude / Filled by the assistant" banner; totals check vs the document's total; user saves / submits | Matching unit tests (barcode, supplier part no., fuzzy); stub extraction fixtures (quote, invoice, handwritten list); `e2e/p2.ai.document.mjs` (tier 1) and `e2e/p2.ai.mcp.mjs` (tier 0: drives `/api/v2/mcp` with a test OAuth token, checks a draft exists and that submit is refused) |
+| **B. Typed lines → Sales Order / Quotation** | `match_party` + `match_lines` + `price_and_stock` (price list, pricing rules, projected qty, ⚠ when qty > projected) → `draft_sales_order` / filled form | Same | Stub turns; API check that the SO is a draft with the bench's prices |
+| **C. Analysis and advice** ("what should I buy", trends, slowing customers) | Analysis tools compute; the model explains; answer = text + table + chart (Claude's chart on tier 0; Crema `DataTable` + chart component from the tool's chart spec on tier 1) + "Create draft Material Request / POs by supplier" | Ends with "Suggestions from stock and sales data up to <time>. You decide." Missing permissions are named, not guessed | Tool tests on seeded data with expected suggestions |
+| **D. Everyday asks** (summaries, what's waiting, follow-up drafts, explain a report or error) | Reads only; emails are drafted into Desk's Communication composer (tier 1) or as text (tier 0); ToDo / Event as drafts or filled forms | User sends / saves | Stub turns |
+
+**Guardrails (all tiers):** permissions of the session user only; drafts only (server-side guard on tier 0, no
+write tools on tier 1); submit / cancel / delete always by the user in Crema; uploads limited by type and size
+(tier 1: ≤ 10 MB, PDFs ≤ 20 pages); text in documents and uploads is treated as data, writes always pass a human
+review; every tool call logged (Crema AI Log); "via Claude / via assistant" comment on changed documents.
+
+**Stub model**: `Crema AI Settings.stub_mode` (developer mode only) swaps the client for `crema.ai.stub.StubClient`,
+replaying scripted turns from `crema/ai/fixtures/*.json` against the real tools. Tier 0 tests call `/api/v2/mcp`
+directly with a token minted for a test user. No test calls a paid API.
+
+### 5.19 Where it appears in Crema
+
+| Place | Tier 0 (Claude connector) | Tier 1 (Crema panel) |
+|---|---|---|
+| Header ✦ / ⌘I | Opens a small popover: "Ask in Claude ↗" (copies a prompt about the current page) + Connected status | Opens the panel (§ 5.2) |
+| Home | "Drafts from Claude" in Needs you / Continue; Ask AI card → Claude link | Ask AI card with suggestions from the home's data (§ 4.1.5); drop a file to start A |
+| List toolbar "Create from document" (PO, PI, PR, MR, SO, Quotation lists the user can create) | Hidden | Opens the panel with the file picker, target preset |
+| Form | Banner on drafts made via Claude: "Check and Submit" + "Attach the original document" | Drop a file on the Items grid → "Add lines from this document" (drafts only) |
+| Settings | Connect Claude (System Manager), My connected apps (everyone), AI activity | AI Settings, AI activity |
+
+### 5.20 Similar apps studied
+
+| App | Model access | Pattern | Take from it |
+|---|---|---|---|
+| "Bizak AI" | Not found. The only public trace is a "Bizak" ERP user guide ([github.com/bizakerp/bizak-user-guide](https://github.com/bizakerp/bizak-user-guide)) with module docs and no AI pages. How its AI works is unknown | — | — |
+| Frappe Assistant Core ([github.com/buildswithpaul/Frappe_Assistant_Core](https://github.com/buildswithpaul/Frappe_Assistant_Core)) | Free path: an MCP server in Frappe; users connect Claude / ChatGPT / Cursor with OAuth as themselves ("you bring the LLM"). In-Desk "FAC Chat" is a separate paid SaaS | Tier 0 + a paid tier 1 | The same split as ours; their admin page shows the MCP endpoint URL to copy |
+| ERPNext AI Assistant ([github.com/ahmad18189/erpnext_ai_assistant](https://github.com/ahmad18189/erpnext_ai_assistant)) | The site's own OpenAI-compatible key in "ERP AI Settings" (default `gpt-4o-mini`, base URL configurable) | In-Desk panel calling the model server-side with session-scoped tools; writes wait for confirmation | Cheap small model by default; configurable base URL (our provider setting); "Show the list" buttons that open real Desk lists |
+| Vyogo AI / `frappe_ai` ([github.com/vyogotech/frappe_ai](https://github.com/vyogotech/frappe_ai)) | An external agent service (`frappe_ai_agent_url` in site config) that holds the model access | Desk sidebar; streams through `frappe.realtime`; Allow / Deny cards; writes run on a one-time token the app mints | Realtime streaming fallback; one-time tokens for approved writes |
+
+A "Bizak-like" chat inside Frappe is almost certainly the second or third pattern: an in-Desk panel calling a
+model API from the server with the site's (or the vendor's) key. Any chat that lives inside Frappe / Crema needs
+model API access paid by someone; only tier 0 uses the users' own Claude plans, and its chat lives in Claude.
 
 ---
 
@@ -1167,46 +1750,67 @@ with VoiceOver (macOS / iOS) before PR 11 and PR 4b.
 
 Every PR: behind the New layout switch; before / after screenshots at 390 / 768 / 1280 / 1600 / 1920 (+ 2560 where
 the screen changes on wide); Lighthouse table for touched routes; the listed suites green; React Doctor 0 errors; classic suites
-green with the switch off. Suite names are new files under `crema-frontend/e2e/`.
+green with the switch off. Suite names are new files under `crema-frontend/e2e/`. PRs marked **app** also change the
+Crema Frappe app (§ 5.15) and include its Python tests (`bench run-tests --app crema`).
 
-| PR | Title | Contains | Suite(s) | Must include in the PR | Depends on |
-|---|---|---|---|---|---|
-| 0 | Measuring + switch at first paint | `e2e/lighthouse.mjs` (S7), `NEW_LAYOUT=1` and `t.axe()` in `e2e/lib.mjs`, `crema_ui` cookie mirror so SSR renders the chosen layout (§ 6.3), tokens from § 2.1, `Tooltip`/`Kbd`/`Toast` | `p2.foundation` (extended) | Baseline Lighthouse table for all § 6.1 routes, Desk and Crema | — |
-| 1 | Record preview + wiring | `Rail`, `Resizer`, `Sheet`; Preview tab porting Desk `ui/side_panel.js` (history / back, Esc rule, close on route change, open full page, width saved); list row preview (§ 4.2 preview row), report link cells (`link_side_panel.js`), link hover card (`ui/link_preview.js`); My work linked from sidebar and as a home option; ⌘K "Go to My work" | `p2.preview`, `p2.mywork` | Preview at 1280 / 1600, sheet-not-used on phone (routes to page), INP of ↑/↓ | 0 |
-| 2a | Large screens | Fluid shell (§ 3.4: no 1290 cap, sidebar 240 / rail 56 with pin + collapse, dock rule, `--field-max`, `--measure`), form 2 → 3 columns by container, form Activity / Info docked at ≥ 1600, list filters pane and form outline at ≥ 1920, second right column at ≥ 2240, pane state remembered | `p2.widths` | Screens of home / list / form at 1280 / 1600 / 1920 / 2560 | 1 |
-| 2b | Dashboard home | Site home resolution (§ 4.1), CardGrid, NumberCard / ChartCard on site sources, edit mode with keyboard moves, per-user layout, role publish | `p2.home` | Home Lighthouse ≥ 98 desktop | 2a |
-| 3a | DocType builder: start + checks | Start dialog with naming example, live checks from `form_builder/store.js`, ErrorSummary | `p2.doctypebuilder` | — | 0 |
-| 3b | DocType builder: canvas + permissions + done | Palette with plain names, properties panel, permissions step, after-save actions; reuses `FormBuilder.tsx` | `p2.doctypebuilder`, `doctype.create` | Builder screens 1280 / 1600 | 3a |
-| 3c | Customize Form in the builder | Custom Field + Property Setter path, allowed properties | `p2.customizeform` | — | 3b |
-| 4a | AI: settings + chat panel (read-only tools) | AI Settings page, `/api/ai/chat` SSE with stub, panel in Rail / Sheet, open / close rules, chips, streaming, tool lines, Stop / Retry / errors, empty state, history, off / no-role states | `p2.ai.panel` | Panel at 390 / 1024 / 1600; a11y 100 with panel open; panel chunk size | 1 |
-| 4b | AI: filled form + confirm cards | open_form flow with ✦ markers and banner; ConfirmCard (old → new, stale check, submit / cancel / delete separate); refresh + timeline note | `p2.ai.write` | Card screenshots; API checks that nothing ran before Confirm | 4a, 5a (Banner) |
-| 4c | AI: setup changes via builders | Drafts into DocType builder / Workflow builder / Print Format Builder; server-script rule | `p2.ai.setup` | — | 4b, 3b |
-| 4d | AI: activity log + limits | Activity log list (System Manager), per-user daily limit, usage counter in the panel | `p2.ai.log` | — | 4a |
-| 5a | Form: header, summary, sections | Sticky header with one primary action, SummaryCard, sections as cards, More fields, `Field` / `FieldGroup` / `Banner` | `p2.form` + `formsave`, `form.salesorder`, `workflow`, `formmenu`, `formnav` (NEW_LAYOUT=1) | Task 1 click count, classic vs new | 2a |
-| 5b | Form: errors, unsaved, restore, undo, success action | ErrorSummary, unsaved bar, IndexedDB restore, `undo_manager.js` port, `success_action.js` port | `p2.form` | — | 5a |
-| 6 | Child tables | `DataTable` grid mode: sticky / resize columns, totals row, row in Rail, phone cards | `p2.grid` + `grid*` (NEW_LAYOUT=1) | INP typing in a grid cell | 5a |
-| 7 | Lists | ViewTabs, FilterChips, BulkBar, InlineEdit (report_view rules), phone cards, empty states | `p2.list` + `list.salesorder`, `listlayouts`, `bulk`, `listhooks`, `listrowextras` | Task 3 click count; list Lighthouse | 1, 6 (DataTable) |
-| 8 | Timeline | Filters, day groups, collapsed calculated changes, Activity tab comment box | `p2.timeline` + `timeline` | — | 5a |
-| 9 | Reports | Filter chips + More filters panel, saved filter sets, chart collapse, column state, link preview | `p2.report` + `report`, `reportview`, `reportgroupby`, `financials`, `reportsave` | Task 5 click count | 6, 1 |
-| 10 | Search | ⌘K groups and ranking from `search_utils.js`, results page, #tag, Ask AI row | `p2.search` + `awesomebar` | — | 4a (Ask AI row hidden until then) |
-| 11 | Mobile | Bottom nav, Create sheet, scanner (`scanner/`) for Item / barcode fields, camera for Attach (`ui/capture.js`), keyboard-aware bars | `p2.mobile` + `mobile` | Screens at 390 / 768; mobile Lighthouse | 5a, 7 |
-| 12 | Settings pages | My settings page, Single DocType "Find a setting" | `p2.settings` | — | 5a |
-| 13 | Onboarding | Checklist card, tours via driver.js, first-visit tips | `p2.onboarding` | — | 2b |
-| 14 | Speed | S1 compression (can land any time after 0), S3 batching, S4 server first paint, S5/S6 JS + fonts, S8 prefetch, CI budget check | `p2.speed` (checks requests count and `content-encoding`) + all p2 suites | Lighthouse table for all routes: ≥ 95 / 100 | 0; S4 after 5a |
-| 15 | Accessibility pass | § 7 fix list on remaining classic-shared parts, `p2.keyboard` | `p2.keyboard`, axe in all p2 | Lighthouse a11y 100 table | 0 |
-| 16 | Usability check + default on | G1/G2 session, write-up; then make New layout the default for new users (classic stays one switch away) | `p2.tasks` | Usability notes | all |
+**Build order (owner's priority, 2026-11-26).** PR 0, then side by side: **Connect Claude (C1, C2) and the dynamic
+home (2b, 2c)**, then **wide screens (2a)**, the **DocType builder (3a–3c)**, the **in-Crema chat (4a, 4b, 4e, 4c,
+4d, 4f)**, then the rest in the order below. PR ids are kept from the first version of this plan so other sections'
+references stay valid.
+
+| Order | PR | Title | Contains | Suite(s) | Must include in the PR | Depends on |
+|---|---|---|---|---|---|---|
+| 1 | 0 | Measuring + switch at first paint | `e2e/lighthouse.mjs` (S7), `NEW_LAYOUT=1` and `t.axe()` in `e2e/lib.mjs`, `crema_ui` cookie mirror so SSR renders the chosen layout (§ 6.3), tokens from § 2.1 and § 10, `Tooltip`/`Kbd`/`Toast` | `p2.foundation` (extended) | Baseline Lighthouse table for all § 6.1 routes, Desk and Crema | — |
+| 2 | C1 | **app** Crema Frappe app + Connect Claude (tier 0) | App skeleton (`crema`, modules Crema Home / Crema AI), `Crema AI Settings`, Connect Claude page (§ 5.14 checks, create the Claude OAuth Client, DCR off, Agent Instructions text; "On this computer" tab with Claude Code / Desktop snippets and own API key), My connected apps + System Manager Connections with revoke, drafts-only guard on MCP requests, "via Claude" comment, `Crema AI Log` for MCP tool calls, AI activity list | `p2.connectclaude` (checks, client created, revoke) + `p2.ai.mcp` (MCP call with a test token: draft allowed, submit refused, comment and log written) | Screens of the page with all checks green / one red; a manual run with a real Claude connector against a tunnelled bench, noted in the PR | 0 |
+| 3 | 2b | **app** Dynamic home | `crema.api.home.get_home` (candidates from permissions, Needs you / Quick create / Continue / KPI / Auto KPI / Chart / Quick list / Today / Recent / Workspaces cards, § 4.1.3–4.1.5), reduced home without the app, CardGrid, edit mode (pin / hide / reorder / resize, keyboard), `user_settings` layout, cache invalidation hooks | `p2.home` | Home for 3 seeded roles side by side; `get_home` timings; Lighthouse home ≥ 98 desktop | 0, C1 (app skeleton) |
+| 4 | C2 | **app** Shared tools | `crema.ai.tools.*` (§ 5.15): `match_lines`, `match_party`, `price_and_stock`, `draft_*`, `reorder_suggestions`, `item_sales_trend`, `customer_slowdown`, `run_report`; discoverable through MCP `search_methods` | Python tool tests on seeded data; `p2.ai.mcp` extended (photo-to-PO and typed-lines flows driven through MCP with fixture lines) | A recorded Claude session (tier 0) doing PO-from-photo and "what should I buy", screenshots without client names | C1 |
+| 5 | 2c | **app** Home learning | Crema writes Route History (Desk route strings, `deferred_insert`), usage profile + role prior + ranking (§ 4.1.4), stable order, `Crema Home Default` + "Publish for role", "Drafts from Claude" in Needs you | `p2.home` (extended: usage changes Quick create; role default applied) | Ranking unit tests; before / after home for a user with seeded history | 2b |
+| 6 | 2a | Large screens | Fluid shell (§ 3.4: no 1290 cap, sidebar 240 / rail 56 with pin + collapse, dock rule, `--field-max`, `--measure`), `Rail` / `Resizer` / `Sheet` / `Banner` primitives (moved here from PR 1 / 5a), form 2 → 3 columns by container, form Activity / Info docked at ≥ 1600, list filters pane and form outline at ≥ 1920, second right column at ≥ 2240, pane state remembered | `p2.widths` | Screens of home / list / form at 1280 / 1600 / 1920 / 2560 | 0 |
+| 7 | 3a | DocType builder: start + checks | Start dialog with naming example, live checks from `form_builder/store.js`, ErrorSummary | `p2.doctypebuilder` | — | 0 |
+| 8 | 3b | DocType builder: canvas + permissions + done | Palette with plain names, properties panel, permissions step, after-save actions; reuses `FormBuilder.tsx` | `p2.doctypebuilder`, `doctype.create` | Builder screens 1280 / 1600 | 3a |
+| 9 | 3c | Customize Form in the builder | Custom Field + Property Setter path, allowed properties | `p2.customizeform` | — | 3b |
+| 10 | 4a | **app** In-Crema chat (tier 1): settings + panel | `crema.ai.api.chat` (streaming in the request, § 5.16), provider adapter layer (`anthropic`, `openai_compatible`; OpenRouter default with the chat / vision / analysis / fallback slots), strict tool-input validation, budget cap, test mode, stub client; `/api/ai/chat` pass-through; panel in Rail / Sheet, open / close rules, chips, streaming, tool lines, Stop / Retry / errors, empty state, history, off / no-role states | `p2.ai.panel` | Panel at 390 / 1024 / 1600; a11y 100 with panel open; panel chunk size; cost per request from the log on 10 stub-free manual asks | 2a, C2 |
+| 11 | 4b | AI: filled form + confirm cards | open_form flow with ✦ markers and banner; ConfirmCard (old → new, stale check, submit / cancel / delete separate); refresh + timeline note | `p2.ai.write` | Card screenshots; API checks that nothing ran before Confirm | 4a |
+| 12 | 4e | AI: create from a document (tier 1 UI) | Drop / camera / 📎 in the panel, "Create from document" on lists, drop on Items grid; review card (matched / check / unmatched, create item); vision slot or OCR route | `p2.ai.document` | Review card screens; extraction cost per page from the log | 4b |
+| 13 | 4c | AI: setup changes via builders | Drafts into DocType builder / Workflow builder / Print Format Builder; server-script rule | `p2.ai.setup` | — | 4b, 3b |
+| 14 | 4d | AI: limits and cost | Per-user daily limit, concurrency cap, usage counter in the panel, cost columns in the AI activity list | `p2.ai.log` | — | 4a |
+| 15 | 4f | AI: Gemini adapter + eval harness | `gemini` adapter; `crema.ai.evals` (~30 tasks, pass rate / cost / latency per provider) | adapter unit tests; eval run with the stub | Eval table for the default trio and one alternative | 4a |
+| 16 | 1 | Record preview + wiring | Preview tab porting Desk `ui/side_panel.js` (history / back, Esc rule, close on route change, open full page, width saved); list row preview (§ 4.2 preview row), report link cells (`link_side_panel.js`), link hover card (`ui/link_preview.js`); My work linked from sidebar; ⌘K "Go to My work" | `p2.preview`, `p2.mywork` | Preview at 1280 / 1600, sheet-not-used on phone (routes to page), INP of ↑/↓ | 2a |
+| 17 | 5a | Form: header, summary, sections | Sticky header with one primary action, SummaryCard, sections as cards, More fields, `Field` / `FieldGroup` | `p2.form` + `formsave`, `form.salesorder`, `workflow`, `formmenu`, `formnav` (NEW_LAYOUT=1) | Task 1 click count, classic vs new | 2a |
+| 18 | 5b | Form: errors, unsaved, restore, undo, success action | ErrorSummary, unsaved bar, IndexedDB restore, `undo_manager.js` port, `success_action.js` port | `p2.form` | — | 5a |
+| 19 | 6 | Child tables | `DataTable` grid mode: sticky / resize columns, totals row, row in Rail, phone cards | `p2.grid` + `grid*` (NEW_LAYOUT=1) | INP typing in a grid cell | 5a |
+| 20 | 7 | Lists | ViewTabs, FilterChips, BulkBar, InlineEdit (report_view rules), phone cards, empty states | `p2.list` + `list.salesorder`, `listlayouts`, `bulk`, `listhooks`, `listrowextras` | Task 3 click count; list Lighthouse | 1, 6 (DataTable) |
+| 21 | 8 | Timeline | Filters, day groups, collapsed calculated changes, Activity tab comment box | `p2.timeline` + `timeline` | — | 5a |
+| 22 | 9 | Reports | Filter chips + More filters panel, saved filter sets, chart collapse, column state, link preview | `p2.report` + `report`, `reportview`, `reportgroupby`, `financials`, `reportsave` | Task 5 click count | 6, 1 |
+| 23 | 10 | Search | ⌘K groups and ranking from `search_utils.js`, results page, #tag, Ask AI row (tier 0: "Ask in Claude ↗"; tier 1: panel) | `p2.search` + `awesomebar` | — | C1 |
+| 24 | 11 | Mobile | Bottom nav, Create sheet, scanner (`scanner/`) for Item / barcode fields, camera for Attach (`ui/capture.js`), keyboard-aware bars, Needs you action sheet | `p2.mobile` + `mobile` | Screens at 390 / 768; mobile Lighthouse | 5a, 7 |
+| 25 | 12 | Settings pages | My settings page, Single DocType "Find a setting" | `p2.settings` | — | 5a |
+| 26 | 13 | Onboarding | Checklist card, tours via driver.js, first-visit tips | `p2.onboarding` | — | 2b |
+| 27 | 14 | Speed | S1 compression (can land any time after 0), S3 batching, S4 server first paint, S5/S6 JS + fonts, S8 prefetch, CI budget check | `p2.speed` (checks requests count and `content-encoding`) + all p2 suites | Lighthouse table for all routes: ≥ 95 / 100 | 0; S4 after 5a |
+| 28 | 15 | Accessibility pass | § 7 fix list on remaining classic-shared parts, `p2.keyboard` | `p2.keyboard`, axe in all p2 | Lighthouse a11y 100 table | 0 |
+| 29 | 16 | Usability check + default on | G1/G2 session, write-up; then make New layout the default for new users (classic stays one switch away) | `p2.tasks` | Usability notes | all |
 
 S1 (compression) and 15's contrast fixes have no screen dependency; split them out and land early if a quick win is
-wanted. Builder (3) and AI (4) are independent of each other until 4c.
+wanted. Tier 0 (C1, C2) needs no Crema screen work beyond the settings page, so it ships first and gives users an
+assistant while the rest is built.
 
 ```
-0 ─┬─ 1 ─┬─ 2a ─┬─ 2b ── 13
-   │     │      └─ 5a ─┬─ 5b      ┌─ 4b ─ 4c
-   │     ├─ 4a ────────┼──────────┤    └ 4d
-   │     │             ├─ 6 ─ 7 ─ 11     ▲
-   │     │             ├─ 8   └─ 9       │
-   │     │             └─ 12             3b
-   ├─ 3a ─ 3b ─ 3c ──────────────────────┘
+0 ─┬─ C1 ─┬─ C2 ─────────────────────────┐
+   │      ├─ 2b ─ 2c                      │
+   │      │    └─ 13                      │
+   │      └─ 10 (search)                  │
+   ├─ 2a ─┬─ 4a ◄─────────────────────────┘
+   │      │   ├─ 4b ─┬─ 4e
+   │      │   │      └─ 4c ◄── 3b
+   │      │   ├─ 4d
+   │      │   └─ 4f
+   │      ├─ 1 ──────────────┐
+   │      └─ 5a ─┬─ 5b       │
+   │             ├─ 6 ─ 7 ◄──┤─ 11
+   │             │      └ 9 ◄┘
+   │             ├─ 8
+   │             └─ 12
+   ├─ 3a ─ 3b ─ 3c
    ├─ 14 (S1 early; S4 after 5a)
    └─ 15
 ```
@@ -1225,19 +1829,62 @@ wanted. Builder (3) and AI (4) are independent of each other until 4c.
 | R4 | Two layouts double the test surface | New layout reuses the classic hooks; suites parametrised by `NEW_LAYOUT`; classic is frozen except fixes |
 | R5 | Assistant writes the wrong thing | Creates never save; other writes need a card with old → new and stale check; activity log; per-user limits |
 | R6 | Data sent to the AI provider | Settings page states it; context chips are visible and removable; off by default |
+| R7 | Tier 0 needs a public HTTPS site; some clients run on private networks | Connect Claude explains the failure; tunnel or hosted site; tier 1 / 2 need only outbound HTTPS or nothing |
+| R8 | Claude (tier 0) can call any whitelisted method the user may call, including submit | Drafts-only guard in the Crema app on MCP requests; OAuth Client `allowed_roles`; AI activity log; revoke per user |
+| R9 | Sites must install the Crema Frappe app for learning home, tier 0 hardening and tools | Home and minimal tier 0 work without it (reduced); the app is small and is the phase 3 app anyway |
+| R10 | A streaming chat holds a gunicorn worker (tier 1) | 90 s turn cap, per-site concurrency cap, realtime delivery fallback |
+| R11 | Cheap models call tools badly or invent numbers | Strict schema validation, small tool sets, server-computed numbers, drafts only, eval set before switching (§ 5.16) |
+| R12 | ERP data processed by a third-party host (OpenRouter routes to many) | ZDR-only + training off required, `data_collection: deny` per request, blocked DocTypes / fields, self-host option |
 
 ### Open questions for the owner
 
-1. **Where do chat history and the AI activity log live** before phase 3 (no Crema app yet)? Recommendation: two custom
-   DocTypes (`custom = 1`) created by the AI Settings page on first enable ("Crema AI Chat", "Crema AI Log"), moved into
-   the Crema app in phase 3. Alternative: user_settings (size-limited) — not recommended.
-2. **Role-published home layouts:** store as a custom DocType too, or as a Workspace (Desk's own, editable in Desk)?
-   Recommendation: a Workspace copy per role, so Desk users see the same.
+1. **Crema Frappe app now, not in phase 3?** The learning home, the tier 0 hardening and the tools need server
+   code (§ 4.1.3, § 5.15). Recommendation: create the `crema` app now (chat history, AI log, home defaults live in its
+   DocTypes). Confirm, and say whether it lives in this repo (`crema-app/`) or its own repo.
+2. **Role-published home layouts:** decided: DocType `Crema Home Default` in the app (§ 4.1.8), as Frappe CRM does.
 3. **Accent colour source:** Navbar Settings has a logo but no colour field in v16 — add a field in Crema settings,
    or keep espresso black? Recommendation: keep black until phase 3's `Crema Settings`.
 4. **Confirm-card totals:** showing recalculated totals before Confirm needs a server dry run Frappe doesn't offer.
    Accept "recalculated on save" for numeric changes, or add a whitelisted dry-run method in phase 3?
-5. **Default model and cost limits** for the assistant (GAPS says Claude Opus 5.5): confirm the default daily limit
-   (proposal: 50 requests / user / day).
+5. **Tier 1 provider and limits:** OpenRouter with Haiku 5.5 (chat + vision) and DeepSeek V4 Pro or Sonnet 5.5
+   (analysis), 50 requests / user / day, monthly budget cap (§ 5.17). Is processing by hosts in China acceptable
+   (decides DeepSeek vs Sonnet for analysis)? What monthly cap per site?
+7. **Tier 0 accounts:** will users connect with their own Claude plans, or will the company buy Team seats so an Owner
+   adds the connector once for everyone?
+8. **Public URL:** which sites are reachable over public HTTPS today? The local bench needs a tunnel to test tier 0.
+9. **"Bizak AI":** nothing public found (§ 5.20). If you have a link or a screenshot, it can be compared properly.
 6. **Usability sessions:** who are the 3–5 users and which site's data is used (screenshots must stay free of client
    names)?
+
+---
+
+## 10. Research: Frappe's own newer frontends
+
+Frappe's newer apps are Vue SPAs on [frappe-ui](https://ui.frappe.io) (shells, sidebar rail, list, settings
+dialog, editor; semantic tokens `ink-gray-*`, `surface-*`, `outline-gray-*`). File paths below are in each repo's
+frontend.
+
+| App (source) | Borrow | Avoid |
+|---|---|---|
+| **Frappe CRM** ([frappe/crm](https://github.com/frappe/crm), `frontend/src/components`) | 1. **Home of widgets with role defaults**: a 20-column grid with 42 px rows (`Home/widgets.js`), per-user layout, manager-published `RoleDefault` (`crm/fcrm/doctype/crm_dashboard/home_layout.py`): our § 4.1.8. 2. **"Today's brief"** (`Home/Brief.vue`, `crm_dashboard/brief.py`): a short list of what needs attention with age in red when late; our Needs you. 3. **Record page = activity in the middle + editable side panel** (`SidePanelLayout.vue`, `SidePanelLayoutEditor.vue`, `Activities/`): emails, calls, notes, tasks and changes in one timeline. 4. **ViewControls** (`ViewControls.vue`, `ColumnSettings.vue`, `GroupBy.vue`, `Kanban/`): saved views, quick filters, column picker and kanban in one toolbar | Settings spread over many modals; CRM-only concepts (Lead / Deal) baked into components |
+| **Helpdesk** ([frappe/helpdesk](https://github.com/frappe/helpdesk), `desk/src/components`) | 1. **Conversation + details panel** with a `Resizer.vue` between them. 2. **Saved replies** picker (`SavedRepliesSelectorModal.vue`): for Crema's comment / email composer. 3. **UnsavedBadge** and **TypingIndicator**: small state signals. 4. `ListViewBuilder.vue`: one list component configured per DocType | Separate agent / customer portals duplicating screens |
+| **Gameplan** ([frappe/gameplan](https://github.com/frappe/gameplan), `frontend/src/components`) | 1. **Separate desktop and mobile layouts** (`DesktopLayout.vue`, `MobileLayout.vue`, `MobileListRow.vue`) rather than one squeezed layout. 2. **App rail** (`AppRail/`) + `CommandPalette/`. 3. **Reading width** for prose and comments. 4. `ListRowSkeleton.vue`, `LoadError.vue`: every list has a skeleton and an error row | Discussion-first navigation doesn't fit ERP data |
+| **Insights** ([frappe/insights](https://github.com/frappe/insights), `frontend/src2`) | 1. **Workbook → chart → dashboard** flow and a chart config pane. 2. **DataTable with footer totals** (`components/DataTable.vue`, `DataTableFooter.vue`) and per-column number formats (`table_number_formats.ts`). 3. **TabbedSidebarLayout** for settings | Query-builder UI for end users who just want a report |
+| **Drive** ([frappe/drive](https://github.com/frappe/drive), `frontend/src/components`) | 1. **Grid / list toggle** (`GridView.vue`, `ListView.vue`). 2. **Right-click context menu** (`ContextMenu.vue`) for row actions. 3. **Upload tray** (`UploadTracker.vue`): for attachments and "Create from document". 4. **Shortcuts dialog** (`ShortcutsDialog.vue`, "?" key) | — |
+| **LMS** ([frappe/lms](https://github.com/frappe/lms), `frontend/src/components`) | 1. **PWA install prompt** (`InstallPrompt.vue`) for phone users. 2. **BottomSheet** on mobile. 3. **Empty states with actions** (`EmptyStateActions.vue`) | Course-specific chrome |
+| **HRMS mobile PWA** ([frappe/hrms](https://github.com/frappe/hrms), `frontend/src/components`) | 1. **Bottom tabs** (`BottomTabs.vue`). 2. **Approve / reject as an action sheet** (`WorkflowActionSheet.vue`, `RequestActionSheet.vue`): our phone Needs you. 3. **Filters as an action sheet** (`ListFiltersActionSheet.vue`). 4. **Quick links home** (`QuickLinks.vue`) | Ionic as a second UI stack |
+| **Builder** ([frappe/builder](https://github.com/frappe/builder), `frontend/src/components`) | 1. **Three panes**: layers left, canvas centre, properties right (`BuilderLeftPanel.vue`, `BuilderCanvas.vue`, `BuilderRightPanel.vue`): our DocType builder (§ 4.9). 2. **AI chat panel that lists what it changed** (`BuilderAIChatPanel.vue`, `AIAffectedItems.vue`): our "changed by the assistant" summary. 3. AI key in a Settings Password field (`builder/ai/llm.py`) | Running AI in background jobs + realtime only (needs workers; § 5.16 streams in the request) |
+| **Frappe v16 Desk** (`frappe/public/js/frappe`, `frappe/boot.py`) | 1. **App-scoped sidebars** (`module_sidebars`, Workspace Sidebar DocType): one sidebar per app. 2. **Desktop of app icons** (Desktop Icon / Desktop Layout DocTypes). 3. **Espresso tokens** (already copied into Crema) | Fixed ~1280 px page width |
+
+**What makes the "modern Frappe" look, and Crema's tokens for it** (adds to § 2.1):
+
+| Trait | In frappe-ui apps | Crema rule |
+|---|---|---|
+| Type | Inter; sizes as classes with weight baked in (`text-base-medium`, `text-lg-semibold`); weights 400 / 500 / 600 only | Keep Inter and 14 px base. Add `--type-*-medium` / `-semibold` pairs; no 700 in UI chrome; tables 13 px in compact |
+| Ink | Grays for text (`ink-gray-9` headings, `-7` body, `-5` meta), colour only for status | `--ink-*` aliases already map this; headings use `--ink-default`, meta `--ink-muted`. No coloured text outside status and links |
+| Surfaces and lines | White cards on a white page separated by 1 px `outline-gray-*` borders, very light shadows only on overlays | `--surface-*` + `--outline-default`; `--elevation-1` only for overlays and dragged cards |
+| Density | Compact lists (36–40 px rows), roomy dialogs and settings | Comfortable default (§ 2.2) for forms and home; lists default to compact rows on ≥ 1280 |
+| Radius | Small and consistent (frappe-ui `rounded-5…7`) | Keep the three `--round-control / card / panel` steps; nothing ad hoc (no `rounded-[…]` in new code) |
+| Motion | Short, no bounce; panels slide, menus fade | § 2.3 durations; `--ease-enter` / `--ease-exit`, nothing over 320 ms |
+| Loading | Skeleton rows, never full-page spinners | Skeletons in the final layout (§ 4.11) |
+| Naming | `ink-*`, `surface-*`, `outline-*` | Keep these names (§ 2.1 already does) so phase 3 can share CSS with frappe-ui apps |
