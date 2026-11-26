@@ -7,7 +7,7 @@ import { FRAPPE_BACKEND_URL, FRAPPE_SITE_NAME, backendFetch } from "@/lib/frappe
  * header (not X-Frappe-Site-Name). On a local bench reach it as http://<site>:<port> — *.localhost
  * resolves to loopback — so the right site's files are found.
  */
-function fileOrigin(): string {
+export function fileOrigin(): string {
   try {
     const u = new URL(FRAPPE_BACKEND_URL);
     if (FRAPPE_SITE_NAME && ["localhost", "127.0.0.1"].includes(u.hostname) && FRAPPE_SITE_NAME.endsWith(".localhost")) u.hostname = FRAPPE_SITE_NAME;
