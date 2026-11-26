@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import type { DeskNavigation, NavLinkItem, NavSection } from "@/lib/navigation";
+import { isCremaRoute } from "@/lib/navigation";
 
 const ICONS = new Set<string>(iconNames);
 
@@ -87,8 +88,10 @@ const APP_TITLES: Record<string, string> = { frappe: "Framework", erpnext: "ERPN
 function SidebarLink({ item, nested }: { item: NavLinkItem; nested?: boolean }) {
   const pathname = usePathname();
   const active = isActive(pathname, item.href);
+  // a path Crema doesn't render (another app's frontend like /banking, an absolute URL) is a page load, as in Desk
+  const Anchor = isCremaRoute(item.href) ? Link : "a";
   return (
-    <Link
+    <Anchor
       href={item.href}
       className={[
         "group flex items-center gap-2 rounded-md px-2 py-[5px] text-[13px] transition-colors",
@@ -104,7 +107,7 @@ function SidebarLink({ item, nested }: { item: NavLinkItem; nested?: boolean }) 
         </span>
       )}
       <span className="truncate">{item.label}</span>
-    </Link>
+    </Anchor>
   );
 }
 

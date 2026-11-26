@@ -217,6 +217,15 @@ export const SYSTEM_DOCTYPES: Array<{ label: string; doctype: string }> = [
 import type { DeskBoot, SidebarItem } from "@/lib/frappe/deskBoot";
 
 /** Crema route for a v16 sidebar/dock link. */
+/**
+ * Whether Crema renders this link itself (client-side navigation). Anything else — another app's frontend such as
+ * `/banking`, a portal page, an absolute URL — is a page load, the way Desk renders a URL item as a plain `<a href>`
+ * (ui/sidebar/sidebar_item.js); Crema passes those paths through to the site (app/[...path]/route.ts).
+ */
+export function isCremaRoute(href: string): boolean {
+  return /^\/(desk|www)(\/|\?|#|$)/.test(href);
+}
+
 export function sidebarItemHref(item: Pick<SidebarItem, "link_type" | "link_to" | "url">): string | null {
   const to = item.link_to ?? "";
   switch (item.link_type) {
