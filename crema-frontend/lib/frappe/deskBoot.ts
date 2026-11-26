@@ -95,12 +95,13 @@ export function clearDeskBootCache(sid?: string): void {
   else cache.clear();
 }
 
-export async function getDeskBoot(cookieHeader: string): Promise<DeskBoot | null> {
+/** `fresh` skips the cached copy (e.g. a Desk URL naming a doctype created since the boot was read). */
+export async function getDeskBoot(cookieHeader: string, fresh = false): Promise<DeskBoot | null> {
   const sid = sidFromCookie(cookieHeader);
   if (!sid) return null;
 
   const hit = cache.get(sid);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.boot;
+  if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.boot;
 
   let res: Response;
   try {

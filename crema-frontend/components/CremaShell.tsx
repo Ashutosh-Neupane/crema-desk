@@ -267,6 +267,13 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) useUIStore.getState().setSidebarOpen(false);
   }, [shellPath]);
+  // narrowing the window to phone width closes it too, so it doesn't cover the page as an overlay
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 767px)");
+    const onChange = (e: MediaQueryListEvent) => e.matches && useUIStore.getState().setSidebarOpen(false);
+    narrow.addEventListener("change", onChange);
+    return () => narrow.removeEventListener("change", onChange);
+  }, []);
   const { data: deskCtx } = useDeskContext();
   const deskUser = deskCtx?.user;
   // A browser with no stored theme choice (new device) takes the user's saved User.desk_theme, as Desk does at boot

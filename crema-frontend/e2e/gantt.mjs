@@ -14,7 +14,7 @@ const tag = `Crema gantt ${Date.now() % 100000}`;
 const task = (await post("frappe.client.insert", { doc: { doctype: "Task", subject: tag, exp_start_date: ymd(addDays(base, 1)), exp_end_date: ymd(addDays(base, 3)), progress: 40 } })).name;
 
 step("Task list offers Gantt");
-await page.goto(`${BASE}/desk/doctype/Task?view=list`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/task?view=list`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Gantt" }).click({ timeout: 90000 });
 await page.waitForURL(/\/view\/gantt/, { timeout: 60000 });
 const bar = page.getByRole("slider", { name: new RegExp(`^${tag}:`) });

@@ -130,7 +130,7 @@ export default function PrintBuilder({ name, deskHref }: { name: string; deskHre
     return (
       <div className="mx-auto max-w-lg p-10 text-center" role="alert">
         <p className="text-sm text-red-600">{b.error}</p>
-        <Link href="/desk/doctype/Print%20Format" className="mt-3 inline-block text-sm underline">Back to Print Formats</Link>
+        <Link href="/desk/print-format" className="mt-3 inline-block text-sm underline">Back to Print Formats</Link>
       </div>
     );
   }

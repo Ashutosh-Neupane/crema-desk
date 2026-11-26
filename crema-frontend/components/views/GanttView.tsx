@@ -17,6 +17,7 @@ import { useCalendarSettings } from "@/lib/views/calendarSettings";
 import { fieldLabel } from "@/components/list/filters";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { monthDay, monthShortYear } from "./parts/dateLabels";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Scale = "Day" | "Week" | "Month";
 const PX: Record<Scale, number> = { Day: 36, Week: 14, Month: 4 };
@@ -154,7 +155,7 @@ export default function GanttView({ doctype }: { doctype: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-xs text-zinc-500">
-            <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+            <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
               {doctype}
             </Link>
             {" / Gantt"}
@@ -162,10 +163,10 @@ export default function GanttView({ doctype }: { doctype: string }) {
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{doctype} Gantt</h1>
         </div>
         <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-          <Link href={`/desk/doctype/${enc(doctype)}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+          <Link href={`${doctypeUrl(doctype)}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
             List
           </Link>
-          <Link href={`/desk/doctype/${enc(doctype)}/view/calendar`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+          <Link href={`${doctypeUrl(doctype)}/view/calendar`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
             Calendar
           </Link>
           <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
@@ -193,7 +194,7 @@ export default function GanttView({ doctype }: { doctype: string }) {
           <div className="flex h-9 items-center border-b border-zinc-200 px-3 text-xs font-medium text-zinc-500 dark:border-zinc-800">{fieldLabel(meta, fm.title ?? "name")}</div>
           {bars.map((b) => (
             <div key={b.id} className="flex h-9 items-center border-b border-zinc-100 px-3 text-sm dark:border-zinc-800/60">
-              <Link href={`/desk/doctype/${enc(doctype)}/${enc(b.id)}`} className="truncate text-zinc-800 hover:underline dark:text-zinc-200" title={b.title}>
+              <Link href={`${doctypeUrl(doctype)}/${enc(b.id)}`} className="truncate text-zinc-800 hover:underline dark:text-zinc-200" title={b.title}>
                 {b.title}
               </Link>
             </div>

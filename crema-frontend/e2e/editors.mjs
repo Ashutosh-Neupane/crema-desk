@@ -3,7 +3,7 @@
 // Preview without scripts; JSON shows parse errors and saves the text; read-only Code has Copy to Clipboard;
 // set_df_property(f, "autocompletions", …) offers completions; frappe.markdown works in app scripts.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/editors.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -51,7 +51,7 @@ r = await post("frappe.client.insert", {
 check(r.ok(), `Client Script (${r.status()})`);
 await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Editors");
 const box = (f) => page.locator(`[data-fieldname="${f}"] .cm-content`);
@@ -120,7 +120,7 @@ await shot("editors_filled", false);
 
 step("save → text stored as typed");
 await page.keyboard.press(`${mod}+s`);
-await page.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(DT)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const d = (await api(`api/resource/${encodeURIComponent(DT)}/${name}`)).data;
 check(d.code === "frappe.db.get_value('User', 'Administrator')", `code (${JSON.stringify(d.code)})`);

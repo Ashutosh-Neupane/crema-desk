@@ -1,6 +1,6 @@
 // Timeline: version diff, comment with @mention (edit/delete), New Email → Communication.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/timeline.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -23,7 +23,7 @@ await post("frappe.client.insert", {
 const name = (await post("frappe.client.insert", { doc: { doctype: DT, title: "First" } })).name;
 
 step("edit → version diff in the timeline");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const title = page.getByRole("textbox", { name: /^Title/ });
 await title.waitFor({ timeout: 90000 });
 await title.fill("Second");

@@ -6,7 +6,7 @@
 //    on a submitted document
 //  - a dialog Comment field: "Comment" shows once there's text, Ctrl+Enter / the button hand the value to on_submit
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/controls4.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -60,7 +60,7 @@ r = await post("frappe.client.insert", {
 check(r.ok(), `Client Script (${r.status()})`);
 
 step("new document: text heights, heading, button look");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Mark Done" }).waitFor({ timeout: 90000 });
 const h = async (label) => page.getByLabel(label, { exact: true }).evaluate((el) => Math.round(el.getBoundingClientRect().height));
 check(Math.abs((await h("Small Note")) - 150) <= 2, `Small Text is 150px (${await h("Small Note")})`);
@@ -87,7 +87,7 @@ step("submitted document: text keeps whitespace, buttons stay clickable");
 const text = "first line\n    indented line\nlast line";
 const doc = (await (await post("frappe.client.insert", { doc: { doctype: DT, title: "Shown", small_note: text, long_note: Array.from({ length: 30 }, (_, i) => `row ${i + 1}`).join("\n") } })).json()).message;
 await post("frappe.client.submit", { doc });
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${doc.name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${doc.name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Mark Done" }).waitFor({ timeout: 90000 });
 const shown = page.getByRole("document", { name: "Small Note" });
 check((await shown.innerText()) === text, "read-only Small Text keeps line breaks and indentation");

@@ -1,6 +1,6 @@
 // Grid details: Move To (row editor), Duplicate with a no_copy child field, select-all "Delete all N rows" across pages.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/gridmove.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -30,7 +30,7 @@ const items = (d) => (d?.rows ?? []).map((r) => r.item).join(",");
 const idxOk = (d) => (d?.rows ?? []).every((r, i) => r.idx === i + 1);
 const mk = async (rows) => (await post("frappe.client.insert", { doc: { doctype: P, title: "t", rows: rows.map((item) => ({ item, secret: `s-${item}` })) } })).name;
 const open = async (name) => {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(P)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(P)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("checkbox", { name: "Select all rows" }).or(page.getByRole("button", { name: "Edit row 1", exact: true })).first().waitFor({ timeout: 120000 });
 };
 const save = async () => page.getByRole("button", { name: /^Save$/ }).click();

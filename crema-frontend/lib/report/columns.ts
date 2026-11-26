@@ -2,6 +2,7 @@
 import { formatCell } from "@/lib/list/format";
 import { formatValue } from "@/lib/frappe/format";
 import type { ChartResult } from "@/lib/hooks/useDashboardChart";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export interface ReportColumn {
   fieldname: string;
@@ -88,12 +89,12 @@ export function defaultFormatter(
         /* keep the value */
       }
     }
-    if (label !== v) return `<a href="/desk/doctype/${encodeURIComponent(column.options)}/${encodeURIComponent(v)}">${esc(label)}</a>`;
-    return `<a href="/desk/doctype/${encodeURIComponent(column.options)}/${encodeURIComponent(v)}">${esc(v)}</a>`;
+    if (label !== v) return `<a href="${doctypeUrl(column.options)}/${encodeURIComponent(v)}">${esc(label)}</a>`;
+    return `<a href="${doctypeUrl(column.options)}/${encodeURIComponent(v)}">${esc(v)}</a>`;
   }
   if (column.fieldtype === "Dynamic Link" && column.options && data?.[column.options]) {
     const v = String(value);
-    return `<a href="/desk/doctype/${encodeURIComponent(String(data[column.options]))}/${encodeURIComponent(v)}">${esc(v)}</a>`;
+    return `<a href="${doctypeUrl(String(data[column.options]))}/${encodeURIComponent(v)}">${esc(v)}</a>`;
   }
   if (column.fieldtype === "Currency" && column.options && data && !data[column.options] && !/^[A-Z]{3}$/.test(column.options)) {
     // options names a currency field missing on this row → company currency

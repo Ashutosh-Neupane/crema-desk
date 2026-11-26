@@ -18,6 +18,7 @@ import { deskRouteToUrl, deskSlug } from "@/lib/navigation/deskRoute";
 import { DeskDialog, confirm as deskConfirm, prompt as deskPrompt } from "./dialogs";
 import * as fmt from "@/lib/frappe/format";
 import { PREFILL_KEY } from "@/lib/form/prefill";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export interface RuntimeContext {
   user: string;
@@ -458,14 +459,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       if (local?.__islocal && typeof sessionStorage !== "undefined") {
         const values = Object.fromEntries(Object.entries(local).filter(([k]) => k !== "name" && k !== "__islocal"));
         sessionStorage.setItem(PREFILL_KEY(p[1]), JSON.stringify(values));
-        ctx.navigate?.(deskRouteToUrl(["Form", p[1]], options) ?? `/desk/doctype/${encodeURIComponent(p[1])}/new`);
+        ctx.navigate?.(deskRouteToUrl(["Form", p[1]], options) ?? `${doctypeUrl(p[1])}/new`);
         return Promise.resolve();
       }
       const url = deskRouteToUrl(p, options);
       if (url) ctx.navigate?.(url);
       return Promise.resolve();
     },
-    new_doc: (dt: string) => ctx.navigate?.(`/desk/doctype/${encodeURIComponent(dt)}/new`),
+    new_doc: (dt: string) => ctx.navigate?.(`${doctypeUrl(dt)}/new`),
     get_route: () => [],
     // frappe.router.slug: listview_settings.get_form_link (Workflow Action) builds Desk paths with it
     router: { slug: (name: unknown) => deskSlug(cstr(name)) },

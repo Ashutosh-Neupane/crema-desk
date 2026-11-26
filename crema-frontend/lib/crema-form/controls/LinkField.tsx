@@ -26,6 +26,7 @@ import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
 import AddMultipleDialog from "@/components/form/AddMultipleDialog";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 function safeQuery(getQuery: FieldControlProps["getQuery"]) {
   try {
@@ -50,7 +51,7 @@ function CreateLinked({ doctype, initial, onDone, onClose }: { doctype: string; 
     // no quick entry for this DocType → full form in a new tab (Desk routes away; a tab keeps this form)
     if (meta && !canQuickEntry(meta) && !opened.current) {
       opened.current = true;
-      window.open(`/desk/doctype/${encodeURIComponent(doctype)}/new`, "_blank");
+      window.open(`${doctypeUrl(doctype)}/new`, "_blank");
       onClose();
     }
   }, [meta, doctype, onClose]);
@@ -150,7 +151,7 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
     return (
       <div className="flex min-h-[38px] items-center gap-1 rounded-lg border border-transparent bg-zinc-100 px-3 py-2 text-sm text-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-200">
         {current ? (
-          <Link href={`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(current)}`} title={display !== current ? current : undefined} className="truncate hover:underline">
+          <Link href={`${doctypeUrl(doctype)}/${encodeURIComponent(current)}`} title={display !== current ? current : undefined} className="truncate hover:underline">
             {display}
           </Link>
         ) : (
@@ -212,7 +213,7 @@ export default function LinkField({ field, inputId, value, onChange, disabled, e
       />
       {current && !open && (
         <Link
-          href={`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(current)}`}
+          href={`${doctypeUrl(doctype)}/${encodeURIComponent(current)}`}
           aria-label={`Open ${current}`}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-400 opacity-0 transition-opacity hover:text-zinc-700 group-hover:opacity-100 dark:hover:text-zinc-200"
         >

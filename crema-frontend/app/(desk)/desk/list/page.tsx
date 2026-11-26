@@ -35,7 +35,7 @@ export default function ListPage() {
         </Link>
 
         <Link
-          href="/desk/doctype/Sales%20Invoice"
+          href="/desk/sales-invoice"
           className="rounded-xl border border-zinc-200 bg-white p-6 hover:border-zinc-300 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600"
         >
           <div className="flex items-center gap-4">
@@ -50,7 +50,7 @@ export default function ListPage() {
         </Link>
 
         <Link
-          href="/desk/doctype/Task"
+          href="/desk/task"
           className="rounded-xl border border-zinc-200 bg-white p-6 hover:border-zinc-300 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600"
         >
           <div className="flex items-center gap-4">

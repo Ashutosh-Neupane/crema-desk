@@ -15,6 +15,7 @@ import { deskCall, getDoc, isNewDoc } from "@/lib/frappe/form";
 import { confirm as deskConfirm } from "@/lib/desk-runtime/dialogs";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import type { WidgetProps } from "./types";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Rec = Record<string, unknown> & { name: string };
 
@@ -58,7 +59,7 @@ export function AddressContact({ ctl, readOnly, fieldname }: WidgetProps & { fie
   const create = () => {
     // frappe.dynamic_link + QuickEntry source_frm: the new doc gets this document as its Dynamic Link row
     sessionStorage.setItem(PREFILL_KEY(g.doctype), JSON.stringify({ links: [{ doctype: "Dynamic Link", parentfield: "links", parenttype: g.doctype, link_doctype: doc.doctype, link_name: doc.name }] }));
-    router.push(`/desk/doctype/${enc(g.doctype)}/new`);
+    router.push(`${doctypeUrl(g.doctype)}/new`);
   };
   const act = async (fn: () => Promise<unknown>) => {
     setMenu(null);
@@ -138,7 +139,7 @@ export function AddressContact({ ctl, readOnly, fieldname }: WidgetProps & { fie
                 </button>
                 {menu === r.name && (
                   <div role="menu" className="absolute right-0 z-10 mt-1 w-44 rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-md dark:border-zinc-700 dark:bg-zinc-900">
-                    <Link role="menuitem" href={`/desk/doctype/${enc(g.doctype)}/${enc(r.name)}`} className="block px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                    <Link role="menuitem" href={`${doctypeUrl(g.doctype)}/${enc(r.name)}`} className="block px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                       Edit
                     </Link>
                     {!readOnly && (
@@ -155,7 +156,7 @@ export function AddressContact({ ctl, readOnly, fieldname }: WidgetProps & { fie
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2 pr-8">
-                <Link href={`/desk/doctype/${enc(g.doctype)}/${enc(r.name)}`} className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100" aria-label={`Edit ${r.name}`}>
+                <Link href={`${doctypeUrl(g.doctype)}/${enc(r.name)}`} className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100" aria-label={`Edit ${r.name}`}>
                   {g.doctype === "Address" ? s(r.address_title) : `${s(r.first_name)} ${s(r.last_name)}`.trim()}
                 </Link>
                 {isPrimary && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">Primary</span>}

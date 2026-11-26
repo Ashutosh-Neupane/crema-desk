@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -39,7 +39,7 @@ const r = await post("frappe.client.insert", {
 });
 check(r.ok(), `DocType (${r.status()})`);
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Rich note");
 const body = page.getByRole("textbox", { name: "Body" });
@@ -106,7 +106,7 @@ await shot("texteditor_filled", false);
 
 step("save → Desk's format; the image becomes a File");
 await page.keyboard.press(`${mod}+s`);
-await page.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(DT)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const saved = (await api(`api/resource/${encodeURIComponent(DT)}/${name}`)).data?.body ?? "";
 console.log("  saved:", saved.slice(0, 200), "…");

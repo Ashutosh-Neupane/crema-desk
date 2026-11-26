@@ -7,6 +7,7 @@ import { ArrowDownRight, ArrowUpRight, ExternalLink } from "lucide-react";
 import DeskChart from "@/components/desk/DeskChart";
 import { useDashboardChart, useNumberCard, type NumberCardResult } from "@/lib/hooks/useDashboardChart";
 import { formatCompact, formatValue } from "@/lib/utils/formatNumber";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const TIMESPANS = ["Last Week", "Last Month", "Last Quarter", "Last Year"];
 
@@ -116,7 +117,7 @@ export function NumberCard({ name, label }: { name: string; label?: string }) {
         <h3 className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-500 dark:text-zinc-400">{data?.label ?? label ?? name}</h3>
         {data?.doctype && (
           <Link
-            href={`/desk/doctype/${encodeURIComponent(data.doctype)}`}
+            href={`${doctypeUrl(data.doctype)}`}
             aria-label={`Open ${data.doctype} list`}
             className="text-zinc-300 opacity-0 transition-opacity hover:text-zinc-600 group-hover:opacity-100 dark:text-zinc-600 dark:hover:text-zinc-300"
           >

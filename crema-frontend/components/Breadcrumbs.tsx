@@ -35,11 +35,14 @@ export default function Breadcrumbs() {
     }
     // under data routes (/desk/doctype/<DocType>/<name>, /desk/print/…, /desk/query-report/<name>) the
     // segments are DocType and document names — show them verbatim; only route keywords are prettified
-    const isData = index >= 2 && DATA_ROUTES.has(segments[1]) && !ROUTE_WORDS.has(label);
+    // Desk URLs (/desk/sales-order/SAL-ORD-0001, /desk/selling/sales-order) mix slugs and names: a lowercase slug is
+    // prettified ("sales-order" → "Sales Order"), anything else (a record name) is shown as it is
+    const isSlug = index === 1 || /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/.test(label) || ROUTE_WORDS.has(label);
+    const isData = index >= 2 && ((DATA_ROUTES.has(segments[1]) && !ROUTE_WORDS.has(label)) || !isSlug);
     const display = LABEL_OVERRIDES[label] || (isData ? label : label.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
 
-    return { href, label: display, isLast };
-  });
+    return { href, label: display, isLast, skip: segment === "view" && index >= 2 };
+  }).filter((i) => !i.skip); // "/view/" only joins a doctype and its view ("Event / Calendar"); /desk/event/view is no page
 
   if (items.length === 0) return null;
 

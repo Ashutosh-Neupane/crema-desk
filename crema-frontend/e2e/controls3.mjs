@@ -3,7 +3,7 @@
 // d.get_values() compared with what Desk returns — MultiSelect "a, b", Pills / List / MultiCheck arrays of values,
 // Date Range [from, to], Switch 0/1; options as lines, {label, value} items and get_data(txt).
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/controls3.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 // the site's date_format (System Settings), as the date inputs expect it typed
 const toUser = (iso, fmt) => {
@@ -44,7 +44,7 @@ frappe.ui.form.on("${DT}", { refresh(frm) {
 } });` } });
 r = await post("frappe.client.insert", { doc: { doctype: DT, title: "multi" } });
 const name = (await r.json()).message?.name;
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Open Multi" }).click({ timeout: 90000 });
 const dlg = page.getByRole("dialog", { name: "Multi" });
 await dlg.waitFor();

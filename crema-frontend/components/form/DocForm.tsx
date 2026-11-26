@@ -39,6 +39,7 @@ import type { FormController, FormSnapshot } from "@/lib/form/FormController";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import TableMultiSelectField from "@/lib/crema-form/controls/TableMultiSelectField";
 import { FormSkeleton } from "@/components/Skeleton";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 
@@ -299,7 +300,7 @@ function FormDialogHost({ kind, onClose, doctype, doc, meta, view, load }: { kin
       onClose={onClose}
       onDone={(n) => {
         onClose();
-        if (n !== doc.name) router.replace(`/desk/doctype/${enc(doctype)}/${enc(n)}`);
+        if (n !== doc.name) router.replace(`${doctypeUrl(doctype)}/${enc(n)}`);
         else void load();
       }}
     />

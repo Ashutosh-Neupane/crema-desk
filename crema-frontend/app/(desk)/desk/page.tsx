@@ -14,6 +14,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { SidebarIcon } from "@/components/DeskSidebar";
 import { getRecentDocs, type RecentDoc } from "@/lib/utils/recentDocs";
 import type { NavSection } from "@/lib/navigation";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const APP_TITLES: Record<string, string> = { frappe: "Framework", erpnext: "ERPNext" };
 const enc = encodeURIComponent;
@@ -109,14 +110,14 @@ export default function DeskHomePage() {
           <div className="mb-2 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-zinc-400" />
             <h2 className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Assigned to me</h2>
-            <Link href="/desk/doctype/ToDo" className="ml-auto text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">All ToDos</Link>
+            <Link href="/desk/todo" className="ml-auto text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">All ToDos</Link>
           </div>
           {todos?.length ? (
             <ul className="-mx-2">
               {todos.map((t) => (
                 <li key={t.name}>
                   <Link
-                    href={t.reference_type && t.reference_name ? `/desk/doctype/${enc(t.reference_type)}/${enc(t.reference_name)}` : `/desk/doctype/ToDo/${enc(t.name)}`}
+                    href={t.reference_type && t.reference_name ? `${doctypeUrl(t.reference_type)}/${enc(t.reference_name)}` : `/desk/todo/${enc(t.name)}`}
                     className="flex items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   >
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.priority === "High" ? "bg-red-500" : t.priority === "Low" ? "bg-zinc-300" : "bg-amber-500"}`} />
@@ -140,7 +141,7 @@ export default function DeskHomePage() {
             <ul className="-mx-2">
               {recent.slice(0, 6).map((r) => (
                 <li key={`${r.doctype}/${r.name}`}>
-                  <Link href={`/desk/doctype/${enc(r.doctype)}/${enc(r.name)}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                  <Link href={`${doctypeUrl(r.doctype)}/${enc(r.name)}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
                     <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-200">{r.title || r.name}</span>
                     <span className="shrink-0 text-xs text-zinc-400">{r.doctype} · {timeAgo(r.at)}</span>
                   </Link>

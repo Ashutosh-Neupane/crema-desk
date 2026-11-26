@@ -15,6 +15,7 @@ import { deskCall } from "@/lib/frappe/form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import TimePicker from "@/components/form/TimePicker";
 import DatePicker from "@/components/form/DatePicker";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
 const input = "h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
@@ -123,7 +124,7 @@ export function LinksDialog({ doctype, name, onClose }: { doctype: string; name:
               <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
                 {g.docs!.slice(0, 50).map((d) => (
                   <li key={String(d.name)}>
-                    <Link href={`/desk/doctype/${enc(dt)}/${enc(String(d.name))}`} onClick={onClose} className="flex items-center gap-3 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                    <Link href={`${doctypeUrl(dt)}/${enc(String(d.name))}`} onClick={onClose} className="flex items-center gap-3 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                       <span className="font-medium text-zinc-900 dark:text-zinc-100">{String(d.name)}</span>
                       {d.status ? <span className="text-xs text-zinc-500">{String(d.status)}</span> : null}
                       {Number(d.docstatus) === 2 && <span className="text-xs text-red-500">Cancelled</span>}

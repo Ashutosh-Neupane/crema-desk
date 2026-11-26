@@ -8,7 +8,7 @@
 //            longer lists the paid invoice
 // Customer, supplier, item and warehouse come from the site; everything created is cancelled and deleted at the end.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/dayofwork.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -34,7 +34,7 @@ const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 
 const open = async (dt, name) => {
-  await page.goto(`${BASE}/desk/doctype/${enc(dt)}/${enc(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(dt)}/${enc(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   // the heading shows the title (party name); a submitted document is ready once ERPNext's Create group is up
   await page.getByRole("button", { name: /^Create/ }).first().waitFor({ timeout: 90000 });
   await page.waitForTimeout(1500);
@@ -63,8 +63,24 @@ const setLink = async (label, value) => {
 };
 /** Save (→ the saved name in the URL), then Submit → Yes; returns the submitted doc from the server */
 const saveSubmit = async (dt) => {
+  // a payment through a bank account needs a cheque / reference number and date (ERPNext payment_entry.json)
+  const ref = page.getByLabel(/^Cheque\/Reference No/).first();
+  if (dt === "Payment Entry" && (await ref.isVisible().catch(() => false))) {
+    await ref.fill(`E2E-${Date.now().toString(36)}`);
+    const refDate = page.getByRole("textbox", { name: /^Cheque\/Reference Date/ }).first();
+    if (await refDate.isVisible().catch(() => false)) {
+      await refDate.fill(new Date().toISOString().slice(0, 10));
+      await page.keyboard.press("Escape");
+    }
+    await page.waitForTimeout(500);
+  }
   await page.getByRole("button", { name: /^Save$/ }).click();
-  await page.waitForURL((u) => u.pathname.startsWith(`/desk/doctype/${enc(dt)}/`) && !u.pathname.endsWith("/new"), { timeout: 60000 });
+  await page.waitForURL((u) => u.pathname.startsWith(`/desk/${slug(dt)}/`) && !u.pathname.endsWith("/new"), { timeout: 60000 }).catch(async (e) => {
+    // say why the save didn't land (a validation message, or the URL it stayed on)
+    const msg = await page.locator('[role="alertdialog"], [role="dialog"], [data-sonner-toast], [role="alert"], [aria-invalid="true"]').evaluateAll((els) => els.map((e) => e.innerText || e.getAttribute("aria-label") || e.id)).catch(() => []);
+    console.log(`  save of ${dt} did not finish at ${page.url()}: ${msg.join(" | ").replace(/\s+/g, " ").slice(0, 600)}`);
+    throw e;
+  });
   const name = decodeURIComponent(page.url().split("?")[0].split("/").pop());
   made.push([dt, name]);
   await page.getByRole("button", { name: /^Submit$/ }).waitFor({ timeout: 30000 });
@@ -109,7 +125,7 @@ try {
 
   // ── stock ──────────────────────────────────────────────────────────────────────────────────────────────
   step("stock: new Stock Entry (Material Receipt) typed in");
-  await page.goto(`${BASE}/desk/doctype/Stock%20Entry/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/stock-entry/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: "New Stock Entry" }).waitFor({ timeout: 90000 });
   await page.waitForTimeout(1500);
   await setLink("Stock Entry Type", "Material Receipt");

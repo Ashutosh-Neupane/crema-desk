@@ -2,7 +2,7 @@
 // disable_primary_action, add_custom_action. A Client Script opens a dialog from a custom button; the primary
 // action writes JSON.stringify(values) into the doc, which is then saved and checked on the server.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/dialogs.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -52,7 +52,7 @@ frappe.ui.form.on("${DT}", {
 });` } });
 
 step("open the dialog");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("button", { name: "Open Dlg" }).click();
 const dlg = page.getByRole("dialog", { name: "Dlg Test" });

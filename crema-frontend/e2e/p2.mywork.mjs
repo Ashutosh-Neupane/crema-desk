@@ -2,7 +2,7 @@
 // (ToDo / _assign), a draft I started, a record I opened (Recent), workspace shortcuts; open works from each list;
 // screenshots at 390 / 768 / 1280 px. Creates its own DocTypes, workflow and documents and removes them at the end.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/p2.mywork.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -98,8 +98,8 @@ try {
 
   step("open from Drafts → form, then it shows under Recent");
   await draftLink.click();
-  await page.waitForURL(new RegExp(`/desk/doctype/${enc(DT_DRAFT).replace(/%20/g, "(%20| )")}/${draft.name}`), { timeout: 30000 });
-  check(await page.getByText(DRAFT_TITLE).first().isVisible({ timeout: 60000 }).catch(() => false), "draft form opened");
+  await page.waitForURL(new RegExp(`/desk/${slug(DT_DRAFT)}/${draft.name}`), { timeout: 30000 });
+  check(await page.getByText(DRAFT_TITLE).first().waitFor({ timeout: 60000 }).then(() => true, () => false), "draft form opened");
   await page.waitForTimeout(1500);
   await openMyWork();
   check(await region("Recent").getByRole("link", { name: new RegExp(DRAFT_TITLE) }).first().isVisible().catch(() => false), "opened draft listed under Recent");
@@ -109,7 +109,7 @@ try {
   await link.focus();
   await page.keyboard.press("Enter");
   await page.waitForURL(new RegExp(`/${approval.name}$`), { timeout: 30000 });
-  check(await page.getByText(APPROVE_TITLE).first().isVisible({ timeout: 60000 }).catch(() => false), "approval form opened with Enter");
+  check(await page.getByText(APPROVE_TITLE).first().waitFor({ timeout: 60000 }).then(() => true, () => false), "approval form opened with Enter");
 
   step("screenshots at 390 / 768 / 1280");
   for (const w of [390, 768, 1280]) {

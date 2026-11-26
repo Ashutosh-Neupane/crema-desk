@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { frappeServerFetch, getCookieHeader } from "@/lib/frappe/server";
 import { Card } from "@/components/shadcn/card";
 import { FileText, BarChart3, Globe, Layout, Layers, ExternalLink } from "lucide-react";
+import { doctypeUrl, workspaceUrl } from "@/lib/navigation/deskUrl";
 
 export const revalidate = 600; // 10 minutes
 
@@ -96,7 +97,7 @@ export default async function ModuleDefPage({ params }: Props) {
   const sections = [
     {
       key: "doctypes", label: `DocTypes (${data.doctypes.length})`, icon: FileText,
-      items: data.doctypes.map((d) => ({ label: d.name, href: `/desk/doctype/${encodeURIComponent(d.name)}` })),
+      items: data.doctypes.map((d) => ({ label: d.name, href: `${doctypeUrl(d.name)}` })),
     },
     {
       key: "reports", label: `Reports (${data.reports.length})`, icon: BarChart3,
@@ -108,7 +109,7 @@ export default async function ModuleDefPage({ params }: Props) {
     },
     {
       key: "workspaces", label: `Workspaces (${data.workspaces.length})`, icon: Layout,
-      items: data.workspaces.map((w) => ({ label: w.title || w.name, href: `/desk/workspace/${encodeURIComponent(w.name)}` })),
+      items: data.workspaces.map((w) => ({ label: w.title || w.name, href: `${workspaceUrl(w.name)}` })),
     },
   ].filter((s) => s.items.length > 0);
 

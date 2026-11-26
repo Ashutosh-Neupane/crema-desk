@@ -11,6 +11,7 @@ import { EmptyNext, WorkSection } from "./WorkSection";
 import { WorkList } from "./WorkList";
 import { ShortcutGrid } from "./ShortcutGrid";
 import { focusRing } from "./data";
+import { workspaceUrl } from "@/lib/navigation/deskUrl";
 
 const SHOW = 8;
 const noopSubscribe = () => () => {};
@@ -60,11 +61,11 @@ function WaitingSection({ waiting, sessionLoading, sessionFailed }: { waiting: M
       title="Waiting on me"
       icon={<Inbox className="h-4 w-4" />}
       count={items.length}
-      viewAll={{ href: "/desk/doctype/ToDo", label: "All ToDos" }}
+      viewAll={{ href: "/desk/todo", label: "All ToDos" }}
       loading={sessionLoading || waiting.isPending}
       error={waiting.isError || sessionFailed}
       onRetry={() => void waiting.refetch()}
-      empty={<EmptyNext icon={<Inbox className="h-6 w-6" />} message="Nothing is waiting on you. Approvals and documents assigned to you show up here." action={{ label: "See all ToDos", href: "/desk/doctype/ToDo" }} />}
+      empty={<EmptyNext icon={<Inbox className="h-6 w-6" />} message="Nothing is waiting on you. Approvals and documents assigned to you show up here." action={{ label: "See all ToDos", href: "/desk/todo" }} />}
     >
       {items.length > 0 && <WorkList items={items.slice(0, SHOW)} label="Waiting on me" />}
     </WorkSection>
@@ -110,7 +111,7 @@ function ShortcutsSection({ shortcuts, sessionLoading }: { shortcuts: MyWork["sh
       id="my-work-shortcuts"
       title="Shortcuts"
       icon={<Pin className="h-4 w-4" />}
-      viewAll={workspace ? { href: `/desk/workspace/${encodeURIComponent(workspace)}`, label: "Workspace" } : undefined}
+      viewAll={workspace ? { href: `${workspaceUrl(workspace)}`, label: "Workspace" } : undefined}
       loading={sessionLoading || shortcuts.isPending}
       error={shortcuts.isError}
       onRetry={() => void shortcuts.refetch()}

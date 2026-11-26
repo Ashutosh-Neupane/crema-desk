@@ -13,7 +13,7 @@ const tag = `Crema Imp ${Date.now() % 100000}`;
 const names = [`${tag} A`, `${tag} B`];
 
 step("Export from the Sales Order list");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.locator("tbody tr").first().waitFor({ timeout: 60000 });
 await page.getByRole("button", { name: "List settings" }).click();
 await page.getByRole("menuitem", { name: "Export" }).click();

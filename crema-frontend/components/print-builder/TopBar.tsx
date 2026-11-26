@@ -40,7 +40,7 @@ function ModeTabs({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
 }
 
 export default function TopBar({ name, doctype, deskHref, readOnly, status, canUndo, canRedo, onUndo, onRedo, onDiscard, onApply, mode, setMode }: Props) {
-  const formHref = `/desk/doctype/Print%20Format/${encodeURIComponent(name)}`;
+  const formHref = `/desk/print-format/${encodeURIComponent(name)}`;
   const hasDraft = (status === "draft" || status === "unsaved") && !readOnly;
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 px-gutter py-2 dark:border-zinc-800">

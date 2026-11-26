@@ -10,6 +10,7 @@ import { reportHelpers } from "@/lib/desk-runtime/appHelpers";
 import { deskCall } from "@/lib/frappe/form";
 import { buildSettings, type ReportBridge, type RuntimeContext } from "./buildSettings";
 import { enc, initialFilterValues, type FilterValues, type InnerButton, type ReportDocInfo, type ReportFilter, type RunResult, type Settings } from "./queryReportTypes";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Loaded = { redirect: string } | { settings: Settings; info: ReportDocInfo; values: FilterValues };
 
@@ -24,7 +25,7 @@ async function loadReport(name: string, ctx: RuntimeContext, bridge: ReportBridg
   const helpers = await reportHelpers(m.script ?? "");
   if (isCancelled()) return null;
   const info = (meta?.env.message ?? {}) as ReportDocInfo;
-  if (info.report_type === "Report Builder" && info.ref_doctype) return { redirect: `/desk/doctype/${enc(info.ref_doctype)}/view/report/${enc(name)}` };
+  if (info.report_type === "Report Builder" && info.ref_doctype) return { redirect: `${doctypeUrl(info.ref_doctype)}/view/report/${enc(name)}` };
   // Desk get_local_report_settings: a Custom Report runs the script of its reference report
   const scriptName = info.report_type === "Custom Report" && info.reference_report ? info.reference_report : name;
   const settings = await buildSettings(name, scriptName, m, ctx, bridge, helpers);

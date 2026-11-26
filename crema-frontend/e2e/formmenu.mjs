@@ -1,6 +1,6 @@
 // Form menu: Rename (title + name), Links, Remind Me, Customize (route_options doc_type).
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/formmenu.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step } = t;
@@ -22,7 +22,7 @@ await post("frappe.client.insert", {
 await post("frappe.client.insert", { doc: { doctype: DT, name: "OLD-1", title: "Old title" } });
 
 step("click title → rename title and ID");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/OLD-1`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/OLD-1`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Old title" }).click({ timeout: 90000 });
 const dlg = page.getByRole("dialog");
 await dlg.getByLabel("Title").fill("New title");
@@ -46,7 +46,7 @@ const so = (await post("frappe.client.get_list", { doctype: "Sales Order", field
 const customer = so?.customer ?? (await post("frappe.client.get_list", { doctype: "Customer", fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 step(`Links on a customer (${customer ?? "none on this site"})`);
 if (customer) {
-  await page.goto(`${BASE}/desk/doctype/Customer/${encodeURIComponent(customer)}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/desk/customer/${encodeURIComponent(customer)}`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "More actions" }).click({ timeout: 90000 });
   await page.getByRole("menuitem", { name: "Links" }).click();
   if (so) {
@@ -62,7 +62,7 @@ if (customer) {
 step("Customize opens Customize Form for this DocType");
 await page.getByRole("button", { name: "More actions" }).click();
 await page.getByRole("menuitem", { name: "Customize" }).click();
-await page.waitForURL(/Customize%20Form/, { timeout: 30000 });
+await page.waitForURL(/customize-form/, { timeout: 30000 });
 const dt = page.getByRole("combobox", { name: /^Enter Form Type/ }).first();
 await page.waitForFunction(() => [...document.querySelectorAll("input")].some((i) => i.value === "Customer"), null, { timeout: 60000 }).catch(() => {});
 check((await dt.inputValue()) === "Customer", `doc_type applied (${await dt.inputValue()})`);

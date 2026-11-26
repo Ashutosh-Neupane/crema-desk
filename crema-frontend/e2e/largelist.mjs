@@ -3,7 +3,7 @@
 // page_length), scrolling through 1000+ rows never blocks the main thread for long, and select-all is quick.
 // Long tasks are read with PerformanceObserver("longtask").
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/largelist.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -26,7 +26,7 @@ const waitRows = async (n) => page.waitForFunction((n) => document.querySelector
 
 // reset this list's saved settings (page length, filters) so the run starts from Desk's defaults
 await api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: DT, user_settings: JSON.stringify({ List: {} }) } });
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}?view=list`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}?view=list`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await rows.first().waitFor({ timeout: 90000 });
 await page.evaluate(() => {
   window.__long = [];

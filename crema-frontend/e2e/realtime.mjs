@@ -23,7 +23,7 @@ const made = [];
 try {
 
 step("list refreshes on list_update");
-await page.goto(`${BASE}/desk/doctype/ToDo?filters=${encodeURIComponent(JSON.stringify([["description", "like", `%${tag}%`]]))}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/todo?filters=${encodeURIComponent(JSON.stringify([["description", "like", `%${tag}%`]]))}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByText(/No ToDo matches these filters|You haven't created/).waitFor({ timeout: 90000 });
 await page.waitForTimeout(2000); // socket joins the doctype room
 made.push((await post("frappe.client.insert", { doc: { doctype: "ToDo", description: `${tag} first` } })).name);
@@ -31,7 +31,7 @@ await page.getByText(`${tag} first`).first().waitFor({ timeout: 15000 }).catch((
 check(await page.getByText(`${tag} first`).first().isVisible(), "new ToDo appeared without reloading");
 
 step("clean form reloads on doc_update");
-await page.goto(`${BASE}/desk/doctype/ToDo/${made[0]}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/todo/${made[0]}`, { waitUntil: "domcontentloaded" });
 await page.getByRole("complementary", { name: "Document sidebar" }).waitFor({ timeout: 90000 });
 await page.waitForTimeout(2000);
 await post("frappe.client.set_value", { doctype: "ToDo", name: made[0], fieldname: "priority", value: "High" });

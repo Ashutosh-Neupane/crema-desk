@@ -36,7 +36,7 @@ try {
   await post("frappe.client.insert", { doc: { doctype: "User", email: EMAIL, first_name: "Imp", send_welcome_email: 0, roles: [{ role: "Sales User" }] } });
 
   step("no banner for Administrator");
-  await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByLabel("List settings").waitFor({ timeout: 90000 });
   check((await ctxUser()).user === "Administrator", "session is Administrator");
   check(!(await page.getByTestId("site-banners").count()), "no site banner");
@@ -44,16 +44,16 @@ try {
   step("ToDo list menu (System Manager)");
   await page.getByLabel("List settings").click();
   await page.getByRole("menuitem", { name: "User Permissions" }).click();
-  await page.waitForURL(/\/desk\/doctype\/User%20Permission\?allow=ToDo/, { timeout: 30000 });
-  check(true, "User Permissions → /desk/doctype/User%20Permission?allow=ToDo");
-  await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.waitForURL(/\/desk\/user-permission\?allow=ToDo/, { timeout: 30000 });
+  check(true, "User Permissions → /desk/user-permission?allow=ToDo");
+  await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByLabel("List settings").click();
   await page.getByRole("menuitem", { name: "Role Permissions Manager" }).click();
-  await page.waitForURL(/\/desk\/page\/permission-manager\/ToDo/, { timeout: 30000 });
-  check(true, "Role Permissions Manager → /desk/page/permission-manager/ToDo");
+  await page.waitForURL(/\/desk\/permission-manager\/ToDo/, { timeout: 30000 });
+  check(true, "Role Permissions Manager → /desk/permission-manager/ToDo");
 
   step("Impersonate");
-  await page.goto(`${BASE}/desk/doctype/User/${encodeURIComponent(EMAIL)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/user/${encodeURIComponent(EMAIL)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await main.getByRole("button", { name: "Impersonate", exact: true }).waitFor({ timeout: 90000 });
   await main.getByRole("button", { name: "Impersonate", exact: true }).click();
   const dlg = page.getByRole("dialog", { name: `Impersonate as ${EMAIL}` });
@@ -66,7 +66,7 @@ try {
   check(c.impersonated_by === "Administrator", `impersonated_by = ${c.impersonated_by}`);
   check((await page.getByTestId("site-banners").innerText()).includes(`You are impersonating ${EMAIL}.`), "banner: You are impersonating <user>.");
   await shot("impersonating", false);
-  await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByLabel("List settings").waitFor({ timeout: 90000 });
   await page.getByLabel("List settings").click();
   check(!(await page.getByRole("menuitem", { name: "User Permissions" }).count()), "list menu hides User Permissions for a non-System Manager");
@@ -78,7 +78,7 @@ try {
   await loginAdmin();
   const a = await ctxUser();
   check(a.user === "Administrator" && !a.impersonated_by, "back to Administrator, not impersonated");
-  await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByLabel("List settings").waitFor({ timeout: 90000 });
   check(!(await page.getByTestId("site-banners").count()), "banner gone");
 } finally {

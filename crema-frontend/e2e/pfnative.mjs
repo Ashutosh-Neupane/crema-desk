@@ -30,7 +30,7 @@ const body = paper.locator('[data-pfb-section]:not([data-pfb-section="header"]):
 const status = page.getByRole("status").filter({ hasText: /Saved|Draft|Unsaved|Saving|Not saved/ });
 
 step("Edit Format → Crema's builder");
-await page.goto(`${BASE}/desk/doctype/Print%20Format/${encodeURIComponent(PF)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/print-format/${encodeURIComponent(PF)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Edit Format" }).click({ timeout: 90000 });
 await page.waitForURL(/\/desk\/print-format-builder\/[^?]+$/, { timeout: 30000 });
 await paper.waitFor({ timeout: 90000 });

@@ -22,6 +22,7 @@ import { PageSizes, ReportFilterPills, ReportViewHeader, ReportViewToolbar, Save
 import { colKey, enc, sameCol, sqlCol, type Col, type ReportSettings, type Row, type ViewCol } from "./reportview/shared";
 import { useDocfields, useReportViewData } from "./reportview/useReportViewData";
 import { useReportViewSettings } from "./reportview/useReportViewSettings";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 function downloadCsv(fileName: string, rows: Row[], viewCols: ViewCol[]) {
   const cols = viewCols.map(({ df, k }) => ({ fieldname: k, label: String(df.label ?? k), fieldtype: df.fieldtype }));
@@ -79,7 +80,7 @@ export default function ReportView({ doctype, reportName }: { doctype: string; r
       const { env } = await deskCall("frappe.desk.reportview.save_report", { name, doctype, report_settings: JSON.stringify({ ...settings, column_widths: {} }) });
       toast.success(`Report ${String(env.message)} saved`);
       setSaveAs(null);
-      if (!reportName || reportName !== env.message) router.push(`/desk/doctype/${enc(doctype)}/view/report/${enc(String(env.message))}`);
+      if (!reportName || reportName !== env.message) router.push(`${doctypeUrl(doctype)}/view/report/${enc(String(env.message))}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save report", { duration: 8000 });
     }

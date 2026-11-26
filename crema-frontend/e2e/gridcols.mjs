@@ -3,7 +3,7 @@
 // in the parent's user settings (the record Desk v16 reads); survives a reload; Desk's legacy `columns` units are read;
 // Reset to default drops only this table's entry; at least one column must stay.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/gridcols.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -55,7 +55,7 @@ await setGridView({ [OTHER]: [{ fieldname: "x", width: 100 }] });
 
 const headers = async () => (await page.getByRole("columnheader").allInnerTexts()).map((s) => s.replace("*", "").trim()).filter(Boolean);
 async function openNew() {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: `New ${PARENT}` }).waitFor({ timeout: 90000 });
   await page.getByRole("columnheader").first().waitFor({ timeout: 30000 });
   await page.waitForTimeout(500);

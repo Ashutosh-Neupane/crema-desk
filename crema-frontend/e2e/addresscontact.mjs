@@ -29,7 +29,7 @@ try {
   const contact = await post("frappe.client.insert", { doc: { doctype: "Contact", first_name: "Ada", last_name: TAG, designation: "Buyer", email_ids: [{ email_id: "ada.ac@example.com", is_primary: 1 }], phone_nos: [{ phone: "9800000001", is_primary_phone: 1 }], links: link } });
 
   step("cards on a saved Customer");
-  await page.goto(`${BASE}/desk/doctype/Customer/${enc(cust.name)}`, { waitUntil: "domcontentloaded", timeout: 240000 });
+  await page.goto(`${BASE}/desk/customer/${enc(cust.name)}`, { waitUntil: "domcontentloaded", timeout: 240000 });
   const openTab = async () => {
     await main.getByRole("tab", { name: "Address & Contact" }).click({ timeout: 120000 });
   };
@@ -44,8 +44,8 @@ try {
   const cText = await cBox.innerText();
   check(cText.includes("ada.ac@example.com") && cText.includes("9800000001") && cText.includes("Buyer"), "contact card shows email, phone, designation");
   check((await cBox.locator('a[href="mailto:ada.ac@example.com"]').count()) === 1, "email is a mailto link");
-  check((await aBox.getByRole("link", { name: `Edit ${addr.name}` }).getAttribute("href")) === `/desk/doctype/Address/${enc(addr.name)}`, "address Edit link route");
-  check((await cBox.getByRole("link", { name: `Edit ${contact.name}` }).getAttribute("href")) === `/desk/doctype/Contact/${enc(contact.name)}`, "contact Edit link route");
+  check((await aBox.getByRole("link", { name: `Edit ${addr.name}` }).getAttribute("href")) === `/desk/address/${enc(addr.name)}`, "address Edit link route");
+  check((await cBox.getByRole("link", { name: `Edit ${contact.name}` }).getAttribute("href")) === `/desk/contact/${enc(contact.name)}`, "contact Edit link route");
   await aBox.getByRole("button", { name: "Options" }).click();
   check(await page.getByRole("menuitem", { name: "Set as Primary" }).isVisible(), "card menu offers Set as Primary");
   check(await page.getByRole("menuitem", { name: "Unlink Address" }).isVisible(), "card menu offers Unlink");
@@ -54,7 +54,7 @@ try {
 
   step("New Address opens a linked form");
   await main.getByRole("group", { name: "Address cards" }).getByRole("button", { name: "Address", exact: true }).click();
-  await page.waitForURL(/\/desk\/doctype\/Address\/new/, { timeout: 60000 });
+  await page.waitForURL(/\/desk\/address\/new/, { timeout: 60000 });
   const title = `${TAG} Second`;
   await main.getByLabel(/Address Title/).first().fill(title);
   await main.getByLabel(/Address Line 1/).first().fill("99 Linked Road");
@@ -62,13 +62,13 @@ try {
   check((await main.getByText(cust.name, { exact: false }).count()) > 0 || (await main.locator(`input[value="${cust.name}"]`).count()) > 0, "new Address form shows the prefilled Dynamic Link row");
   await shot("addr_new_linked");
   await page.keyboard.press("Control+s");
-  await page.waitForURL((u) => !/\/new/.test(u.pathname) && /\/Address\//.test(u.pathname), { timeout: 60000 });
-  const saved = decodeURIComponent(page.url().split("/Address/")[1]);
+  await page.waitForURL((u) => !/\/new/.test(u.pathname) && /\/address\//.test(u.pathname), { timeout: 60000 });
+  const saved = decodeURIComponent(new URL(page.url()).pathname.split("/address/")[1]);
   const doc = await post("frappe.client.get", { doctype: "Address", name: saved });
   check(doc?.links?.some((l) => l.link_doctype === "Customer" && l.link_name === cust.name), "saved Address is linked to the Customer on the server");
 
   step("back on the Customer, both addresses listed");
-  await page.goto(`${BASE}/desk/doctype/Customer/${enc(cust.name)}`, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await page.goto(`${BASE}/desk/customer/${enc(cust.name)}`, { waitUntil: "domcontentloaded", timeout: 120000 });
   await openTab();
   await main.locator(`[data-name="${saved}"]`).waitFor({ timeout: 60000 });
   check((await main.locator("[data-name]").filter({ hasText: "99 Linked Road" }).count()) === 1, "new address card appears");
@@ -81,7 +81,7 @@ try {
   check(true, "unlinked card disappears");
 
   step("hidden on a new Customer");
-  await page.goto(`${BASE}/desk/doctype/Customer/new`, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await page.goto(`${BASE}/desk/customer/new`, { waitUntil: "domcontentloaded", timeout: 120000 });
   await main.getByLabel(/Customer Name/).first().waitFor({ timeout: 120000 });
   check((await main.locator(".address-display, [data-name]").count()) === 0 && (await main.getByText(/No addresses added yet|No contacts added yet/).count()) === 0, "no address/contact cards on an unsaved Customer");
 } finally {

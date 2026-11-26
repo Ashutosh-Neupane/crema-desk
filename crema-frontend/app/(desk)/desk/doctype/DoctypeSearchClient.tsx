@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 interface DoctypeRow {
   name: string;
@@ -94,7 +95,7 @@ export function DoctypeSearchClient({ doctypes }: { doctypes: DoctypeRow[] }) {
                 >
                   <td className="px-4 py-3">
                     <Link
-                      href={`/desk/doctype/${encodeURIComponent(dt.name)}`}
+                      href={`${doctypeUrl(dt.name)}`}
                       className="font-medium text-zinc-900 hover:text-blue-600 dark:text-zinc-100 dark:hover:text-blue-400"
                     >
                       {dt.name}
@@ -105,7 +106,7 @@ export function DoctypeSearchClient({ doctypes }: { doctypes: DoctypeRow[] }) {
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/desk/doctype/${encodeURIComponent(dt.name)}`}
+                      href={`${doctypeUrl(dt.name)}`}
                       className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                     >
                       View

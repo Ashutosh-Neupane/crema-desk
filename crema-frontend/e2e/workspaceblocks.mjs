@@ -4,7 +4,7 @@
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/workspaceblocks.mjs
 import { chromium } from "@playwright/test";
 import fs from "node:fs";
-import { BASE, OUT } from "./lib.mjs";
+import { BASE, OUT, slug } from "./lib.mjs";
 
 // Same helpers as lib.mjs start(), but signs in through the login API: this test goes straight to a workspace, so it
 // does not wait for the /desk home page (the slowest route to compile) to load.
@@ -96,7 +96,7 @@ try {
   });
 
   step("workspace renders both blocks");
-  await page.goto(`${BASE}/desk/workspace/${enc(WS)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(WS)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   const widget = page.getByRole("region", { name: "Onboarding" });
   await widget.waitFor({ timeout: 90000 });
   check((await widget.locator("li[data-step]").count()) === 3, "onboarding shows its 3 steps");
@@ -131,7 +131,7 @@ try {
 
   step("step action routes");
   await widget.getByRole("button", { name: "Create the entry" }).click();
-  await page.waitForURL(new RegExp(`/desk/doctype/${enc(entryDoctype).replace(/%20/g, "(%20|\\+)")}/new`), { timeout: 60000 });
+  await page.waitForURL(new RegExp(`/desk/${slug(entryDoctype)}/new`), { timeout: 60000 });
   check(true, `Create Entry opens a new ${entryDoctype} form`);
   check(!(await stepRow(stepNames[0])).is_complete, "Create Entry is not ticked until the work is done");
   await page.goBack();

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCookieHeader } from "@/lib/frappe/server";
 import { getDeskBoot } from "@/lib/frappe/deskBoot";
 import { resolveDeskPath } from "@/lib/navigation/deskRoute";
+import { registryFromBoot } from "@/lib/navigation/deskRegistry";
 
 interface Props {
   params: Promise<{ slug: string; rest?: string[] }>;
@@ -16,12 +17,10 @@ interface Props {
 export default async function DeskSlugRoute({ params, searchParams }: Props) {
   const [{ slug, rest = [] }, sp, boot] = await Promise.all([params, searchParams, getCookieHeader().then(getDeskBoot)]);
   if (!boot) notFound();
-  const user = (boot.user ?? {}) as { can_read?: string[] };
-  const pages = ((boot.workspaces as { pages?: Array<{ name: string }> } | undefined)?.pages ?? []).map((p) => p.name);
   const search = new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => [k, x]) : v === undefined ? [] : [[k, v]])),
   ).toString();
   redirect(
-    resolveDeskPath([slug, ...rest].join("/"), { doctypes: user.can_read ?? [], workspaces: pages, shells: Object.keys(boot.module_sidebars ?? {}) }, search),
+    resolveDeskPath([slug, ...rest].join("/"), registryFromBoot(boot), search),
   );
 }

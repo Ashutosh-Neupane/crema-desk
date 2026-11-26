@@ -2,7 +2,7 @@
 // autocomplete.js, password.js, color.js, icon.js): stored values in Desk's format, Desk's validation, and Table
 // MultiSelect in a frappe.ui.Dialog.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/controls2.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -49,7 +49,7 @@ r = await post("frappe.client.insert", { doc: { doctype: DT, title: "From Desk",
 const name = (await r.json()).message?.name;
 check(!!name, `document ${name}`);
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("textbox", { name: /^Title/ }).waitFor({ timeout: 90000 });
 const roles = page.locator('[data-fieldname="roles"]');
 await roles.locator("[data-pill]").first().waitFor({ timeout: 20000 });

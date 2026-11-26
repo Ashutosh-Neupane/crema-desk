@@ -1,3 +1,4 @@
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 /**
  * "My work" (docs/GAPS.md § 3.4 Home) — pure helpers shared by the fetchers and the views.
  * No React here so the component modules only export components.
@@ -39,7 +40,7 @@ export const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-r
 const enc = encodeURIComponent;
 
 export function docHref(doctype: string, name: string): string {
-  return `/desk/doctype/${enc(doctype)}/${enc(name)}`;
+  return `${doctypeUrl(doctype)}/${enc(name)}`;
 }
 
 export function stripHtml(s: unknown): string {

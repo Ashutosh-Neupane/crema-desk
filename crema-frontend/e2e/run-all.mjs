@@ -1,5 +1,5 @@
 // Runs every e2e suite sequentially against the live bench and prints a summary.
-//   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/run-all.mjs [--only a,b] [--skip c,d]
+//   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/run-all.mjs [--only=a,b] [--skip=c,d]
 // Suites that need ERPNext data are skipped automatically when SKIP_ERPNEXT=1 (e.g. a site without ERPNext).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";

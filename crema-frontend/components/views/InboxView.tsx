@@ -156,7 +156,7 @@ export default function InboxView() {
                       })
                     }
                   />
-                  <Link href={`/desk/doctype/Communication/${enc(r.name)}`} onClick={() => !seen && void flag("Read", [r.name])} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Link href={`/desk/communication/${enc(r.name)}`} onClick={() => !seen && void flag("Read", [r.name])} className="flex min-w-0 flex-1 items-center gap-3">
                     <span className={`w-48 shrink-0 truncate ${seen ? "text-zinc-600 dark:text-zinc-400" : "font-semibold text-zinc-900 dark:text-zinc-100"}`}>{String(current === "Sent" ? r.recipients : r.sender_full_name || r.sender || "")}</span>
                     <span className={`min-w-0 flex-1 truncate ${seen ? "text-zinc-700 dark:text-zinc-300" : "font-semibold text-zinc-900 dark:text-zinc-100"}`}>{String(r.subject || "(no subject)")}</span>
                     {!!Number(r.has_attachment) && <Paperclip className="h-3.5 w-3.5 shrink-0 text-zinc-400" aria-label="Has attachment" />}

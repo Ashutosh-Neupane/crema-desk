@@ -82,7 +82,7 @@ export default function FileManager() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-xs text-zinc-500">
-            <Link href="/desk/doctype/File" className="hover:underline">
+            <Link href="/desk/file" className="hover:underline">
               File
             </Link>
             {" / Home"}
@@ -184,7 +184,7 @@ export default function FileManager() {
                       ) : (
                         <FileIcon className="h-4 w-4 text-zinc-400" aria-hidden />
                       )}
-                      <Link href={`/desk/doctype/File/${enc(e.name)}`} className="text-zinc-800 hover:underline dark:text-zinc-200">
+                      <Link href={`/desk/file/${enc(e.name)}`} className="text-zinc-800 hover:underline dark:text-zinc-200">
                         {e.file_name}
                       </Link>
                       {e.file_url?.startsWith("/private/") && <Lock className="h-3 w-3 text-zinc-400" aria-label="Private" />}

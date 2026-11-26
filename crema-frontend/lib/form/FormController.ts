@@ -924,8 +924,38 @@ export class FormController {
     this.gridSelection[table] = names;
   }
 
-  private addButton(b: CustomButton) {
-    if (this.buttons.some((x) => x.label === b.label && (x.group ?? "") === (b.group ?? ""))) return;
+  /**
+   * Desk's frm.add_custom_button returns the button's jQuery element, and scripts chain on it
+   * (`.addClass("btn-primary").css(...)`). Crema returns a stand-in: every jQuery method chains, and
+   * adding / removing `btn-primary` makes the button primary or not; the rest has no visual effect.
+   */
+  private buttonHandle(label: string, group?: string): unknown {
+    const setPrimary = (primary: boolean) => {
+      this.buttons = this.buttons.map((x) => (x.label === label && (x.group ?? "") === (group ?? "") ? { ...x, primary } : x));
+      this.emit();
+    };
+    const handle: unknown = new Proxy(function () {}, {
+      get: (_t, prop) => {
+        if (prop === "length") return 1;
+        // not a promise, and prints as nothing
+        if (typeof prop === "symbol" || prop === "then") return undefined;
+        if (prop === "toString") return () => "";
+        // getters read as empty; setters chain
+        if (prop === "text" || prop === "val" || prop === "html" || prop === "attr") return (...args: unknown[]) => (args.length > (prop === "attr" ? 1 : 0) ? handle : "");
+        if (prop === "addClass" || prop === "removeClass" || prop === "toggleClass") {
+          return (cls?: unknown, on?: boolean) => {
+            if (typeof cls === "string" && cls.split(/\s+/).includes("btn-primary")) setPrimary(prop === "toggleClass" ? on !== false : prop === "addClass");
+            return handle;
+          };
+        }
+        return () => handle;
+      },
+    });
+    return handle;
+  }
+
+  private addButton(b: CustomButton): unknown {
+    if (this.buttons.some((x) => x.label === b.label && (x.group ?? "") === (b.group ?? ""))) return this.buttonHandle(b.label, b.group);
     const action = b.action;
     this.buttons = [
       ...this.buttons,
@@ -941,6 +971,7 @@ export class FormController {
       },
     ];
     this.emit();
+    return this.buttonHandle(b.label, b.group);
   }
 
   /** Evaluate the DocType's app JS + Client Scripts so their handlers register */

@@ -29,12 +29,12 @@ const open = async (path, ready) => {
 await open("/desk/selling", () => page.locator("#main-content").getByText(/Sales Order/).first().waitFor({ timeout: 90000 }));
 await shot("workspace");
 
-await open("/desk/doctype/Sales%20Order", () => page.getByLabel("List settings").waitFor({ timeout: 90000 }));
+await open("/desk/sales-order", () => page.getByLabel("List settings").waitFor({ timeout: 90000 }));
 await shot("list");
 
 const so = (await api("frappe.client.get_list", { doctype: "Sales Order", filters: { docstatus: 1 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 if (so) {
-  await open(`/desk/doctype/Sales%20Order/${encodeURIComponent(so)}`, () => page.getByRole("region", { name: "Activity" }).waitFor({ timeout: 90000 }));
+  await open(`/desk/sales-order/${encodeURIComponent(so)}`, () => page.getByRole("region", { name: "Activity" }).waitFor({ timeout: 90000 }));
   await shot("form");
   await open(`/desk/print/Sales%20Order/${encodeURIComponent(so)}`, () => page.locator("iframe").first().waitFor({ timeout: 90000 }));
   await page.waitForTimeout(3000);
@@ -46,7 +46,7 @@ await shot("report");
 
 
 
-await open("/desk/doctype/Sales%20Order", () => page.getByLabel("List settings").waitFor({ timeout: 90000 }));
+await open("/desk/sales-order", () => page.getByLabel("List settings").waitFor({ timeout: 90000 }));
 await page.keyboard.press("Meta+k");
 await page.keyboard.type("new sales", { delay: 40 });
 await page.waitForTimeout(1500);

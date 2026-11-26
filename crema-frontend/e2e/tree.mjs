@@ -7,7 +7,7 @@ const t = await start();
 const { page, check, step, shot } = t;
 
 step("Account list route opens the Chart of Accounts tree");
-await page.goto(`${BASE}/desk/doctype/Account`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/account`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.waitForURL(/\/view\/tree/, { timeout: 60000 });
 await page.getByRole("heading", { name: "Chart of Accounts" }).waitFor({ timeout: 60000 });
 check(true, "redirected to tree with ERPNext title");
@@ -26,7 +26,7 @@ await page.locator("tbody tr").first().waitFor({ timeout: 60000 });
 check((await page.locator("tbody tr").count()) > 0, "Account list shows rows");
 
 step("Item Group: add child prefilled with parent");
-await page.goto(`${BASE}/desk/doctype/Item%20Group/view/tree`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/item-group/view/tree`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByText("All Item Groups").first().waitFor({ timeout: 60000 });
 // header "Add" creates under the root group (All Item Groups)
 await page.getByRole("button", { name: /^Add Item Group$/ }).click();

@@ -2,7 +2,7 @@
 // switch to Default Layout and back, the last layout comes back on reopen, URL filters select the matching layout,
 // duplicate as personal, edit, delete; a layout made elsewhere (as Desk saves it) shows under Your Layouts.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/listlayouts.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -22,7 +22,7 @@ await post("frappe.client.insert", { doc: { doctype: DT, description: "crema lay
 
 const trigger = () => page.getByRole("button", { name: /^Layout: / });
 const open = async (q = "") => {
-  await page.goto(`${BASE}/desk/doctype/${DT}${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(decodeURIComponent(DT))}${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await trigger().waitFor({ timeout: 90000 });
 };
 

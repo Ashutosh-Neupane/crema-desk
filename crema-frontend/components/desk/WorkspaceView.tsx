@@ -16,6 +16,7 @@ import { sidebarItemHref } from "@/lib/navigation";
 import OnboardingWidget, { type OnboardingData } from "@/components/desk/OnboardingWidget";
 import CustomBlock from "@/components/desk/CustomBlock";
 import { objectKey } from "@/components/desk/objectKey";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 interface Block {
   id?: string;
@@ -66,7 +67,7 @@ const stripHtml = (s: unknown) => String(s ?? "").replace(/<[^>]+>/g, "").replac
 
 function linkHref(l: { link_type?: string; type?: string; link_to?: string; url?: string; is_query_report?: 0 | 1; doc_view?: string }): string | null {
   const t = (l.link_type ?? l.type) as "DocType" | "Report" | "Page" | "URL" | "Dashboard";
-  if (t === "DocType" && l.doc_view === "New") return `/desk/doctype/${enc(l.link_to ?? "")}/new`;
+  if (t === "DocType" && l.doc_view === "New") return `${doctypeUrl(l.link_to ?? "")}/new`;
   return sidebarItemHref({ link_type: t, link_to: l.link_to ?? null, url: l.url ?? null });
 }
 
@@ -149,13 +150,13 @@ function QuickList({ q }: { q: NonNullable<WorkspaceDoc["quick_lists"]>[number] 
     <WidgetShell
       title={q.label || q.document_type}
       className="h-full"
-      action={<Link href={`/desk/doctype/${enc(q.document_type)}`} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">View all</Link>}
+      action={<Link href={`${doctypeUrl(q.document_type)}`} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">View all</Link>}
     >
       {data?.length ? (
         <ul className="-mx-2">
           {data.map((d) => (
             <li key={d.name}>
-              <Link href={`/desk/doctype/${enc(q.document_type)}/${enc(d.name)}`} className="flex items-center rounded-md px-2 py-1.5 text-[13px] text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
+              <Link href={`${doctypeUrl(q.document_type)}/${enc(d.name)}`} className="flex items-center rounded-md px-2 py-1.5 text-[13px] text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
                 <span className="truncate">{d.name}</span>
               </Link>
             </li>
@@ -311,7 +312,7 @@ export default function WorkspaceView({ name }: { name: string }) {
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{ws.title || ws.label || ws.name}</h1>
           {ws.module && <p className="text-xs text-zinc-500">{ws.module}</p>}
         </div>
-        <Link href={`/desk/doctype/Workspace/${enc(ws.name)}`} className="ml-auto rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
+        <Link href={`/desk/workspace/${enc(ws.name)}`} className="ml-auto rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
           Edit
         </Link>
       </div>

@@ -4,7 +4,7 @@
 // (empty field → site country), Barcode as JsBarcode SVG with data-barcode-value (EAN validated), Geolocation as a
 // GeoJSON FeatureCollection (circles keep their radius).
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/controls.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -43,7 +43,7 @@ r = await post("frappe.client.insert", { doc: { doctype: DT, title: "From Desk",
 const name = (await r.json()).message?.name;
 check(!!name, `document ${name}`);
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("textbox", { name: /^Title/ }).waitFor({ timeout: 90000 });
 
 step("Desk's values shown right");
@@ -120,7 +120,7 @@ const circle = geo.features.find((f) => f.properties?.point_type === "circle");
 check(geo.type === "FeatureCollection" && geo.features.length === 3 && circle?.properties.radius === 300, `GeoJSON: 3 features, circle radius ${circle?.properties.radius}`);
 
 step("new document: Phone starts on the site's country");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 const sysCountry = (await api("api/method/frappe.client.get_single_value?doctype=System%20Settings&field=country")).message;
 await page.waitForFunction(() => document.querySelectorAll('select[aria-label="Mobile country code"] option').length > 100, null, { timeout: 20000 });

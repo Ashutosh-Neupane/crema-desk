@@ -19,7 +19,7 @@ let name = null;
 
 try {
   step(`new Sales Invoice for ${CUSTOMER}`);
-  await page.goto(`${BASE}/desk/doctype/Sales%20Invoice/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/sales-invoice/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: "New Sales Invoice" }).waitFor({ timeout: 120000 });
   const cust = page.getByRole("combobox", { name: /^Customer/ }).first();
   await cust.click();
@@ -45,7 +45,7 @@ try {
 
   step("save → server keeps the link to the order");
   await page.getByRole("button", { name: /^Save$/ }).click();
-  await page.waitForURL(/Sales%20Invoice\/(?!new)/, { timeout: 60000 });
+  await page.waitForURL(/sales-invoice\/(?!new)/, { timeout: 60000 });
   name = decodeURIComponent(page.url().split("/").pop());
   const si = await post("frappe.client.get", { doctype: "Sales Invoice", name });
   check(si?.items?.length === ITEMS.length && si.items.every((r) => r.sales_order === SO), `${name}: ${ITEMS.length} row(s) linked to ${SO}`);

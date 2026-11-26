@@ -44,13 +44,13 @@ await page.keyboard.press("Escape");
 step("Help route → Desk URL resolved");
 await openMenu();
 await page.getByRole("menuitem", { name: "System Health", exact: true }).click();
-await page.waitForURL(/\/desk\/doctype\/System%20Health%20Report\/System%20Health%20Report/, { timeout: 60000 });
+await page.waitForURL(/\/desk\/system-health-report\/System%20Health%20Report/, { timeout: 60000 });
 check(true, "/desk/system-health-report → the System Health Report single");
 
 step("My Settings");
 await openMenu();
 await page.getByRole("menuitem", { name: "My Settings" }).click();
-await page.waitForURL(/\/desk\/doctype\/User\/Administrator/, { timeout: 60000 });
+await page.waitForURL(/\/desk\/user\/Administrator/, { timeout: 60000 });
 check(true, "opens the user's own User form");
 
 step("Session Defaults");
@@ -77,21 +77,22 @@ await page.waitForTimeout(1500);
 check((await post("frappe.client.get_value", { doctype: "User", filters: "Administrator", fieldname: "desk_theme" }))?.desk_theme === "Dark", "User.desk_theme = Dark");
 check(await page.evaluate(() => document.documentElement.getAttribute("data-theme") === "dark"), "dark theme applied");
 
-step("Desk URLs resolved like Desk's router");
+step("Desk URLs open in place (Desk's router, served by proxy.ts)");
 const cases = [
-  ["/desk/sales-invoice/new", /\/desk\/doctype\/Sales%20Invoice\/new$/],
-  ["/desk/user/view/report", /\/desk\/doctype\/User\/view\/report$/],
-  ["/desk/user/Administrator", /\/desk\/doctype\/User\/Administrator$/],
-  ["/desk/buying", /\/desk\/workspace\/Buying$/],
-  ["/desk/stock/item", /\/desk\/doctype\/Item$/],
-  ["/desk/List/User", /\/desk\/doctype\/User$/],
-  ["/desk/permission-manager/ToDo", /\/desk\/page\/permission-manager\/ToDo$/],
-  ["/desk/todo?status=Open", /\/desk\/doctype\/ToDo\?status=Open$/],
+  ["/desk/sales-invoice/new", "New Sales Invoice"],
+  ["/desk/user/view/report", "User"],
+  ["/desk/user/Administrator", "Administrator"],
+  ["/desk/buying", "Buying"],
+  ["/desk/stock/item", "Item"],
+  ["/desk/todo?status=Open", "ToDo"],
 ];
-for (const [from, to] of cases) {
-  await page.goto(`${BASE}${from}`, { waitUntil: "domcontentloaded" });
-  const ok = await page.waitForURL(to, { timeout: 60000 }).then(() => true, () => false);
-  check(ok, `${from} → ${ok ? new URL(page.url()).pathname + new URL(page.url()).search : page.url()}`);
+for (const [url, title] of cases) {
+  await page.goto(`${BASE}${url}`, { waitUntil: "domcontentloaded" });
+  const ok = await page
+    .waitForFunction((t) => document.title.includes(t) || [...document.querySelectorAll("h1, h2")].some((h) => h.textContent?.includes(t)), title, { timeout: 60000 })
+    .then(() => true, () => false);
+  const now = new URL(page.url());
+  check(ok && `${now.pathname}${now.search}`.startsWith(url.split("?")[0]), `${url} → "${await page.title()}" at ${now.pathname}${now.search}`);
 }
 
 step("restore");

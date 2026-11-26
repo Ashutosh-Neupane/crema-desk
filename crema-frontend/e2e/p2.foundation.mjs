@@ -28,6 +28,11 @@ async function pillContrasts() {
   });
 }
 
+// the contrast checks measure the light theme; another suite may have left the user on Dark
+const themeOf = async () => (await t.api("api/method/frappe.client.get_value", { data: { doctype: "User", filters: "Administrator", fieldname: "desk_theme" } })).message?.desk_theme ?? "Light";
+const originalTheme = await themeOf();
+await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { theme: "Light" } });
+
 // clean prefs for a deterministic start (server copy + local cache)
 await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
@@ -75,6 +80,8 @@ const dialog = page.getByRole("dialog", { name: "Preview (Comfortable)" });
 await dialog.waitFor();
 check((await dialog.getAttribute("aria-modal")) === "true", "role=dialog aria-modal");
 check(await page.evaluate(() => document.activeElement?.hasAttribute("data-autofocus")), "data-autofocus element focused");
+// the drawer slides in; measure once it has settled
+await page.waitForFunction((el) => Math.round(el.getBoundingClientRect().right) === window.innerWidth, await dialog.elementHandle(), { timeout: 5000 }).catch(() => {});
 let box = await dialog.boundingBox();
 check(box && Math.round(box.x + box.width) === 1440 && box.height > 900, `drawer on the right (${JSON.stringify(box)})`);
 const inside = [];
@@ -117,9 +124,11 @@ check((await page.evaluate(() => document.documentElement.dataset.density)) === 
 
 step("high contrast + dark keep AA");
 await page.getByLabel("High contrast").check();
+await page.waitForTimeout(600); // colours transition to the high-contrast tokens
 for (const p of await pillContrasts()) check(p.ratio >= 7, `high-contrast pill ${p.tone} ${p.ratio.toFixed(2)} ≥ 7`);
 await page.getByLabel("High contrast").uncheck();
 await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+await page.waitForTimeout(600);
 for (const p of await pillContrasts()) check(p.ratio >= 4.5, `dark pill ${p.tone} ${p.ratio.toFixed(2)} ≥ 4.5`);
 await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
 
@@ -145,4 +154,5 @@ await page.setViewportSize({ width: 1440, height: 1000 });
 await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
 await t.shot("p2-foundation-1440");
+if (originalTheme !== "Light") await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { theme: originalTheme } });
 await t.finish();

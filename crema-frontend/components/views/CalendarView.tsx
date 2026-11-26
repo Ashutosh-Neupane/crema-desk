@@ -20,7 +20,8 @@ import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { monthDay, monthDayYear, monthYear } from "./parts/dateLabels";
 import { CalendarGrid } from "./parts/calendar/CalendarGrid";
 import { useCalendarEvents, useCalendarRange } from "./parts/calendar/useCalendarEvents";
-import { DAY, btn, enc, ymd, type CalendarMode } from "./parts/calendar/shared";
+import { DAY, btn, ymd, type CalendarMode } from "./parts/calendar/shared";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const startOfToday = () => new Date(new Date().setHours(0, 0, 0, 0));
 
@@ -49,7 +50,7 @@ export default function CalendarView({ doctype }: { doctype: string }) {
       PREFILL_KEY(doctype),
       JSON.stringify({ [fm.start]: v, ...(fm.end && fm.end !== fm.start ? { [fm.end]: v } : {}) })
     );
-    router.push(`/desk/doctype/${enc(doctype)}/new`);
+    router.push(`${doctypeUrl(doctype)}/new`);
   };
 
   const shift = (n: number) =>
@@ -110,7 +111,7 @@ function CalendarTitle({ doctype, heading, meta }: { doctype: string; heading: s
     <>
       <div className="min-w-0 flex-1">
         <div className="text-xs text-zinc-500">
-          <Link href={`/desk/doctype/${enc(doctype)}`} className="hover:underline">
+          <Link href={`${doctypeUrl(doctype)}`} className="hover:underline">
             {doctype}
           </Link>
           {" / Calendar"}
@@ -119,7 +120,7 @@ function CalendarTitle({ doctype, heading, meta }: { doctype: string; heading: s
       </div>
       <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
         <Link
-          href={`/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}`}
+          href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`}
           prefetch={false}
           className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >

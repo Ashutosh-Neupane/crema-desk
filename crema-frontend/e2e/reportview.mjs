@@ -10,14 +10,14 @@ await post("frappe.model.utils.user_settings.save", { doctype: "Sales Order", us
 await post("frappe.desk.reportview.delete_report", { name: REPORT }).catch(() => {});
 
 step("open Report view from the list");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Report", exact: true }).click();
 await page.waitForURL(/\/view\/report/, { timeout: 30000 });
 const grid = page.getByRole("table", { name: "Sales Order report" });
 await grid.locator("tbody tr").first().waitFor({ timeout: 60000 });
 const base = await grid.locator("tbody tr").count();
 check(base > 0, `rows (${base})`);
-check(await grid.locator("tbody a[href*='/desk/doctype/Sales%20Order/SAL-ORD-']").first().isVisible(), "ID links to form");
+check(await grid.locator("tbody a[href*='/desk/sales-order/SAL-ORD-']").first().isVisible(), "ID links to form");
 
 step("pick columns: Customer's Purchase Order + child Item Code");
 await page.getByRole("button", { name: "Columns" }).click();
@@ -33,7 +33,7 @@ const fanned = await grid.locator("tbody tr").count();
 check(fanned >= base, `child rows fan out (${base} → ${fanned})`);
 
 step("inline edit a draft's PO number");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/view/report?docstatus=0`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/sales-order/view/report?docstatus=0`, { waitUntil: "domcontentloaded" });
 await grid.locator("tbody tr").first().waitFor({ timeout: 60000 });
 const firstName = (await grid.locator("tbody tr").first().locator("a").first().innerText()).trim();
 const poIdx = await grid.locator("thead th").evaluateAll((ths) => ths.findIndex((th) => /Customer's Purchase Order/.test(th.textContent ?? "")));

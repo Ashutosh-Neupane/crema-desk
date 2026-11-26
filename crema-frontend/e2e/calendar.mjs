@@ -12,11 +12,15 @@ const now = new Date();
 const d1 = new Date(now.getFullYear(), now.getMonth(), 12);
 const d2 = new Date(now.getFullYear(), now.getMonth(), 13);
 const title = `Crema cal ${Date.now() % 100000}`;
+// events left by an interrupted run fill the test days and push this one behind "+ more"
+for (const e of (await post("frappe.client.get_list", { doctype: "Event", filters: [["subject", "like", "Crema cal %"]], fields: ["name"], limit_page_length: 200 })) ?? []) {
+  await post("frappe.client.delete", { doctype: "Event", name: e.name });
+}
 const ev = (await post("frappe.client.insert", { doc: { doctype: "Event", subject: title, starts_on: `${ymd(d1)} 10:00:00`, ends_on: `${ymd(d1)} 11:30:00`, event_type: "Private" } })).name;
 
 step("/desk/calendar → Event calendar shows the event");
 await page.goto(`${BASE}/desk/calendar`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.waitForURL(/\/desk\/doctype\/Event\/view\/calendar/, { timeout: 60000 });
+await page.waitForURL(/\/desk\/event\/view\/calendar/, { timeout: 60000 });
 const chip = page.getByRole("link", { name: new RegExp(title) });
 await chip.waitFor({ timeout: 60000 });
 const cell1 = page.getByRole("gridcell", { name: d1.toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" }) });
@@ -40,13 +44,13 @@ check(await cell2.getByRole("link", { name: new RegExp(title) }).isVisible(), "e
 step("+ on a day opens New Event prefilled");
 await cell2.hover();
 await cell2.getByRole("button", { name: /^New on / }).click();
-await page.waitForURL(/Event\/new/, { timeout: 30000 });
+await page.waitForURL(/event\/new/, { timeout: 30000 });
 await page.getByRole("heading", { name: "New Event" }).waitFor({ timeout: 60000 });
 const startsOn = await page.getByLabel(/^Starts on$/i).first().inputValue();
 check(startsOn.includes(String(d2.getDate()).padStart(2, "0")), `starts_on prefilled (${startsOn})`);
 
 step("Task calendar (Date fields, ERPNext calendar JS) loads");
-await page.goto(`${BASE}/desk/doctype/Task/view/calendar`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/task/view/calendar`, { waitUntil: "domcontentloaded" });
 await page.getByRole("grid", { name: "Task calendar" }).waitFor({ timeout: 60000 });
 check(true, "Task calendar grid rendered");
 

@@ -31,7 +31,7 @@ page.on("request", (r) => {
 
 const draft = await order();
 check(!!draft, `draft ${draft} (${customer}, ${item}, ${template ?? "no tax template"})`);
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/${draft}`);
+await page.goto(`${BASE}/desk/sales-order/${draft}`);
 const submit = page.getByRole("button", { name: /^Submit$/ });
 await submit.waitFor({ timeout: 90000 });
 await page.waitForTimeout(2500);

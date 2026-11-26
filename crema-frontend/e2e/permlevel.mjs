@@ -2,7 +2,7 @@
 // sees the level-0 field editable, the level-1 field read-only and the level-2 field hidden (get_field_display_status);
 // saving a level-0 change works. frm.perm / frm.has_perm / frappe.perm.has_perm follow the same rules.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/permlevel.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, browser, check, step, shot } = t;
@@ -41,7 +41,7 @@ const docName = (await post("frappe.client.insert", { doc: { doctype: DT, open_n
 await post("frappe.client.insert", { doc: { doctype: "User", email: EMAIL, first_name: "PL", send_welcome_email: 0, new_password: PASS, roles: [{ role: ROLE }] } });
 
 step("administrator sees every level");
-const FORM = `${BASE}/desk/doctype/${encodeURIComponent(DT)}/${encodeURIComponent(docName)}`;
+const FORM = `${BASE}/desk/${slug(DT)}/${encodeURIComponent(docName)}`;
 await page.goto(FORM, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByLabel("Open Note").waitFor({ timeout: 120000 });
 check(await page.getByLabel("Secret Note").isEditable(), "Administrator: level-2 field is editable");

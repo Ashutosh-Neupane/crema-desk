@@ -11,7 +11,7 @@ const EMAIL = `crema.actions.${Date.now() % 100000}@example.com`;
 const NEW_PASS = `Tv-${Date.now().toString(36)}-x9Q!`;
 await post("frappe.client.insert", { doc: { doctype: "User", email: EMAIL, first_name: "Actions", send_welcome_email: 0, roles: [{ role: "Sales User" }] } });
 const main = page.locator("#main-content");
-const FORM = `${BASE}/desk/doctype/User/${encodeURIComponent(EMAIL)}`;
+const FORM = `${BASE}/desk/user/${encodeURIComponent(EMAIL)}`;
 const openForm = async () => {
   await page.goto(FORM, { waitUntil: "domcontentloaded", timeout: 180000 });
   await main.getByRole("button", { name: "Password", exact: true }).waitFor({ timeout: 90000 });
@@ -28,7 +28,7 @@ await shot("user_actions");
 
 step("Permissions ▾");
 await menu("Permissions", "Set User Permissions");
-await page.waitForURL(/\/desk\/doctype\/User%20Permission\?user=/, { timeout: 30000 });
+await page.waitForURL(/\/desk\/user-permission\?user=/, { timeout: 30000 });
 check(decodeURIComponent(page.url()).endsWith(`user=${EMAIL}`), "Set User Permissions → User Permission list filtered by user");
 await openForm();
 await menu("Permissions", "View Permitted Documents");

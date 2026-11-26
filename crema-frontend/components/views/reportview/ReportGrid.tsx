@@ -10,6 +10,7 @@ import type { GroupBy } from "@/lib/report/groupBy";
 import CellEditor from "./CellEditor";
 import { NUMERIC, enc, type Col, type Row, type ViewCol } from "./shared";
 import type { ReportViewData } from "./useReportViewData";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type SortDir = "asc" | "desc";
 const DOCSTATUS = ["Draft", "Submitted", "Cancelled"];
@@ -72,7 +73,7 @@ function CellContent({ vc, v, text, r, p }: { vc: ViewCol; v: unknown; text: str
   const { col, k } = vc;
   if (col[0] === "name" && col[1] === p.doctype && !p.groupBy) {
     return (
-      <Link href={`/desk/doctype/${enc(p.doctype)}/${enc(r.name)}`} className="whitespace-nowrap font-medium text-zinc-900 hover:underline dark:text-zinc-100">
+      <Link href={`${doctypeUrl(p.doctype)}/${enc(r.name)}`} className="whitespace-nowrap font-medium text-zinc-900 hover:underline dark:text-zinc-100">
         {String(v)}
       </Link>
     );

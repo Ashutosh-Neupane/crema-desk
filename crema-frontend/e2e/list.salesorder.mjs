@@ -15,7 +15,7 @@ page.on("response", (r) => r.status() >= 500 && errors.push(`HTTP ${r.status()} 
 let failures = 0;
 const check = (c, m) => { console.log(`  ${c ? "PASS" : "FAIL"} ${m}`); if (!c) failures++; };
 const step = (m) => console.log(`• ${m}`);
-const LIST = `${BASE}/desk/doctype/Sales%20Order`;
+const LIST = `${BASE}/desk/sales-order`;
 const rowCount = () => page.locator("tbody tr").count();
 const settle = () => page.waitForTimeout(1200);
 // expected values come from the bench itself, so the suite runs against any site with ERPNext data
@@ -98,7 +98,7 @@ check(!!firstSO && firstId.includes(firstSO), `first row is ${firstSO} when asce
 
 step("row click opens document");
 await page.locator("tbody tr").first().locator("td").nth(3).click();
-await page.waitForURL(/Sales%20Order\/SAL-ORD/, { timeout: 15000 });
+await page.waitForURL(/sales-order\/SAL-ORD/, { timeout: 15000 });
 check(true, `opened ${decodeURIComponent(page.url().split("/").pop())}`);
 await page.screenshot({ path: `${OUT}/so_form.png`, fullPage: true });
 

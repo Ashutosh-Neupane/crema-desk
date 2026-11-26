@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useDoctypes } from "@/lib/hooks/useDoctypes";
 import { FileText, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 export default function FormsPage() {
   const { data: doctypes, isLoading } = useDoctypes();
@@ -15,7 +16,7 @@ export default function FormsPage() {
     (dt.module ?? "").toLowerCase().includes(query.toLowerCase())
   );
 
-  const handleSelectDoctype = (name: string) => router.push(`/desk/doctype/${encodeURIComponent(name)}/new`);
+  const handleSelectDoctype = (name: string) => router.push(`${doctypeUrl(name)}/new`);
 
   return (
     <div className="space-y-6">

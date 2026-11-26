@@ -7,8 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { deskCall, isNewDoc, type Doc } from "@/lib/frappe/form";
 import type { DocTypeMeta } from "@/lib/frappe/types";
+import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
-const enc = encodeURIComponent;
 
 type Dashboard = { fieldname?: string; non_standard_fieldnames?: Record<string, string>; transactions?: Array<{ label?: string; items: string[] }> };
 
@@ -34,11 +34,11 @@ export default function Connections({ meta, doc }: { meta: DocTypeMeta; doc: Doc
           <ul className="space-y-1">
             {t.items.map((dt) => (
               <li key={dt} className="flex items-center gap-2">
-                <Link href={`/desk/doctype/${enc(dt)}?${new URLSearchParams({ [fieldFor(dt)]: doc.name })}`} className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                <Link href={`${doctypeUrl(dt)}?${new URLSearchParams({ [fieldFor(dt)]: doc.name })}`} className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">
                   <span className="flex-1 truncate">{dt}</span>
                   {!!counts?.[dt] && <span className="rounded-full bg-zinc-100 px-1.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{counts[dt]}</span>}
                 </Link>
-                <Link href={`/desk/doctype/${enc(dt)}/new`} aria-label={`New ${dt}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
+                <Link href={`${doctypeUrl(dt)}/new`} aria-label={`New ${dt}`} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
                   <Plus className="h-3.5 w-3.5" />
                 </Link>
               </li>
