@@ -136,7 +136,7 @@ await waRow.waitFor({ timeout: 60000 });
 check(true, "Workflow Action row for the pending doc");
 await waRow.click();
 await page.waitForURL(new RegExp(`${slug(DT)}/${b}`), { timeout: 60000 }).catch(() => {});
-check(decodeURIComponent(page.url()).includes(`${DT}/${b}`), `row opened the document (${decodeURIComponent(page.url()).replace(BASE, "")})`);
+check(new URL(page.url()).pathname.endsWith(`/${slug(DT)}/${b}`), `row opened the document (${decodeURIComponent(page.url()).replace(BASE, "")})`);
 await page.getByRole("region", { name: "Waiting on you" }).waitFor({ timeout: 30000 });
 
 step("Reject stays draft");

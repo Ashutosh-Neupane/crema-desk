@@ -7,7 +7,7 @@ import { start, BASE } from "./lib.mjs";
 const t = await start();
 const { page, check, step, shot } = t;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
-const SO = (await post("frappe.client.get_list", { doctype: "Sales Order", fields: ["name"], order_by: "modified desc", limit_page_length: 1 }))?.[0]?.name;
+const SO = (await post("frappe.client.get_list", { doctype: "Sales Order", filters: [["docstatus", "<", 2]], fields: ["name"], order_by: "modified desc", limit_page_length: 1 }))?.[0]?.name;
 check(!!SO, `site data: Sales Order ${SO}`);
 // the list restores its last filters into the address (Desk list settings), so start and end from none
 const resetList = () => post("frappe.model.utils.user_settings.save", { doctype: "Sales Order", user_settings: JSON.stringify({ List: { filters: [] } }) });

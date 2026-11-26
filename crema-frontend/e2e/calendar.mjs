@@ -12,6 +12,10 @@ const now = new Date();
 const d1 = new Date(now.getFullYear(), now.getMonth(), 12);
 const d2 = new Date(now.getFullYear(), now.getMonth(), 13);
 const title = `Crema cal ${Date.now() % 100000}`;
+// events left by an interrupted run fill the test days and push this one behind "+ more"
+for (const e of (await post("frappe.client.get_list", { doctype: "Event", filters: [["subject", "like", "Crema cal %"]], fields: ["name"], limit_page_length: 200 })) ?? []) {
+  await post("frappe.client.delete", { doctype: "Event", name: e.name });
+}
 const ev = (await post("frappe.client.insert", { doc: { doctype: "Event", subject: title, starts_on: `${ymd(d1)} 10:00:00`, ends_on: `${ymd(d1)} 11:30:00`, event_type: "Private" } })).name;
 
 step("/desk/calendar → Event calendar shows the event");

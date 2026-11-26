@@ -78,7 +78,7 @@ check((await dlg.innerText()).includes("Move Item") && (await dlg.innerText()).i
 await dlg.getByLabel("Quantity").fill("99");
 await dlg.getByRole("button", { name: "Create Stock Entry" }).click();
 await page.waitForTimeout(1000);
-check(/Item\//.test(page.url()), "quantity above available is refused (stays on the item)");
+check(/\/desk\/item\//.test(page.url()), "quantity above available is refused (stays on the item)");
 
 step("cleanup");
 await cleanup();

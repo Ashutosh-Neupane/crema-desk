@@ -63,7 +63,7 @@ try {
   await shot("addr_new_linked");
   await page.keyboard.press("Control+s");
   await page.waitForURL((u) => !/\/new/.test(u.pathname) && /\/address\//.test(u.pathname), { timeout: 60000 });
-  const saved = decodeURIComponent(page.url().split("/Address/")[1]);
+  const saved = decodeURIComponent(new URL(page.url()).pathname.split("/address/")[1]);
   const doc = await post("frappe.client.get", { doctype: "Address", name: saved });
   check(doc?.links?.some((l) => l.link_doctype === "Customer" && l.link_name === cust.name), "saved Address is linked to the Customer on the server");
 
