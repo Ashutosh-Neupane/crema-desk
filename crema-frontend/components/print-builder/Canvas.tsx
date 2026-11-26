@@ -7,7 +7,7 @@
  * shows whenever it is hovered or selected — Desk hides it while previewing a record, which made sections
  * impossible to remove.
  */
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -24,10 +24,9 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Plus, Scissors, X } from "lucide-react";
-import { formatCell } from "@/lib/list/format";
+import FieldBody from "@/components/print-builder/FieldBody";
 import type { DocTypeMeta } from "@/lib/frappe/types";
 import { columnKey, fieldKey, getSection, parseKey, type PFField, type PFLayout, type PFSection, type SectionKey, type Selection } from "@/lib/print-builder/layout";
-import { sanitizeHtml } from "@/lib/report/columns";
 
 export interface CanvasProps {
   layout: PFLayout;
@@ -48,97 +47,41 @@ export interface CanvasProps {
 
 const sameSel = (a: Selection, b: Selection) => JSON.stringify(a) === JSON.stringify(b);
 
-/** what a field card shows: the sample record's value, formatted like the list does */
-function sampleValue(f: PFField, meta: DocTypeMeta | null, sample: Record<string, unknown> | null): string {
-  if (!sample) return "";
-  const df = meta?.fields?.find((x) => x.fieldname === f.fieldname);
-  const v = sample[f.fieldname] ?? (f.fieldname === "name" ? sample.name : undefined);
-  if (v == null || v === "") return "";
-  return formatCell(v, { fieldtype: df?.fieldtype ?? f.fieldtype, options: df?.options ?? (f.options as string | undefined) }, sample);
-}
-
-function FieldBody({ f, meta, sample, colon }: { f: PFField; meta: DocTypeMeta | null; sample: Record<string, unknown> | null; colon: boolean }) {
-  const label = f.show_label === "hide" ? null : <span className="text-[0.85em] text-zinc-500">{String(f.label ?? f.fieldname)}{colon && !f.hide_colon ? ":" : ""}</span>;
-  const style: CSSProperties = { textAlign: (f.align as CSSProperties["textAlign"]) || undefined, fontWeight: f.bold ? 700 : undefined, fontSize: f.font_size ? `${Number(f.font_size)}px` : undefined };
-  switch (f.fieldtype) {
-    case "Static Text":
-      return <div style={style} className="whitespace-pre-line">{String(f.text ?? "") || <span className="italic text-zinc-400">Empty text</span>}</div>;
-    case "HTML":
-      return (
-        <div>
-          <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-zinc-400">{String(f.label || "HTML")}</span>
-          {String(f.html ?? "").trim() ? (
-            // the block's HTML as it will look (sanitized; Jinja tags show as written until the preview fills them)
-            <div className="max-h-40 overflow-hidden [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(f.html)) }} />
-          ) : (
-            <span className="text-[11px] text-zinc-400">Empty HTML block — write it on the right</span>
-          )}
-        </div>
-      );
-    case "Spacer":
-      return <div style={{ height: `${Number(f.height ?? 10)}px` }} className="rounded border border-dashed border-zinc-300 bg-zinc-50" aria-label="Spacer" />;
-    case "Divider":
-      return <hr className="my-1.5 border-zinc-400" aria-label="Divider" />;
-    case "Image":
-      return f.image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- user-supplied URL, not an optimisable asset
-        <img src={String(f.image_url)} alt={String(f.label ?? "Image")} style={{ width: f.width ? String(f.width) : undefined }} className="max-h-24 max-w-full object-contain" />
-      ) : (
-        <div className="flex h-12 items-center justify-center rounded border border-dashed border-zinc-300 text-xs text-zinc-400">Image (set a URL)</div>
-      );
-    case "Barcode":
-      return <div className="flex h-12 items-center justify-center rounded border border-dashed border-zinc-300 text-xs text-zinc-500">{f.barcode_format === "QR" ? "QR code" : "Barcode"} · {String(f.barcode_field || f.barcode_value || "no value yet")}</div>;
-    case "Table":
-    case "Table MultiSelect": {
-      const cols = (f.table_columns as Array<{ label?: string; fieldname: string; width?: number }> | undefined) ?? [];
-      const rows = ((sample?.[f.fieldname] as Array<Record<string, unknown>> | undefined) ?? []).slice(0, 2);
-      return (
-        <div>
-          {label}
-          <table className="mt-0.5 w-full border-collapse text-[0.85em]">
-            <thead>
-              <tr>{cols.map((c) => <th key={c.fieldname} className="border border-zinc-300 bg-zinc-50 px-1.5 py-0.5 text-left font-medium">{c.label ?? c.fieldname}</th>)}</tr>
-            </thead>
-            <tbody>
-              {(rows.length ? rows : [{}]).map((r, i) => (
-                <tr key={i}>{cols.map((c) => <td key={c.fieldname} className="border border-zinc-300 px-1.5 py-0.5 text-zinc-700">{r[c.fieldname] == null ? "" : String(r[c.fieldname])}</td>)}</tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-    default: {
-      const v = sampleValue(f, meta, sample);
-      return (
-        <div style={style} className={f.show_label === "inline" ? "flex gap-2" : ""}>
-          {label}
-          <div className="min-h-[1.2em] break-words">{v || <span className="text-zinc-300">—</span>}</div>
-        </div>
-      );
-    }
-  }
-}
+/** Enter / Space on a focused card selects it, like a click */
+const onActivateKey = (select: () => void) => (e: KeyboardEvent<HTMLElement>) => {
+  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+  e.preventDefault();
+  e.stopPropagation();
+  select();
+};
 
 function FieldCard({ id, f, sel, onSelect, onRemove, meta, sample, colon }: { id: string; f: PFField; sel: boolean; onSelect: () => void; onRemove: () => void; meta: DocTypeMeta | null; sample: Record<string, unknown> | null; colon: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, data: { type: "field" } });
+  const name = String(f.label ?? f.fieldname);
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
       data-pfb-field={f.fieldname}
-      aria-label={`Field ${String(f.label ?? f.fieldname)}`}
-      aria-selected={sel}
-      role="option"
-      className={`group/field relative rounded-md px-1.5 py-1 outline-offset-1 ${sel ? "outline outline-2 outline-blue-500" : "hover:outline hover:outline-1 hover:outline-blue-300"}`}
+      className="group/field relative"
     >
-      <FieldBody f={f} meta={meta} sample={sample} colon={colon} />
-      <div className={`absolute -top-2.5 right-1 z-10 items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-0.5 shadow-sm ${sel ? "flex" : "hidden group-hover/field:flex"}`}>
-        <button type="button" {...attributes} {...listeners} aria-label={`Drag ${String(f.label ?? f.fieldname)}`} className="cursor-grab rounded p-0.5 text-zinc-400 hover:text-zinc-700">
+      {/* the card itself is the selectable option; its tools sit beside it so they keep their own button semantics */}
+      <div
+        role="option"
+        tabIndex={0}
+        aria-label={`Field ${name}`}
+        aria-selected={sel}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+        onKeyDown={onActivateKey(onSelect)}
+        className={`rounded-md px-1.5 py-1 outline-offset-1 ${sel ? "outline outline-2 outline-blue-500" : "hover:outline hover:outline-1 hover:outline-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300"}`}
+      >
+        <FieldBody f={f} meta={meta} sample={sample} colon={colon} />
+      </div>
+      <div className={`absolute -top-2.5 right-1 z-10 items-center gap-0.5 rounded-md border border-zinc-200 bg-white px-0.5 shadow-sm ${sel ? "flex" : "hidden group-hover/field:flex group-focus-within/field:flex"}`}>
+        <button type="button" {...attributes} {...listeners} onClick={stop(onSelect)} aria-label={`Drag ${name}`} className="cursor-grab rounded p-0.5 text-zinc-400 hover:text-zinc-700">
           <GripVertical className="h-3 w-3" />
         </button>
         <button
@@ -147,7 +90,7 @@ function FieldCard({ id, f, sel, onSelect, onRemove, meta, sample, colon }: { id
             e.stopPropagation();
             onRemove();
           }}
-          aria-label={`Remove ${String(f.label ?? f.fieldname)}`}
+          aria-label={`Remove ${name}`}
           className="rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
         >
           <X className="h-3 w-3" />
@@ -167,105 +110,91 @@ function ColumnDrop({ id, children, empty }: { id: string; children: ReactNode; 
   );
 }
 
-function SectionBox({
-  s,
-  sec,
-  props,
-  handle,
-  zone,
-}: {
-  s: SectionKey;
-  sec: PFSection;
-  props: CanvasProps;
-  handle?: { attributes: object; listeners?: object };
-  zone?: "Header" | "Footer";
-}) {
-  const sel = sameSel(props.selection, { kind: "section", s });
+type Handle = { attributes: object; listeners?: object };
+const stop = (fn: () => void) => (e: MouseEvent) => {
+  e.stopPropagation();
+  fn();
+};
+
+/** a section's hover / selected toolbar: drag grip, title, column count, remove */
+function SectionToolbar({ s, sec, sel, zone, handle, props }: { s: SectionKey; sec: PFSection; sel: boolean; zone?: "Header" | "Footer"; handle?: Handle; props: CanvasProps }) {
   const n = sec.columns.length;
-  const colon = !!Number(props.settings.show_label_colon);
-  const fieldsEmpty = sec.columns.every((c) => c.fields.length === 0);
+  const title = zone ?? (sec.page_break ? "Page break" : sec.label || "Section");
   return (
-    <div
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onSelect({ kind: "section", s });
-      }}
-      data-pfb-section={String(s)}
-      aria-label={zone ? `${zone} zone` : `Section ${Number(s) + 1}${sec.label ? ` ${sec.label}` : ""}`}
-      className={`group/sec relative rounded-lg border ${sel ? "border-blue-500 ring-2 ring-blue-500/20" : zone ? "border-dashed border-zinc-300 hover:border-blue-300" : "border-transparent hover:border-blue-300"}`}
-    >
-      <div role="toolbar" aria-label={zone ? `${zone} zone tools` : `Section ${Number(s) + 1} tools`} className={`absolute -top-3.5 left-2 z-20 items-center gap-1 rounded-md border border-zinc-200 bg-white px-1 py-0.5 text-[11px] text-zinc-600 shadow-sm ${sel ? "flex" : "hidden group-hover/sec:flex"}`}>
-        {handle && (
-          <button type="button" {...handle.attributes} {...handle.listeners} aria-label="Drag section" className="cursor-grab rounded p-0.5 text-zinc-400 hover:text-zinc-700">
-            <GripVertical className="h-3 w-3" />
+    <div role="toolbar" aria-label={zone ? `${zone} zone tools` : `Section ${Number(s) + 1} tools`} className={`absolute -top-3.5 left-2 z-20 items-center gap-1 rounded-md border border-zinc-200 bg-white px-1 py-0.5 text-[11px] text-zinc-600 shadow-sm ${sel ? "flex" : "hidden group-hover/sec:flex"}`}>
+      {handle && (
+        <button type="button" {...handle.attributes} {...handle.listeners} aria-label="Drag section" className="cursor-grab rounded p-0.5 text-zinc-400 hover:text-zinc-700">
+          <GripVertical className="h-3 w-3" />
+        </button>
+      )}
+      <span className="px-0.5 font-medium">{title}</span>
+      <span className="mx-0.5 h-3 w-px bg-zinc-200" />
+      {[1, 2, 3, 4].map((k) => (
+        <button key={k} type="button" onClick={stop(() => props.onColumns(s, k))} aria-label={`${k} column${k > 1 ? "s" : ""}`} aria-pressed={n === k} className={`h-5 w-5 rounded ${n === k ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`}>
+          {k}
+        </button>
+      ))}
+      {typeof s === "number" && (
+        <>
+          <span className="mx-0.5 h-3 w-px bg-zinc-200" />
+          <button type="button" onClick={stop(() => props.onRemoveSection(s))} aria-label="Remove section" title="Remove section" className="rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-600">
+            <X className="h-3 w-3" />
           </button>
-        )}
-        <span className="px-0.5 font-medium">{zone ?? (sec.page_break ? "Page break" : sec.label || "Section")}</span>
-        <span className="mx-0.5 h-3 w-px bg-zinc-200" />
-        {[1, 2, 3, 4].map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onColumns(s, k);
-            }}
-            aria-label={`${k} column${k > 1 ? "s" : ""}`}
-            aria-pressed={n === k}
-            className={`h-5 w-5 rounded ${n === k ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`}
-          >
-            {k}
-          </button>
-        ))}
-        {typeof s === "number" && (
-          <>
-            <span className="mx-0.5 h-3 w-px bg-zinc-200" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                props.onRemoveSection(s);
-              }}
-              aria-label="Remove section"
-              title="Remove section"
-              className="rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </>
-        )}
-      </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** a section's columns of field cards */
+function SectionColumns({ s, sec, props }: { s: SectionKey; sec: PFSection; props: CanvasProps }) {
+  const colon = !!Number(props.settings.show_label_colon);
+  return (
+    <div className="grid gap-3 p-2" style={{ gridTemplateColumns: `repeat(${sec.columns.length}, minmax(0, 1fr))` }}>
+      {sec.columns.map((col, c) => {
+        const id = columnKey(s, c);
+        return (
+          <SortableContext key={id} items={col.fields.map((_, f) => fieldKey(s, c, f))} strategy={verticalListSortingStrategy}>
+            <ColumnDrop id={id} empty={col.fields.length === 0}>
+              {col.fields.map((f, fi) => (
+                <FieldCard
+                  key={`${f.fieldname}-${fi}`}
+                  id={fieldKey(s, c, fi)}
+                  f={f}
+                  sel={sameSel(props.selection, { kind: "field", s, c, f: fi })}
+                  onSelect={() => props.onSelect({ kind: "field", s, c, f: fi })}
+                  onRemove={() => props.onRemoveField(s, c, fi)}
+                  meta={props.meta}
+                  sample={props.sample}
+                  colon={colon}
+                />
+              ))}
+            </ColumnDrop>
+          </SortableContext>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * One section or zone. A click anywhere in it that no card or tool took selects it; that click is handled once
+ * on the sheet (Canvas), which finds the section from `data-pfb-section`.
+ */
+function SectionBox({ s, sec, props, handle, zone }: { s: SectionKey; sec: PFSection; props: CanvasProps; handle?: Handle; zone?: "Header" | "Footer" }) {
+  const sel = sameSel(props.selection, { kind: "section", s });
+  const fieldsEmpty = sec.columns.every((c) => c.fields.length === 0);
+  const border = sel ? "border-blue-500 ring-2 ring-blue-500/20" : zone ? "border-dashed border-zinc-300 hover:border-blue-300" : "border-transparent hover:border-blue-300";
+  return (
+    <div data-pfb-section={String(s)} aria-label={zone ? `${zone} zone` : `Section ${Number(s) + 1}${sec.label ? ` ${sec.label}` : ""}`} className={`group/sec relative rounded-lg border ${border}`}>
+      <SectionToolbar s={s} sec={sec} sel={sel} zone={zone} handle={handle} props={props} />
       {sec.page_break && (
         <div className="flex items-center gap-1.5 px-2 pt-2 text-[10px] uppercase tracking-wide text-zinc-400">
           <Scissors className="h-3 w-3" /> new page starts here
         </div>
       )}
       {sec.label && sec.show_label !== "hide" && <div className="px-2 pt-2 text-[1.05em] font-semibold">{sec.label}</div>}
-      {zone && fieldsEmpty && !sel ? (
-        <div className="px-2 py-2 text-[11px] text-zinc-400">{zone}: fields here repeat on every page (optional)</div>
-      ) : (
-        <div className="grid gap-3 p-2" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
-          {sec.columns.map((col, c) => (
-            <SortableContext key={c} items={col.fields.map((_, f) => fieldKey(s, c, f))} strategy={verticalListSortingStrategy}>
-              <ColumnDrop id={columnKey(s, c)} empty={col.fields.length === 0}>
-                {col.fields.map((f, fi) => (
-                  <FieldCard
-                    key={`${f.fieldname}-${fi}`}
-                    id={fieldKey(s, c, fi)}
-                    f={f}
-                    sel={sameSel(props.selection, { kind: "field", s, c, f: fi })}
-                    onSelect={() => props.onSelect({ kind: "field", s, c, f: fi })}
-                    onRemove={() => props.onRemoveField(s, c, fi)}
-                    meta={props.meta}
-                    sample={props.sample}
-                    colon={colon}
-                  />
-                ))}
-              </ColumnDrop>
-            </SortableContext>
-          ))}
-        </div>
-      )}
+      {zone && fieldsEmpty && !sel ? <div className="px-2 py-2 text-[11px] text-zinc-400">{zone}: fields here repeat on every page (optional)</div> : <SectionColumns s={s} sec={sec} props={props} />}
     </div>
   );
 }
@@ -296,6 +225,13 @@ function InsertLine({ onInsert }: { onInsert: () => void }) {
       <span className="absolute inset-x-0 top-1/2 hidden h-px bg-blue-300 group-hover/ins:block" />
     </div>
   );
+}
+
+/** the section a click on the sheet landed in, from its `data-pfb-section` */
+function sectionAt(target: EventTarget): Selection {
+  const key = target instanceof Element ? target.closest<HTMLElement>("[data-pfb-section]")?.dataset.pfbSection : undefined;
+  if (key === undefined) return null;
+  return { kind: "section", s: key === "header" || key === "footer" ? key : Number(key) };
 }
 
 export default function Canvas(props: CanvasProps) {
@@ -337,7 +273,9 @@ export default function Canvas(props: CanvasProps) {
       <div
         role="document"
         aria-label="Print layout"
-        onClick={() => props.onSelect(null)}
+        // one click handler for the whole sheet: the section under the click, else nothing (cards and tools stop it)
+        onClick={(e) => props.onSelect(sectionAt(e.target))}
+        onKeyDown={(e) => e.key === "Escape" && props.onSelect(null)}
         // paper stays white in dark mode, like printed output
         className="mx-auto w-full bg-white text-zinc-900 shadow-lg ring-1 ring-black/5"
         style={{ padding: `${m("margin_top", 15)} ${m("margin_right", 15)} ${m("margin_bottom", 15)} ${m("margin_left", 15)}`, fontSize: `${Number(settings.font_size || 14)}px`, maxWidth: `${props.paper?.width ?? 210}mm`, minHeight: `${props.paper?.height ?? 297}mm`, colorScheme: "light" }}
@@ -346,6 +284,7 @@ export default function Canvas(props: CanvasProps) {
         <SortableContext items={layout.sections.map((_, i) => `s|${i}`)} strategy={verticalListSortingStrategy}>
           <InsertLine onInsert={() => props.onInsertSection(0)} />
           {layout.sections.map((sec, i) => (
+            // react-doctor-disable-next-line react-doctor/no-array-index-as-key -- format_data sections carry no id (Desk's JSON); dnd-kit ids are positional (`s|i`) too
             <div key={i}>
               <SortableSection i={i} sec={sec} props={props} />
               <InsertLine onInsert={() => props.onInsertSection(i + 1)} />
