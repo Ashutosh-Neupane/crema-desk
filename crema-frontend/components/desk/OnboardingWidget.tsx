@@ -7,6 +7,7 @@
  * skipped with frappe.desk.desktop.update_onboarding_step; the server refuses an unfinished step.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, CircleCheck, CircleDashed, Circle, Play } from "lucide-react";
@@ -60,7 +61,7 @@ function isDismissed(title: string): boolean {
 }
 
 /** The video id in a YouTube link (Desk get_youtube_id): watch?v=, youtu.be/, shorts/, live/, embed/, v/ or a bare id. */
-export function youtubeId(value: string | null | undefined): string | null {
+function youtubeId(value: string | null | undefined): string | null {
   const v = (value || "").trim();
   if (/^[\w-]{11}$/.test(v)) return v;
   let url: URL;
@@ -113,6 +114,28 @@ async function updateStep(name: string, field: "is_complete" | "is_skipped"): Pr
 }
 
 const pendingSteps = () => Object.keys(readStore(sessionStorage, PENDING_KEY));
+
+/** The first open (not done, not skipped) step after `after`, wrapping round (Desk onboarding_widget.js) */
+function nextStep(list: OnboardingStep[], after?: string): string | undefined {
+  const start = after ? list.findIndex((s) => s.name === after) + 1 : 0;
+  return [...list.slice(start), ...list.slice(0, start)].find((s) => !s.is_complete && !s.is_skipped)?.name;
+}
+
+/**
+ * Steps started here but finished elsewhere (Create Entry / Update Settings) are asked about again; the server only
+ * marks one complete once its work is done. Resolves to the steps it accepted.
+ */
+async function confirmPendingSteps(items: OnboardingStep[]): Promise<OnboardingStep[]> {
+  const open = new Map(items.filter((s) => !s.is_complete && !s.is_skipped).map((s) => [s.name, s]));
+  const asked = pendingSteps().flatMap((name) => {
+    const step = open.get(name);
+    return step ? [step] : [];
+  });
+  asked.forEach((s) => setPending(s.name, false));
+  const errors = await Promise.all(asked.map((s) => updateStep(s.name, "is_complete")));
+  return asked.filter((_, i) => !errors[i]);
+}
+
 function setPending(name: string, on: boolean) {
   const all = readStore(sessionStorage, PENDING_KEY);
   if (on) all[name] = 1;
@@ -169,7 +192,7 @@ export default function OnboardingWidget({ data }: { data: OnboardingData }) {
   const [hidden, setHidden] = useState(false);
   // only rendered after the page payload arrives on the client, so reading localStorage here is safe
   const [dismissed, setDismissed] = useState(() => isDismissed(data.title || "Let's Get Started"));
-  const [openName, setOpenName] = useState<string | undefined>(undefined);
+  const [openName, setOpenName] = useState<string | undefined>(() => nextStep(data.items));
   const initialised = useRef(false);
   const stepsRef = useRef(data.items);
 
@@ -183,14 +206,6 @@ export default function OnboardingWidget({ data }: { data: OnboardingData }) {
   const skipped = required.filter((s) => !s.is_complete && s.is_skipped).length;
   const allDone = completed + skipped === required.length;
 
-  const nextStep = useCallback(
-    (list: OnboardingStep[], after?: string) => {
-      const start = after ? list.findIndex((s) => s.name === after) + 1 : 0;
-      return [...list.slice(start), ...list.slice(0, start)].find((s) => !s.is_complete && !s.is_skipped)?.name;
-    },
-    [],
-  );
-
   const apply = useCallback(
     (name: string, field: "is_complete" | "is_skipped") => {
       const next = stepsRef.current.map((s) => (s.name === name ? { ...s, [field]: 1 as const } : s));
@@ -198,7 +213,7 @@ export default function OnboardingWidget({ data }: { data: OnboardingData }) {
       setSteps(next);
       setOpenName(nextStep(next, name));
     },
-    [nextStep],
+    [],
   );
 
   const markComplete = useCallback(
@@ -224,20 +239,20 @@ export default function OnboardingWidget({ data }: { data: OnboardingData }) {
 
   // Create Entry / Update Settings finish elsewhere (Desk ticks them from a form hook); here the step is remembered and
   // the server is asked again when the workspace is back, which only accepts it if the work is done.
+  // react-doctor-disable-next-line query-mutation-missing-invalidation -- onSuccess updates this widget's steps; the desktop-page query (staleTime 0) is fetched again on the next visit, and fetching it now would drop a just-finished onboarding from view, unlike Desk
+  const { mutate: confirmPending } = useMutation({
+    mutationFn: confirmPendingSteps,
+    onSuccess: (done) =>
+      done.forEach((step) => {
+        apply(step.name, "is_complete");
+        toast.success(`Done: ${step.title}`);
+      }),
+  });
   useEffect(() => {
     if (initialised.current) return;
     initialised.current = true;
-    setOpenName(nextStep(data.items));
-    const pend = pendingSteps().filter((n) => data.items.some((s) => s.name === n && !s.is_complete && !s.is_skipped));
-    pend.forEach(async (name) => {
-      setPending(name, false);
-      if (!(await updateStep(name, "is_complete"))) {
-        apply(name, "is_complete");
-        const s = data.items.find((x) => x.name === name);
-        if (s) toast.success(`Done: ${s.title}`);
-      }
-    });
-  }, [data.items, nextStep, apply]);
+    confirmPending(stepsRef.current);
+  }, [confirmPending]);
 
   const go = (route: string[]) => {
     const url = deskRouteToUrl(route);
