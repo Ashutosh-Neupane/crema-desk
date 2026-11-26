@@ -631,6 +631,8 @@ layout asks to convert it in Desk once.
 
 ## 3. Phase 2 — reimagining the frontend (UI/UX plan)
 
+Screen-by-screen design and the PR plan: [PHASE2_DESIGN.md](PHASE2_DESIGN.md).
+
 Phase 1 copies Desk; phase 2 makes it pleasant for a **normal user** (sales clerk, storekeeper, accountant, approver)
 rather than for an implementer. Behaviour stays Frappe's (same APIs, same scripts); only presentation changes, and
 each change keeps the e2e suites green. Built so far: the design system (3.2), My work (3.4), the layout switch
