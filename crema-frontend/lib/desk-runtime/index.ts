@@ -303,8 +303,14 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     session: { user: ctx.user, user_fullname: ctx.full_name ?? ctx.user },
     user: {
       name: ctx.user,
-      has_role: (r: string | string[]) => (Array.isArray(r) ? r : [r]).some((x) => ctx.roles?.includes(x)),
-      is_report_manager: () => ["Administrator", "System Manager", "Report Manager"].some((x) => ctx.roles?.includes(x)),
+      has_role: (r: string | string[]) => {
+        const roles = new Set(ctx.roles ?? []);
+        return (Array.isArray(r) ? r : [r]).some((x) => roles.has(x));
+      },
+      is_report_manager: () => {
+        const roles = new Set(ctx.roles ?? []);
+        return ["Administrator", "System Manager", "Report Manager"].some((x) => roles.has(x));
+      },
       full_name: (u?: string) => (!u || u === ctx.user ? (ctx.full_name ?? ctx.user) : u),
     },
     user_roles: ctx.roles ?? [],
@@ -328,10 +334,11 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       downloadify(data: unknown[][], _roles: unknown, title = "export") {
         const csv = (data ?? []).map((r) => r.map((c) => `"${cstr(c).replace(/"/g, '""')}"`).join(",")).join("\n");
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+        a.href = url;
         a.download = `${title}.csv`;
         a.click();
-        URL.revokeObjectURL(a.href);
+        URL.revokeObjectURL(url);
       },
     },
     datetime,
@@ -486,7 +493,10 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
     cint,
     cstr,
     in_list,
-    has_common: (a: unknown[], b: unknown[]) => (a ?? []).some((x) => (b ?? []).includes(x)),
+    has_common: (a: unknown[], b: unknown[]) => {
+      const other = new Set(b ?? []);
+      return (a ?? []).some((x) => other.has(x));
+    },
     locals: {} as Record<string, unknown>,
     cur_frm: undefined,
     // Desk globals some scripts still call

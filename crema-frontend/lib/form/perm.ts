@@ -36,11 +36,12 @@ export function getRights(ctx: PermContext, doctype?: string): string[] {
 export function getRolePermissions(meta: DocTypeMeta, ctx: PermContext): Perm {
   let perm: Perm = [{ read: 0, permlevel: 0, rights_without_if_owner: new Set<string>() }];
   const rights = getRights(ctx, meta.name);
+  const roles = new Set(ctx.roles);
   for (const p of meta.permissions ?? []) {
     const permlevel = cint(p.permlevel);
     const cur = (perm[permlevel] ??= { permlevel });
     if (permlevel === 0) cur.rights_without_if_owner ??= new Set<string>();
-    if (ctx.roles.includes(p.role)) {
+    if (roles.has(p.role)) {
       for (const right of rights) {
         if (!p[right]) continue;
         cur[right] = 1;
@@ -51,6 +52,11 @@ export function getRolePermissions(meta: DocTypeMeta, ctx: PermContext): Perm {
   // fill gaps with empty object
   perm = Array.from(perm, (p) => p ?? {});
   return perm;
+}
+
+/** _get_perm: a doc shared for reading also gets print / email when the user may print / email the doctype */
+function sharedReadRights(ctx: PermContext, doctype: string): { email: number; print: number } {
+  return { email: ctx.lists?.can_email?.includes(doctype) ? 1 : 0, print: ctx.lists?.can_print?.includes(doctype) ? 1 : 0 };
 }
 
 /** frappe.perm._get_perm(doctype, doc): `doc` is undefined for a new/unsaved document */
@@ -87,11 +93,8 @@ export function getPerm(meta: DocTypeMeta | undefined, ctx: PermContext, doc?: R
     for (const s of docinfo?.shared ?? []) {
       if (s.user !== user) continue;
       for (const right of ["read", "write", "submit", "share"]) if (!base[right]) base[right] = s[right];
-      if (s.read) {
-        // also give print, email permissions if read
-        base.email = ctx.lists?.can_email?.includes(meta.name) ? 1 : 0;
-        base.print = ctx.lists?.can_print?.includes(meta.name) ? 1 : 0;
-      }
+      // also give print, email permissions if read
+      if (s.read) Object.assign(base, sharedReadRights(ctx, meta.name));
     }
   }
   // read via sharing

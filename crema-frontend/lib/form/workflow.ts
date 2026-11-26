@@ -57,8 +57,8 @@ export function isWorkflowReadOnly(wf: WorkflowDoc, doc: Doc, roles: string[]): 
   if (doc.__islocal) return false;
   const state = workflowStateOf(wf, doc);
   if (!state) return false;
-  const editors = wf.states.filter((s) => s.state === state).map((s) => s.allow_edit);
-  return !roles.some((r) => editors.includes(r));
+  const editors = new Set(wf.states.filter((s) => s.state === state).map((s) => s.allow_edit));
+  return !roles.some((r) => editors.has(r));
 }
 
 /** Indicator colour from the Workflow State style (Desk: state style → indicator) */
@@ -111,9 +111,10 @@ export function workflowStatus(wf: WorkflowDoc, doc: Doc, server: Transition[], 
   const next = state ? wf.transitions.filter((t) => t.state === state) : [];
   const key = (t: Transition) => `${t.action}|${t.next_state}|${t.allowed}`;
   const fromServer = new Set(server.map(key));
-  const mine = server.filter((t) => roles.includes(t.allowed) && hasApprovalAccess(t, user, doc));
-  const selfBlocked = server.filter((t) => roles.includes(t.allowed) && !hasApprovalAccess(t, user, doc));
-  const conditionBlocked = next.filter((t) => roles.includes(t.allowed) && !fromServer.has(key(t)) && !!t.condition);
+  const roleSet = new Set(roles);
+  const mine = server.filter((t) => roleSet.has(t.allowed) && hasApprovalAccess(t, user, doc));
+  const selfBlocked = server.filter((t) => roleSet.has(t.allowed) && !hasApprovalAccess(t, user, doc));
+  const conditionBlocked = next.filter((t) => roleSet.has(t.allowed) && !fromServer.has(key(t)) && !!t.condition);
   const waitingOn = mine.length ? [] : [...new Set(next.map((t) => t.allowed))];
   return { state, mine, selfBlocked, conditionBlocked, next, waitingOn };
 }
