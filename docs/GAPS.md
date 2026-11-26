@@ -713,6 +713,8 @@ the PR, e2e suites unchanged, and a short usability check (task time, clicks) ag
   stored per user in Frappe `user_settings` ("Crema UI") with a localStorage cache; SSR renders the classic layout.
 
 ### 3.7 Large screens and a dashboard home
+> Plan: [PHASE2_DESIGN § 4.1](PHASE2_DESIGN.md#41-home-dynamic-and-role-based-gaps-37-desk) — the home is computed
+> from the user's permissions and learned from their usage (Route History, Version, Activity Log), not a fixed workspace.
 Desk was laid out for ~1280px; on 1600–2560px monitors most of the screen is empty.
 - **Width:** content grows to the window (text keeps a readable line length). Forms use 2 → 3 columns by container
   width (the DocType's section `columns` stay the minimum); timeline, comments and record info move into a right
@@ -746,6 +748,10 @@ Today "New DocType" opens the raw DocType form (a fields table). Admins who aren
 - Tests: `e2e/p2.doctypebuilder.mjs` (DocType with a table and a Link, permissions, first record, cleanup).
 
 ### 3.9 AI assistant inside Crema
+> **Updated 2026-11-26:** the default is now the **Claude connector** (each user's own Claude plan calls the site's
+> MCP endpoint; no API key, no company bill), with a one-computer variant for private sites. The in-Crema chat below
+> becomes optional and provider-agnostic (OpenRouter default, any OpenAI-compatible router, own model), run by a small
+> Crema Frappe app with the key in a Password field. Details and costs: [PHASE2_DESIGN § 5.0 and § 5.14–5.20](PHASE2_DESIGN.md#5-ai-assistant).
 A chat panel in Crema (side panel on desktop, bottom sheet on phones, ⌘I) that reads and changes the site in plain
 language: "make a purchase invoice from Supplier X for 10 × Item Y at 500", "which sales orders are overdue?",
 "create a DocType Vehicle with plate number, owner (Employee) and insurance expiry", "add a client script that fills
