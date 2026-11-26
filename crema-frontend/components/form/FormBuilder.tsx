@@ -9,7 +9,7 @@
  *    common toggles, then advanced (fetch, depends_on, length, …)
  * Edits are the DocType's `fields` rows (DocField) and save through Frappe.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -101,20 +101,24 @@ function Check({ label, checked, onChange, hint }: { label: string; checked: boo
 
 const inputCls = "h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
 
-function Properties({ f, types, set, onDelete, onDuplicate, onClose }: { f: F; types: string[]; set: (k: string, v: unknown) => void; onDelete: () => void; onDuplicate: () => void; onClose: () => void }) {
+const OPTIONS_HELP: Record<string, string> = {
+  Select: "One option per line",
+  Link: "DocType to link to",
+  "Dynamic Link": "Field that holds the DocType",
+  Table: "Child DocType",
+  "Table MultiSelect": "Child DocType",
+  Currency: "Currency field (e.g. currency)",
+  Code: "Language: Javascript, Python, HTML, CSS, JSON, SQL",
+  Data: "Email, Name, Phone, URL, Barcode, IBAN (optional)",
+};
+const textareaCls = "w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+type SetProp = (k: string, v: unknown) => void;
+const flag = (set: SetProp, k: string) => (v: boolean) => set(k, v ? 1 : 0);
+
+function Properties({ f, types, set, onDelete, onDuplicate, onClose }: { f: F; types: string[]; set: SetProp; onDelete: () => void; onDuplicate: () => void; onClose: () => void }) {
   const [advanced, setAdvanced] = useState(false);
   const isNewField = String(f.name).startsWith("new-") || !!f.__islocal;
   const layout = LAYOUT.has(f.fieldtype);
-  const optionsHelp: Record<string, string> = {
-    Select: "One option per line",
-    Link: "DocType to link to",
-    "Dynamic Link": "Field that holds the DocType",
-    Table: "Child DocType",
-    "Table MultiSelect": "Child DocType",
-    Currency: "Currency field (e.g. currency)",
-    Code: "Language: Javascript, Python, HTML, CSS, JSON, SQL",
-    Data: "Email, Name, Phone, URL, Barcode, IBAN (optional)",
-  };
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -124,109 +128,142 @@ function Properties({ f, types, set, onDelete, onDuplicate, onClose }: { f: F; t
         <button type="button" onClick={onClose} aria-label="Close properties" className="rounded p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="h-4 w-4" /></button>
       </div>
 
-      <label className="block space-y-1">
-        <span className="text-xs font-medium text-zinc-500">Label</span>
-        <input
-          autoFocus
-          value={String(f.label ?? "")}
-          onChange={(e) => {
-            set("label", e.target.value);
-            // Desk derives the fieldname from the label until the field is saved
-            if (isNewField) set("fieldname", scrub(e.target.value));
-          }}
-          className={inputCls}
-        />
-      </label>
-      {!layout && (
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-zinc-500">Type</span>
-            <select value={f.fieldtype} onChange={(e) => set("fieldtype", e.target.value)} className={inputCls}>
-              <optgroup label="Common">{COMMON_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
-              <optgroup label="All">{types.filter((t) => !COMMON_TYPES.includes(t) && !LAYOUT.has(t)).map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
-            </select>
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-zinc-500">Field name</span>
-            <input value={String(f.fieldname ?? "")} onChange={(e) => set("fieldname", scrub(e.target.value))} readOnly={!isNewField} className={`${inputCls} font-mono text-xs ${isNewField ? "" : "bg-zinc-50 text-zinc-500 dark:bg-zinc-800"}`} />
-          </label>
-        </div>
-      )}
-
-      {!layout && (!!optionsHelp[f.fieldtype] || !!f.options) && (
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-zinc-500">Options <span className="font-normal text-zinc-400">· {optionsHelp[f.fieldtype] ?? ""}</span></span>
-          {["Link", "Table", "Table MultiSelect"].includes(f.fieldtype) ? (
-            <LinkInput doctype="DocType" value={String(f.options ?? "")} onChange={(v) => set("options", v || null)} placeholder="DocType" getQuery={() => (f.fieldtype === "Link" ? undefined : { filters: { istable: 1 } })} />
-          ) : f.fieldtype === "Select" ? (
-            <textarea value={String(f.options ?? "")} onChange={(e) => set("options", e.target.value)} rows={4} className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
-          ) : (
-            <input value={String(f.options ?? "")} onChange={(e) => set("options", e.target.value || null)} className={inputCls} />
-          )}
-        </label>
-      )}
-
-      {f.fieldtype === "Section Break" && <Check label="Collapsible" checked={!!f.collapsible} onChange={(v) => set("collapsible", v ? 1 : 0)} />}
-
-      {!layout && (
-        <div className="grid grid-cols-2 gap-x-2 rounded-lg border border-zinc-100 p-2 dark:border-zinc-800">
-          <Check label="Mandatory" checked={!!f.reqd} onChange={(v) => set("reqd", v ? 1 : 0)} />
-          <Check label="In List View" checked={!!f.in_list_view} onChange={(v) => set("in_list_view", v ? 1 : 0)} />
-          <Check label="Read Only" checked={!!f.read_only} onChange={(v) => set("read_only", v ? 1 : 0)} />
-          <Check label="Standard Filter" checked={!!f.in_standard_filter} onChange={(v) => set("in_standard_filter", v ? 1 : 0)} />
-          <Check label="Hidden" checked={!!f.hidden} onChange={(v) => set("hidden", v ? 1 : 0)} />
-          <Check label="Unique" checked={!!f.unique} onChange={(v) => set("unique", v ? 1 : 0)} />
-          <Check label="Bold" checked={!!f.bold} onChange={(v) => set("bold", v ? 1 : 0)} />
-          <Check label="Quick Entry" checked={!!f.allow_in_quick_entry} onChange={(v) => set("allow_in_quick_entry", v ? 1 : 0)} />
-        </div>
-      )}
-
+      <LabelInput
+        value={String(f.label ?? "")}
+        onChange={(v) => {
+          set("label", v);
+          // Desk derives the fieldname from the label until the field is saved
+          if (isNewField) set("fieldname", scrub(v));
+        }}
+      />
+      {!layout && <TypeAndName f={f} types={types} isNewField={isNewField} set={set} />}
+      {!layout && (!!OPTIONS_HELP[f.fieldtype] || !!f.options) && <OptionsInput f={f} set={set} />}
+      {f.fieldtype === "Section Break" && <Check label="Collapsible" checked={!!f.collapsible} onChange={flag(set, "collapsible")} />}
+      {!layout && <CommonFlags f={f} set={set} />}
       {!layout && (
         <label className="block space-y-1">
           <span className="text-xs font-medium text-zinc-500">Description</span>
-          <textarea value={String(f.description ?? "")} onChange={(e) => set("description", e.target.value || null)} rows={2} className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
+          <textarea value={String(f.description ?? "")} onChange={(e) => set("description", e.target.value || null)} rows={2} className={textareaCls} />
         </label>
       )}
 
       <button type="button" onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advanced ? "" : "-rotate-90"}`} /> Advanced
       </button>
-      {advanced && (
-        <div className="space-y-3">
-          {[
-            ["default", "Default"],
-            ["depends_on", "Display depends on (JS)"],
-            ["mandatory_depends_on", "Mandatory depends on (JS)"],
-            ["read_only_depends_on", "Read only depends on (JS)"],
-            ...(layout ? [] : [["fetch_from", "Fetch from (link_field.source_field)"], ["placeholder", "Placeholder"]]),
-          ].map(([k, label]) => (
-            <label key={k} className="block space-y-1">
-              <span className="text-xs font-medium text-zinc-500">{label}</span>
-              <input value={String(f[k] ?? "")} onChange={(e) => set(k, e.target.value || null)} className={`${inputCls} ${k.includes("depends") ? "font-mono text-xs" : ""}`} placeholder={k.includes("depends") ? "eval:doc.status == 'Open'" : ""} />
-            </label>
+      {advanced && <AdvancedProps f={f} layout={layout} set={set} />}
+    </div>
+  );
+}
+
+/** the label input takes focus when the properties panel opens for a field */
+function LabelInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-zinc-500">Label</span>
+      <input ref={ref} value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
+    </label>
+  );
+}
+
+function TypeAndName({ f, types, isNewField, set }: { f: F; types: string[]; isNewField: boolean; set: SetProp }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <label className="block space-y-1">
+        <span className="text-xs font-medium text-zinc-500">Type</span>
+        <select value={f.fieldtype} onChange={(e) => set("fieldtype", e.target.value)} className={inputCls}>
+          <optgroup label="Common">{COMMON_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
+          <optgroup label="All">{types.filter((t) => !COMMON_TYPES.includes(t) && !LAYOUT.has(t)).map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
+        </select>
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs font-medium text-zinc-500">Field name</span>
+        <input value={String(f.fieldname ?? "")} onChange={(e) => set("fieldname", scrub(e.target.value))} readOnly={!isNewField} className={`${inputCls} font-mono text-xs ${isNewField ? "" : "bg-zinc-50 text-zinc-500 dark:bg-zinc-800"}`} />
+      </label>
+    </div>
+  );
+}
+
+function OptionsInput({ f, set }: { f: F; set: SetProp }) {
+  const value = String(f.options ?? "");
+  const isLink = ["Link", "Table", "Table MultiSelect"].includes(f.fieldtype);
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-zinc-500">Options <span className="font-normal text-zinc-400">· {OPTIONS_HELP[f.fieldtype] ?? ""}</span></span>
+      {isLink ? (
+        <LinkInput doctype="DocType" value={value} onChange={(v) => set("options", v || null)} placeholder="DocType" getQuery={() => (f.fieldtype === "Link" ? undefined : { filters: { istable: 1 } })} />
+      ) : f.fieldtype === "Select" ? (
+        <textarea value={value} onChange={(e) => set("options", e.target.value)} rows={4} className={textareaCls} />
+      ) : (
+        <input value={value} onChange={(e) => set("options", e.target.value || null)} className={inputCls} />
+      )}
+    </label>
+  );
+}
+
+const COMMON_FLAGS: Array<[string, string]> = [
+  ["reqd", "Mandatory"],
+  ["in_list_view", "In List View"],
+  ["read_only", "Read Only"],
+  ["in_standard_filter", "Standard Filter"],
+  ["hidden", "Hidden"],
+  ["unique", "Unique"],
+  ["bold", "Bold"],
+  ["allow_in_quick_entry", "Quick Entry"],
+];
+const ADVANCED_FLAGS: Array<[string, string]> = [
+  ["allow_on_submit", "Allow on Submit"],
+  ["no_copy", "No Copy"],
+  ["set_only_once", "Set Only Once"],
+  ["in_global_search", "Global Search"],
+  ["fetch_if_empty", "Fetch if Empty"],
+  ["print_hide", "Print Hide"],
+];
+
+function CommonFlags({ f, set }: { f: F; set: SetProp }) {
+  return (
+    <div className="grid grid-cols-2 gap-x-2 rounded-lg border border-zinc-100 p-2 dark:border-zinc-800">
+      {COMMON_FLAGS.map(([k, label]) => (
+        <Check key={k} label={label} checked={!!f[k]} onChange={flag(set, k)} />
+      ))}
+    </div>
+  );
+}
+
+function AdvancedProps({ f, layout, set }: { f: F; layout: boolean; set: SetProp }) {
+  const texts = [
+    ["default", "Default"],
+    ["depends_on", "Display depends on (JS)"],
+    ["mandatory_depends_on", "Mandatory depends on (JS)"],
+    ["read_only_depends_on", "Read only depends on (JS)"],
+    ...(layout ? [] : [["fetch_from", "Fetch from (link_field.source_field)"], ["placeholder", "Placeholder"]]),
+  ];
+  return (
+    <div className="space-y-3">
+      {texts.map(([k, label]) => (
+        <label key={k} className="block space-y-1">
+          <span className="text-xs font-medium text-zinc-500">{label}</span>
+          <input value={String(f[k] ?? "")} onChange={(e) => set(k, e.target.value || null)} className={`${inputCls} ${k.includes("depends") ? "font-mono text-xs" : ""}`} placeholder={k.includes("depends") ? "eval:doc.status == 'Open'" : ""} />
+        </label>
+      ))}
+      {!layout && (
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-zinc-500">Length</span>
+            <input type="number" value={String(f.length ?? "")} onChange={(e) => set("length", e.target.value ? Number(e.target.value) : 0)} className={inputCls} />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-zinc-500">Grid columns (1–10)</span>
+            <input type="number" min={0} max={10} value={String(f.columns ?? "")} onChange={(e) => set("columns", e.target.value ? Number(e.target.value) : 0)} className={inputCls} />
+          </label>
+        </div>
+      )}
+      {!layout && (
+        <div className="grid grid-cols-2 gap-x-2">
+          {ADVANCED_FLAGS.map(([k, label]) => (
+            <Check key={k} label={label} checked={!!f[k]} onChange={flag(set, k)} />
           ))}
-          {!layout && (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-zinc-500">Length</span>
-                <input type="number" value={String(f.length ?? "")} onChange={(e) => set("length", e.target.value ? Number(e.target.value) : 0)} className={inputCls} />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-zinc-500">Grid columns (1–10)</span>
-                <input type="number" min={0} max={10} value={String(f.columns ?? "")} onChange={(e) => set("columns", e.target.value ? Number(e.target.value) : 0)} className={inputCls} />
-              </label>
-            </div>
-          )}
-          {!layout && (
-            <div className="grid grid-cols-2 gap-x-2">
-              <Check label="Allow on Submit" checked={!!f.allow_on_submit} onChange={(v) => set("allow_on_submit", v ? 1 : 0)} />
-              <Check label="No Copy" checked={!!f.no_copy} onChange={(v) => set("no_copy", v ? 1 : 0)} />
-              <Check label="Set Only Once" checked={!!f.set_only_once} onChange={(v) => set("set_only_once", v ? 1 : 0)} />
-              <Check label="Global Search" checked={!!f.in_global_search} onChange={(v) => set("in_global_search", v ? 1 : 0)} />
-              <Check label="Fetch if Empty" checked={!!f.fetch_if_empty} onChange={(v) => set("fetch_if_empty", v ? 1 : 0)} />
-              <Check label="Print Hide" checked={!!f.print_hide} onChange={(v) => set("print_hide", v ? 1 : 0)} />
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -7,7 +7,7 @@
  * allow_in_quick_entry fields in a dialog; fall back to the full form
  * when there are mandatory tables or too many fields.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Maximize2, X } from "lucide-react";
@@ -17,6 +17,7 @@ import { getNewDoc } from "@/lib/crema-form/newDoc";
 import { saveDoc, type Doc } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { quickFields } from "@/components/form/quickEntryRules";
+import { useBackdropClose } from "@/components/form/useBackdropClose";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 export { canQuickEntry } from "@/components/form/quickEntryRules";
@@ -36,6 +37,8 @@ export default function QuickEntry({
   const router = useRouter();
   const { data: ctx } = useDeskContext();
   const [busy, setBusy] = useState(false);
+  const backdrop = useRef<HTMLDivElement>(null);
+  useBackdropClose(backdrop, onClose);
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -80,12 +83,10 @@ export default function QuickEntry({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-[10vh] backdrop-blur-[2px]"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`New ${meta.name}`}
+      ref={backdrop}
     >
-      <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-zinc-50 shadow-2xl dark:border-zinc-700 dark:bg-zinc-950">
+      {/* non-modal <dialog open>: Link / Date popovers portalled to <body> must stay usable (a modal one makes them inert) */}
+      <dialog open aria-modal="true" aria-label={`New ${meta.name}`} className="static m-0 w-full max-w-xl rounded-xl border border-zinc-200 bg-zinc-50 p-0 text-inherit shadow-2xl dark:border-zinc-700 dark:bg-zinc-950">
         <div className="flex items-center gap-2 px-5 py-3">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">New {meta.name}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800">
@@ -123,7 +124,7 @@ export default function QuickEntry({
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
