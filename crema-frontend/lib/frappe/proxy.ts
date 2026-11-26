@@ -5,7 +5,34 @@
  * the response bytes with Set-Cookie / Content-Disposition intact.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { FRAPPE_BACKEND_URL, backendFetch } from "@/lib/frappe/server";
+import { FRAPPE_BACKEND_URL, backendFetch, sidFromCookie } from "@/lib/frappe/server";
+import { clearDeskBootCache } from "@/lib/frappe/deskBoot";
+
+// What the Desk boot is built from (readable doctypes, workspaces, sidebars, permissions). Desk builds a fresh boot
+// on every page load; Crema caches it briefly, so a save to one of these drops the session's cached boot and a new
+// DocType, role or workspace shows at once.
+const BOOT_SOURCES = [
+  "DocType", "Customize Form", "Custom Field", "Property Setter", "DocPerm", "Custom DocPerm", "Role", "Has Role",
+  "User", "User Permission", "Module Def", "Workspace", "Workspace Sidebar", "Desktop Icon", "Page", "Report",
+  "Navbar Settings", "System Settings", "Role Profile", "Module Profile",
+];
+const BOOT_SOURCE_RE = new RegExp(`"(?:doctype|doc_type)"\\s*:\\s*"(?:${BOOT_SOURCES.join("|")})"|/api/resource/(?:${BOOT_SOURCES.map(encodeURIComponent).join("|")})(?:/|$)|frappe\\.permissions|permission_manager|frappe\\.desk\\.doctype\\.workspace`);
+
+// Frappe also POSTs reads (frappe.client.get_list …); only calls that write count
+const WRITE_RE = /\/api\/resource\/|\.(?:insert|insert_many|save|savedocs|set_value|delete|delete_doc|rename_doc|submit|cancel|bulk_update|save_customization|reset_to_defaults|add|remove|update|new_page|save_page|update_page)(?:$|[?/])/;
+
+function touchesBoot(path: string, body: ArrayBuffer | undefined): boolean {
+  if (!WRITE_RE.test(`/${path}`)) return false;
+  if (BOOT_SOURCE_RE.test(`/${path}`)) return true;
+  if (!body || body.byteLength > 2_000_000) return false;
+  const text = new TextDecoder().decode(body);
+  if (BOOT_SOURCE_RE.test(text)) return true;
+  try {
+    return BOOT_SOURCE_RE.test(decodeURIComponent(text.replace(/\+/g, " ")));
+  } catch {
+    return false;
+  }
+}
 
 export async function proxyToBackend(req: NextRequest, method: string, backendPath: string): Promise<NextResponse> {
   const url = new URL(`${FRAPPE_BACKEND_URL}/${backendPath.replace(/^\//, "")}`);
@@ -43,6 +70,9 @@ export async function proxyToBackend(req: NextRequest, method: string, backendPa
   for (const h of ["content-disposition", "cache-control"]) {
     const v = res.headers.get(h);
     if (v) out.set(h, v);
+  }
+  if (method !== "GET" && res.ok && touchesBoot(backendPath, init.body as ArrayBuffer | undefined)) {
+    clearDeskBootCache(sidFromCookie(req.headers.get("cookie") ?? "") ?? undefined);
   }
   return new NextResponse(await res.arrayBuffer(), { status: res.status, headers: out });
 }
