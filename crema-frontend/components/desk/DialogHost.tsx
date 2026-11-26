@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import FormBody from "@/components/form/FormBody";
 import HtmlHost from "@/components/form/HtmlHost";
 import DialogTable from "@/components/desk/DialogTable";
+import { objectKey } from "@/components/desk/objectKey";
 import TableMultiSelectField from "@/lib/crema-form/controls/TableMultiSelectField";
 import { dialogStore, type DeskDialog, type DialogField } from "@/lib/desk-runtime/dialogs";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
@@ -38,8 +39,12 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-[10vh] backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && !d.opts.static && d.hide()}>
-      <div role="dialog" aria-modal="true" aria-label={d.opts.title} className={`w-full ${width} rounded-xl border border-zinc-200 bg-zinc-50 shadow-2xl dark:border-zinc-700 dark:bg-zinc-950`}>
+    // the backdrop only catches outside clicks (Desk modals close on them unless static); it is not a control itself
+    <div role="presentation" className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-[10vh] backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && !d.opts.static && d.hide()}>
+      {/* Native <dialog> shown non-modally (`open`, not showModal()): showModal() would put it in the top layer and make
+          everything outside inert, including the portalled Link / date pickers its controls open. Escape and stacking
+          stay with DialogHost (topmost closes first), like Desk's bootstrap modals. */}
+      <dialog open aria-modal="true" aria-label={d.opts.title} className={`relative m-0 w-full ${width} rounded-xl border border-zinc-200 bg-zinc-50 p-0 text-inherit shadow-2xl dark:border-zinc-700 dark:bg-zinc-950`}>
         <div className="flex items-center gap-2 px-5 py-3">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{d.opts.title}</h2>
           {ind && (
@@ -83,8 +88,8 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
           )}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-3">
-          {d.customActions.map((a, i) => (
-            <button key={`${i}-${a.label}`} type="button" onClick={() => void a.action?.call(d)} className="mr-auto rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
+          {d.customActions.map((a) => (
+            <button key={objectKey(a)} type="button" onClick={() => void a.action?.call(d)} className="mr-auto rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
               {a.label}
             </button>
           ))}
@@ -100,7 +105,7 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
             </button>
           )}
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
