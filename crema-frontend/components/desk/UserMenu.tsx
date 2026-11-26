@@ -16,7 +16,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import SessionDefaultsDialog from "@/components/desk/SessionDefaultsDialog";
 import AboutDialog from "@/components/desk/AboutDialog";
 import { createRuntime } from "@/lib/desk-runtime";
-import { clearDoctypeMetaCache } from "@/lib/frappe/doctype";
+import { clearDeskCache } from "@/components/desk/clearDeskCache";
+import { objectKey } from "@/components/desk/objectKey";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
 
@@ -30,14 +31,6 @@ interface NavbarItem {
 }
 interface ShellSettings {
   navbar_settings: { settings_dropdown?: NavbarItem[]; help_dropdown?: NavbarItem[] } | null;
-}
-
-/** frappe.ui.toolbar.clear_cache: the server's boot cache and the client caches, then a reload */
-export async function clearDeskCache(qc: ReturnType<typeof useQueryClient>) {
-  clearDoctypeMetaCache();
-  qc.clear();
-  await fetch("/api/desk/shell", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clear-cache" }), credentials: "include" }).catch(() => undefined);
-  window.location.reload();
 }
 
 export default function UserMenu({
@@ -136,8 +129,8 @@ export default function UserMenu({
             <DropdownMenuItem onClick={close(() => toggleFullWidth())}>
               <Maximize2 className="h-4 w-4" /> Toggle Full Width
             </DropdownMenuItem>
-            {siteRows.map((item, i) => (
-              <DropdownMenuItem key={`s-${i}-${item.item_label}`} onClick={() => run(item)}>
+            {siteRows.map((item) => (
+              <DropdownMenuItem key={objectKey(item)} onClick={() => run(item)}>
                 {item.item_label}
               </DropdownMenuItem>
             ))}
@@ -146,8 +139,8 @@ export default function UserMenu({
             <>
               <DropdownMenuSeparator />
               <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Help</div>
-              {helpRows.map((item, i) => (
-                <DropdownMenuItem key={`h-${i}-${item.item_label}`} onClick={() => run(item)}>
+              {helpRows.map((item) => (
+                <DropdownMenuItem key={objectKey(item)} onClick={() => run(item)}>
                   {item.item_label}
                 </DropdownMenuItem>
               ))}
