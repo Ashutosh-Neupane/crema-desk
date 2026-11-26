@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import Providers from "./providers";
+import { UiPrefsProvider } from "@/lib/ui/newLayout";
+import { DEFAULT_UI_PREFS } from "@/lib/ui/prefs";
+import { parseUiCookie, UI_COOKIE } from "@/lib/ui/prefsCookie";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
@@ -35,13 +39,16 @@ function appUrl(): URL {
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // the user's New layout / density, mirrored in a cookie so this HTML is already in the chosen layout
+  const jar = await cookies();
+  const prefs = parseUiCookie(jar.get(UI_COOKIE)?.value, jar.get("user_id")?.value) ?? DEFAULT_UI_PREFS;
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-layout={prefs.newLayout ? "new" : "classic"} data-density={prefs.density}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -62,7 +69,9 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ErrorBoundary>
-          <Providers>{children}</Providers>
+          <UiPrefsProvider initial={prefs}>
+            <Providers>{children}</Providers>
+          </UiPrefsProvider>
         </ErrorBoundary>
       </body>
     </html>
