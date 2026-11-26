@@ -8,878 +8,186 @@
  *    removable chips; synced to the URL (?status=Draft or ?filters=[…])
  *  - sort, group-by counts, page size + load more, bulk actions (components/list/BulkActions)
  *  - only the views that make sense for the DocType; quick entry for New when allowed
+ * State lives in hooks next to it (useListLayouts → useSavedListState → useListFilters, useListColumns, useListRows,
+ * useListNavigation), pure helpers in listModel.ts, and the UI in ListHeader / ListFilterBar / ListRows / ListFooter.
  */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  ArrowDownNarrowWide,
-  ArrowUpNarrowWide,
-  Filter as FilterIcon,
-  Layers,
-  ListFilter,
-  Heart,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings2,
-  X,
-} from "lucide-react";
 import { useDoctype } from "@/lib/hooks/useDoctype";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
-import { AssigneeAvatars, CommentCount, LikeButton } from "@/components/list/RowExtras";
-import { RowButtons, ToolbarButtons } from "@/components/list/ListHooksUI";
-import { createListview, EMPTY_PAGE_STATE, runHook, type ListviewHandle } from "@/lib/list/listviewShim";
-import { sanitizeHtml } from "@/lib/report/columns";
-import { isUnread, jsonList } from "@/lib/list/rowMeta";
-import { DEFAULT_LAYOUT, fetchLayouts, findBySignature, layoutColumns, layoutFilters, type ListLayout } from "@/lib/list/layouts";
-import { LayoutDialog, LayoutMenu, ManageLayoutsDialog } from "@/components/list/Layouts";
-import { useListSettings } from "@/lib/list/useListSettings";
-import { lvsKey, parseColumnSettings, useListViewSettings, type ListColumnSetting } from "@/lib/list/useListViewSettings";
-import { loadUserSettings, saveListState, userSettingsKey, type UserSettings } from "@/lib/list/useUserListState";
-import ListSettingsDialog from "@/components/list/ListSettingsDialog";
-import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
-import { getIndicator, INDICATOR_PILL, indicatorFilters } from "@/lib/list/indicator";
-import { formatCell, timeAgo } from "@/lib/list/format";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
-import LinkInput from "@/components/list/LinkInput";
-import { FilterEditor, GroupBy, NO_VALUE, OPERATORS, describeValue, fieldLabel, filtersFromParams } from "@/components/list/filters";
-import QuickEntry, { canQuickEntry } from "@/components/form/QuickEntry";
-import BulkActions from "@/components/list/BulkActions";
-import ExportDialog from "@/components/list/ExportDialog";
-import ListSidebar from "@/components/list/ListSidebar";
-import DatePicker from "@/components/form/DatePicker";
 import { useIsPhone } from "@/lib/hooks/useIsPhone";
 import { useShortcuts } from "@/lib/shortcuts";
-import { useListRealtime } from "@/lib/services/realtime";
-import type { DocField } from "@/lib/frappe/types";
+import { useListSettings } from "@/lib/list/useListSettings";
+import { lvsKey } from "@/lib/list/useListViewSettings";
+import type { DocTypeMeta } from "@/lib/frappe/types";
+import QuickEntry from "@/components/form/QuickEntry";
+import ExportDialog from "@/components/list/ExportDialog";
+import ListSettingsDialog from "@/components/list/ListSettingsDialog";
+import { docHref, newDocHref, standardFiltersOf } from "@/components/list/listModel";
+import { useListLayouts } from "@/components/list/useListLayouts";
+import { useListColumns, useListViewConfig } from "@/components/list/useListColumns";
+import { useListRows, useListviewHooks, useSelection } from "@/components/list/useListRows";
+import { useAddAction, useListRedirects } from "@/components/list/useListNavigation";
+import { ListHeader } from "@/components/list/ListHeader";
+import { ActiveFilters, ListFilterBar } from "@/components/list/ListFilterBar";
+import { ListBody } from "@/components/list/ListBody";
+import type { RowContext } from "@/components/list/ListRows";
+import { ListLayoutDialogs, type LayoutDialogState } from "@/components/list/ListLayoutDialogs";
 
-const enc = encodeURIComponent;
-type Sort = { field: string; order: "asc" | "desc" };
+const Skeleton = () => <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
 
-const noSubscribe = () => () => {};
-const emptyPageState = () => EMPTY_PAGE_STATE;
-
-// ── Main ───────────────────────────────────────────────────────────────────
 export default function ListView({ doctype }: { doctype: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const qc = useQueryClient();
-  const { data: meta, isLoading: metaLoading, error: metaError } = useDoctype(doctype);
-  // a Single has no list: Desk's router opens its only document (router.set_doctype_route)
-  useEffect(() => {
-    if (meta?.issingle) router.replace(`/desk/doctype/${encodeURIComponent(doctype)}/${encodeURIComponent(doctype)}`);
-  }, [meta?.issingle, doctype, router]);
+  const { data: meta, isLoading, error } = useDoctype(doctype);
   const { data: ctx } = useDeskContext();
+  const user = ctx?.user ?? "";
   const settings = useListSettings(meta);
-  // Desk list_view.js get_form_link: listview_settings.get_form_link may send a row elsewhere (Workflow Action → the
-  // document waiting on you); its Desk path (/desk/<slug>/<name>) is resolved by the /desk/[slug] route
-  const rowHref = (r: Record<string, unknown> & { name: string }) => {
-    const fn = settings?.get_form_link;
-    if (typeof fn === "function") {
-      try {
-        const p = fn.call(settings, r);
-        if (typeof p === "string" && p.startsWith("/")) return p.replace(/^\/app\//, "/desk/");
-      } catch {
-        /* a broken app script falls back to the record's own form */
-      }
-    }
-    return `/desk/doctype/${enc(doctype)}/${enc(r.name)}`;
-  };
-  // Desk base_list.js get_list_view_settings: the List View Settings doc (columns, disable_count, …)
-  const lvsQuery = useListViewSettings(doctype);
-  const lvs = lvsQuery.data;
-  const lvsReady = lvsQuery.isSuccess || lvsQuery.isError;
-  const lvsColumns = useMemo(() => parseColumnSettings(lvs), [lvs]);
-  // saved layouts (Desk v16 list_filter/): the active one's columns replace the List View Settings columns
-  const layoutsQuery = useQuery({ queryKey: ["list-layouts", doctype, ctx?.user ?? ""], queryFn: () => fetchLayouts(doctype, ctx?.user ?? ""), enabled: !!ctx?.user, staleTime: 60_000 });
-  const layouts = useMemo(() => layoutsQuery.data ?? [], [layoutsQuery.data]);
-  const [activeLayout, setActiveLayout] = useState<string | null>(null);
-  const [layoutCols, setLayoutCols] = useState<ListColumnSetting[] | null>(null);
-  const [layoutDialog, setLayoutDialog] = useState<{ layout: ListLayout | null; duplicateFrom: ListLayout | null } | null>(null);
-  const [manageLayouts, setManageLayouts] = useState(false);
-  // list_filter_menu.js capture_default_layout_state: the Default Layout's filters / sort, taken when leaving it
-  const defaultSnapshot = useRef<{ filters: Filter[]; sort: Sort | null } | null>(null);
-  const colSettings = layoutCols ?? lvsColumns;
-  const disableCount = !!lvs?.disable_count;
-  const disableCommentCount = !!lvs?.disable_comment_count;
+  const config = useListViewConfig(doctype);
+  const state = useListLayouts({ doctype, meta, settings, user });
+  // saved layouts: the active one's columns replace the List View Settings columns
+  const colSettings = state.layoutCols ?? config.columns;
+  const columns = useListColumns(meta, settings, colSettings);
+  useListRedirects({ doctype, meta, settings, view: state.view, wantNew: state.wantNew });
 
-  const filters = useMemo(() => filtersFromParams(doctype, new URLSearchParams(params.toString())), [doctype, params]);
-  const [search, setSearch] = useState(params.get("q") ?? "");
-  // ?q= can change while this list stays mounted (awesomebar "<text> in <DocType>"): follow the URL
-  const urlQ = params.get("q") ?? "";
-  const [prevUrlQ, setPrevUrlQ] = useState(urlQ);
-  if (prevUrlQ !== urlQ) {
-    setPrevUrlQ(urlQ);
-    setSearch(urlQ);
-  }
-  const [debounced, setDebounced] = useState(search);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  if (error) return <p className="p-6 text-sm text-red-600">{(error as Error).message}</p>;
+  if (isLoading || !meta || meta.issingle) return <Skeleton />;
+  return <ListPage doctype={doctype} meta={meta} settings={settings} ctx={ctx} config={config} state={state} colSettings={colSettings} columns={columns} />;
+}
 
-  const defaultSort: Sort = { field: String(meta?.sort_field || "modified"), order: (String(meta?.sort_order || "desc").toLowerCase() as "asc" | "desc") };
-  const [sortState, setSort] = useState<Sort | null>(null);
-  const sort = sortState ?? defaultSort;
+type DeskCtx = ReturnType<typeof useDeskContext>["data"];
+
+function ListPage({
+  doctype,
+  meta,
+  settings,
+  ctx,
+  config,
+  state,
+  colSettings,
+  columns,
+}: {
+  doctype: string;
+  meta: DocTypeMeta;
+  settings: ReturnType<typeof useListSettings>;
+  ctx: DeskCtx;
+  config: ReturnType<typeof useListViewConfig>;
+  state: ReturnType<typeof useListLayouts>;
+  colSettings: ReturnType<typeof useListViewConfig>["columns"];
+  columns: ReturnType<typeof useListColumns>;
+}) {
+  const router = useRouter();
+  const qc = useQueryClient();
+  const phone = useIsPhone();
+  const user = ctx?.user ?? "";
+  const { filters, setFilters } = state;
+  const { selected, setSelected, clearSelected, toggle } = useSelection(filters);
+
   const [pageLength, setPageLength] = useState(20);
-  // base_list.js: the chosen page size (20 / 100 / 500) is also how many rows "Load more" adds (start += page_length)
-  const [pageStep, setPageStep] = useState(20);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const list = useListRows({
+    doctype,
+    meta,
+    settings,
+    enabled: config.ready && state.stateReady,
+    fields: columns.fetchFields,
+    filters: state.allFilters,
+    sort: state.sort,
+    pageLength,
+    disableCount: config.disableCount,
+    disableCommentCount: config.disableCommentCount,
+    disableAutoRefresh: config.disableAutoRefresh,
+  });
+  const { rows, refresh } = list;
+  const pageState = useListviewHooks({ doctype, meta, settings, ready: state.stateReady, loadedAt: list.isSuccess ? list.dataUpdatedAt : 0, host: { rows, selected, clearSelected, filters, setFilters, refresh } });
+
   const [quickEntry, setQuickEntry] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [listSettingsOpen, setListSettingsOpen] = useState(false);
-  const phone = useIsPhone();
-  // phones: standard filters, Group by and sidebar stats fold behind "More filters"
-  const [moreFilters, setMoreFilters] = useState(false);
-
-  // Desk list_view.js setup_defaults: filters / sort_by / sort_order restored from user_settings["List"]
-  // (URL filters win); before_render saves them back (+ last_view). Query is not cached so a revisit re-reads it.
-  const usQuery = useQuery({ queryKey: userSettingsKey(doctype), queryFn: () => loadUserSettings(doctype), staleTime: 0, gcTime: 0, refetchOnMount: "always" });
-  const userSettings = useRef<UserSettings>({});
-  const [restoredFor, setRestoredFor] = useState<string | null>(null);
-  const [awaitFrom, setAwaitFrom] = useState<Filter[] | null>(null);
-
-  const setFilters = useCallback(
-    (next: Filter[]) => {
-      const sp = new URLSearchParams();
-      // simple equality filters read nicely in the URL (?status=Draft), others go in ?filters=
-      const complex: Filter[] = [];
-      for (const f of next) {
-        if (f[2] === "=" && (typeof f[3] === "string" || typeof f[3] === "number") && !sp.has(f[1]) && !["filters", "view", "sort", "q"].includes(f[1])) sp.set(f[1], String(f[3]));
-        else complex.push(f);
-      }
-      if (complex.length) sp.set("filters", JSON.stringify(complex));
-      if (search.trim()) sp.set("q", search.trim());
-      // keep ?view=list: without it a tree DocType's list goes back to Tree view
-      if (params.get("view")) sp.set("view", params.get("view") as string);
-      setSelected(new Set());
-      router.replace(`${pathname}${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
-    },
-    [pathname, router, search, params],
-  );
-  useEffect(() => {
-    if (restoredFor === doctype || !meta || !usQuery.isFetchedAfterMount || settings === undefined) return;
-    const saved = usQuery.data ?? {};
-    userSettings.current = saved;
-    const cur = saved.List ?? {};
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot restore of the saved view state
-    if (cur.sort_by) setSort({ field: String(cur.sort_by), order: String(cur.sort_order).toLowerCase() === "asc" ? "asc" : "desc" });
-    if (filters.length === 0 && Array.isArray(cur.filters) && cur.filters.length) {
-      const std = new Set(["name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "_assign", "_user_tags", "_comments", "_liked_by"]);
-      const valid = (cur.filters as Filter[]).filter((f) => Array.isArray(f) && f.length === 4 && (f[0] !== doctype || std.has(f[1]) || meta.fields?.some((x) => x.fieldname === f[1])));
-      if (valid.length) {
-        setAwaitFrom(filters);
-        setFilters(valid);
-      }
-    } else if (filters.length === 0 && !Array.isArray(cur.filters) && Array.isArray(settings.filters) && settings.filters.length) {
-      // list_view.js set_fields priority 2: the app's listview_settings.filters ([field, op, value] or 4-tuples)
-      const defaults = (settings.filters as unknown[][]).filter(Array.isArray).map((f) => (f.length === 3 ? [doctype, ...f] : f.slice(0, 4)) as Filter);
-      setAwaitFrom(filters);
-      setFilters(defaults);
-    }
-    setRestoredFor(doctype);
-  }, [restoredFor, doctype, meta, usQuery.isFetchedAfterMount, usQuery.data, filters, setFilters, settings]);
-  const stateReady = restoredFor === doctype && !(awaitFrom !== null && awaitFrom === filters);
-
-  const addFilter = (f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]);
-  const removeFilter = (i: number) => setFilters(filters.filter((_, j) => j !== i));
-
-  const titleField = typeof meta?.title_field === "string" && meta.title_field && meta.show_title_field_in_link !== undefined ? meta.title_field : typeof meta?.title_field === "string" ? meta.title_field : "";
-  const listFields = useMemo(() => {
-    if (!meta) return [] as DocField[];
-    // List View Settings `fields` (list_view.js build_columns): exactly those columns, in that order
-    if (colSettings.length) {
-      const subject = new Set(["name", titleField, colSettings[0]?.fieldname]);
-      const std: Record<string, Partial<DocField>> = { owner: { fieldtype: "Link", options: "User", label: "Created By" }, modified_by: { fieldtype: "Link", options: "User", label: "Last Updated By" }, creation: { fieldtype: "Datetime", label: "Created On" }, modified: { fieldtype: "Datetime", label: "Last Updated On" }, idx: { fieldtype: "Int", label: "Index" }, docstatus: { fieldtype: "Int", label: "Document Status" } };
-      const out: DocField[] = [];
-      for (const c of colSettings) {
-        // the Status indicator column already shows the `status` field
-        if (c.fieldname === "status_field" || subject.has(c.fieldname) || (c.fieldname === "status" && colSettings.some((x) => x.fieldname === "status_field"))) continue;
-        const df = meta.fields?.find((f) => f.fieldname === c.fieldname) ?? (std[c.fieldname] ? ({ fieldname: c.fieldname, ...std[c.fieldname] } as DocField) : undefined);
-        if (df && !NO_VALUE.has(df.fieldtype)) out.push(df);
-      }
-      return out;
-    }
-    return (meta.fields ?? [])
-      .filter((f) => f.in_list_view && !NO_VALUE.has(f.fieldtype) && f.fieldname !== titleField && f.fieldname !== "status")
-      .slice(0, 6);
-  }, [meta, titleField, colSettings]);
-  const colWidth = (fieldname: string) => colSettings.find((c) => c.fieldname === fieldname)?.width;
-  const hasStatusField = !!meta?.fields?.some((f) => f.fieldname === "status");
-  const hasIndicator =
-    !!meta &&
-    (!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled")) &&
-    (!colSettings.length || colSettings.some((c) => c.fieldname === "status_field"));
-  const standardFilters = useMemo(
-    () => (meta?.fields ?? []).filter((f) => f.in_standard_filter && ["Link", "Select", "Data", "Date", "Check"].includes(f.fieldtype)).slice(0, 4),
-    [meta],
-  );
-
-  const fetchFields = useMemo(() => {
-    if (!meta) return [];
-    const fs = new Set<string>(["name", "docstatus", "modified", "owner", "_comment_count", "_assign", "_liked_by"]);
-    // set_fields: _seen when the DocType tracks who opened each record
-    if (meta.track_seen) fs.add("_seen");
-    if (titleField) fs.add(titleField);
-    if (hasStatusField) fs.add("status");
-    if (meta.fields?.some((f) => f.fieldname === "workflow_state")) fs.add("workflow_state");
-    for (const f of listFields) {
-      fs.add(f.fieldname);
-      if (f.fieldtype === "Currency" && typeof f.options === "string" && meta.fields?.some((x) => x.fieldname === f.options)) fs.add(f.options);
-    }
-    for (const f of (settings?.add_fields as string[] | undefined) ?? []) if (f === "name" || meta.fields?.some((x) => x.fieldname === f)) fs.add(f);
-    for (const f of ["enabled", "disabled", "currency"]) if (meta.fields?.some((x) => x.fieldname === f)) fs.add(f);
-    return [...fs].filter((f) => f !== "_comment_count");
-  }, [meta, titleField, hasStatusField, listFields, settings]);
-
-  const searchFilter = useMemo<Filter[]>(() => (debounced ? [[doctype, titleField || "name", "like", `%${debounced}%`]] : []), [debounced, doctype, titleField]);
-  const allFilters = useMemo(() => [...filters, ...searchFilter], [filters, searchFilter]);
-
-  const rowsQuery = useQuery<Row[]>({
-    queryKey: ["list", doctype, fetchFields, allFilters, sort, pageLength, disableCommentCount],
-    enabled: !!meta && !meta.issingle && settings !== undefined && lvsReady && stateReady,
-    queryFn: () => fetchRows({ doctype, fields: fetchFields, filters: allFilters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength, withCommentCount: !disableCommentCount }),
-    placeholderData: keepPreviousData,
-  });
-  const countQuery = useQuery({
-    queryKey: ["list-count", doctype, allFilters],
-    enabled: !!meta && !meta.issingle && lvsReady && stateReady && !disableCount,
-    queryFn: () => fetchCount(doctype, allFilters),
-  });
-
-  // Search by title can miss an exact ID — retry on name when the title search is empty
-  const rows = rowsQuery.data ?? [];
-  const total = countQuery.data ?? rows.length;
-  const moreRows = disableCount ? rows.length >= pageLength : rows.length < total;
-  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.name));
-
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["list", doctype] });
-    qc.invalidateQueries({ queryKey: ["list-count", doctype] });
-  };
-
-  // the `listview` an app's listview_settings hooks receive (onload / refresh / before_render); it reads this render's
-  // state through hostRef, and the buttons it adds come back through useSyncExternalStore
-  const lvHandle = useMemo(() => (meta && settings ? createListview(doctype, meta, settings) : null), [meta, settings, doctype]);
-  useEffect(() => {
-    lvHandle?.setHost({
-      rows: () => rows,
-      selected: () => [...selected],
-      clearSelected: () => setSelected(new Set()),
-      filters: () => filters,
-      setFilters,
-      refresh,
-    });
-  });
-  const pageState = useSyncExternalStore(lvHandle?.subscribe ?? noSubscribe, lvHandle?.getState ?? emptyPageState, emptyPageState);
-  // list_view.js setup_view: settings.onload(listview), once per list
-  const onloadFor = useRef<ListviewHandle | null>(null);
-  useEffect(() => {
-    if (!lvHandle || !stateReady || onloadFor.current === lvHandle) return;
-    onloadFor.current = lvHandle;
-    runHook(settings, "onload", lvHandle.listview);
-  }, [lvHandle, stateReady, settings]);
-  // base_list.js refresh: before_render(), then settings.refresh(listview) after each load
-  useEffect(() => {
-    if (!lvHandle || !rowsQuery.isSuccess || !rowsQuery.dataUpdatedAt) return;
-    runHook(settings, "before_render");
-    runHook(settings, "refresh", lvHandle.listview);
-  }, [lvHandle, rowsQuery.isSuccess, rowsQuery.dataUpdatedAt, settings]);
-
-  // Desk refreshes the list when anyone creates/changes/deletes a document (list_update); bursts coalesce
-  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useListRealtime(lvs?.disable_auto_refresh ? undefined : doctype, () => {
-    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
-    realtimeTimer.current = setTimeout(() => {
-      qc.invalidateQueries({ queryKey: ["list", doctype] });
-      qc.invalidateQueries({ queryKey: ["list-count", doctype] });
-    }, 800);
-  });
-  useEffect(() => () => {
-    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
-  }, []);
-
-  // before_render: save { filters, sort_by, sort_order } (and last_view) to the user's settings
-  useEffect(() => {
-    if (!stateReady || !meta) return;
-    const value = { filters, sort_by: sort.field, sort_order: sort.order, active_layout_name: activeLayout && activeLayout !== DEFAULT_LAYOUT ? activeLayout : "" };
-    const cur = userSettings.current;
-    const next = { ...cur, List: { ...(cur.List ?? {}), ...value }, last_view: "List" };
-    if (JSON.stringify(next) === JSON.stringify(cur)) return;
-    userSettings.current = next;
-    saveListState(doctype, cur, value).catch(() => {});
-  }, [stateReady, meta, doctype, filters, sort.field, sort.order, activeLayout]);
-
-  // list_filter_menu.js apply_saved_layout / apply_default_layout
-  const applyLayout = useCallback(
-    (name: string, list: ListLayout[] = layouts) => {
-      if (name === DEFAULT_LAYOUT) {
-        const snap = defaultSnapshot.current;
-        setActiveLayout(DEFAULT_LAYOUT);
-        setLayoutCols(null);
-        if (snap) {
-          setSort(snap.sort);
-          setFilters(snap.filters);
-        }
-        return;
-      }
-      const l = list.find((x) => x.name === name);
-      if (!l) return;
-      setActiveLayout(l.name);
-      const cols = layoutColumns(l);
-      setLayoutCols(cols.length ? cols : null);
-      if (l.sort_field) setSort({ field: l.sort_field, order: String(l.sort_order).toLowerCase() === "asc" ? "asc" : "desc" });
-      setFilters(layoutFilters(l));
-    },
-    [layouts, setFilters],
-  );
-  const selectLayout = (name: string) => {
-    if (name === activeLayout) return;
-    if ((activeLayout ?? DEFAULT_LAYOUT) === DEFAULT_LAYOUT) defaultSnapshot.current = { filters, sort: sortState };
-    applyLayout(name);
-  };
-  // restore_layout_from_route_signature: URL filters that match a layout select it; no filters → the last one used
-  useEffect(() => {
-    if (activeLayout !== null || !stateReady || !layoutsQuery.isSuccess) return;
-    const matched = findBySignature(layouts, doctype, filters);
-    const saved = String(userSettings.current.List?.active_layout_name ?? "");
-    const savedLayout = !filters.length && saved ? layouts.find((l) => l.name === saved) : undefined;
-    /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore once layouts and saved state are in */
-    if (matched) {
-      setActiveLayout(matched.name);
-      const cols = layoutColumns(matched);
-      setLayoutCols(cols.length ? cols : null);
-    } else if (savedLayout) {
-      defaultSnapshot.current = { filters, sort: sortState };
-      applyLayout(savedLayout.name);
-    } else setActiveLayout(DEFAULT_LAYOUT);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [activeLayout, stateReady, layoutsQuery.isSuccess, layouts, doctype, filters, sortState, applyLayout]);
-
-  const views = useMemo(() => {
-    if (!meta) return [] as Array<{ id: string; label: string; href: string }>;
-    const v = [{ id: "list", label: "List", href: `/desk/doctype/${enc(doctype)}${meta.is_tree ? "?view=list" : ""}` }];
-    v.push({ id: "report", label: "Report", href: `/desk/doctype/${enc(doctype)}/view/report` });
-    // Desk: File has a folder view (/app/file/view/home)
-    if (doctype === "File") v.push({ id: "home", label: "Home", href: "/desk/files" });
-    // Desk offers Calendar when the DocType ships calendar settings (frappe.views.calendar)
-    const calJs = String((meta as { __calendar_js?: string }).__calendar_js ?? "");
-    if (calJs) v.push({ id: "calendar", label: "Calendar", href: `/desk/doctype/${enc(doctype)}/view/calendar` });
-    // Gantt when the calendar settings enable it (gantt: true / { ... })
-    if (/\bgantt\s*:\s*(true|\{)/.test(calJs)) v.push({ id: "gantt", label: "Gantt", href: `/desk/doctype/${enc(doctype)}/view/gantt` });
-    // Desk offers Kanban for any DocType with a Select field to build columns from
-    if (meta.fields?.some((f) => f.fieldtype === "Select" && !f.hidden)) v.push({ id: "kanban", label: "Kanban", href: `/desk/doctype/${enc(doctype)}/view/kanban` });
-    if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `/desk/doctype/${enc(doctype)}/view/tree` });
-    if (meta.image_field) v.push({ id: "image", label: "Image", href: `/desk/doctype/${enc(doctype)}/view/image` });
-    return v;
-  }, [meta, doctype]);
-
-  // Desk opens tree DocTypes (Account, Item Group, …) in Tree view unless the list is asked for
-  useEffect(() => {
-    if (meta?.is_tree && params.get("view") !== "list") router.replace(`/desk/doctype/${enc(doctype)}/view/tree`);
-  }, [meta?.is_tree, params, router, doctype]);
-
-  // ?new=1 (e.g. /desk/doctype/new redirect) opens New / the primary action once the list JS is loaded
-  const wantNew = params.get("new") === "1";
-  const [openedNew, setOpenedNew] = useState(false);
-  useEffect(() => {
-    if (!wantNew || openedNew || !meta || settings === undefined) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot trigger from the URL
-    setOpenedNew(true);
-    if (typeof settings.primary_action === "function") (settings.primary_action as () => unknown).call(settings);
-    else router.push(`/desk/doctype/${enc(doctype)}/new`);
-  }, [wantNew, openedNew, meta, settings, router, doctype]);
-
+  const [layoutDialog, setLayoutDialog] = useState<LayoutDialogState>(null);
+  const [manageLayouts, setManageLayouts] = useState(false);
+  const onAdd = useAddAction(doctype, meta, settings, () => setQuickEntry(true));
   // Desk list shortcut: Ctrl/⌘+B = New (list_view.js)
-  useShortcuts(
-    [{ keys: "mod+b", description: `New ${doctype}`, group: "List", allowInInput: true, action: () => router.push(`/desk/doctype/${enc(doctype)}/new`) }],
-    [doctype, router],
-  );
-
-  if (meta?.issingle) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
-  if (metaError) return <p className="p-6 text-sm text-red-600">{(metaError as Error).message}</p>;
-  if (metaLoading || !meta) return <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
-
-  const sortable = [
-    { fieldname: "modified", label: "Last Updated On" },
-    { fieldname: "creation", label: "Created On" },
-    { fieldname: "name", label: "ID" },
-    ...(meta.fields ?? []).filter((f) => ["Date", "Datetime", "Int", "Float", "Currency", "Percent", "Data", "Link", "Select"].includes(f.fieldtype) && (f.in_list_view || f.in_standard_filter || f.bold)).map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname })),
-  ];
-  const canCreate = !meta.issingle && !meta.istable;
-  // Desk: the app's listview_settings.primary_action replaces New (e.g. DocType's "Create New DocType" dialog)
-  const onAdd = () => {
-    if (typeof settings?.primary_action === "function") {
-      try {
-        (settings.primary_action as () => unknown).call(settings);
-        return;
-      } catch (err) {
-        console.warn("[list] primary_action failed", err);
-      }
-    }
-    if (canQuickEntry(meta)) setQuickEntry(true);
-    else router.push(`/desk/doctype/${enc(doctype)}/new`);
-  };
-  // listview_settings: per-row button / dropdown_button, column formatters, hide_name_column
-  const hasRowButtons = !!settings?.button || !!settings?.dropdown_button;
-  const hideName = !!settings?.hide_name_column;
-  const formatter = (fieldname: string) => {
-    const fn = (settings?.formatters as Record<string, unknown> | undefined)?.[fieldname];
-    return typeof fn === "function" ? (fn as (v: unknown, df: unknown, doc: unknown) => unknown) : null;
-  };
-  const formatted = (f: DocField, r: Record<string, unknown>) => {
-    try {
-      return sanitizeHtml(String(formatter(f.fieldname)?.(r[f.fieldname], f, r) ?? ""));
-    } catch (e) {
-      console.warn(`listview_settings.formatters.${f.fieldname}:`, e);
-      return sanitizeHtml(String(r[f.fieldname] ?? ""));
-    }
-  };
-  const runItem = (fn: () => unknown) => {
-    try {
-      fn();
-    } catch (e) {
-      console.warn("listview_settings:", e);
-    }
-  };
-  const me = ctx?.user ?? "";
-  const unread = (r: Record<string, unknown>) => !!meta.track_seen && !!me && isUnread(r._seen, me);
-  // avatar_group filterable: an assignee avatar filters the list to that user's assignments
-  const filterAssigned = (u: string) => addFilter([doctype, "_assign", "like", `%${u}%`]);
-  const likedByMe = filters.some((f) => f[1] === "_liked_by");
-  const toggleLikedByMe = () => setFilters(likedByMe ? filters.filter((f) => f[1] !== "_liked_by") : [...filters, [doctype, "_liked_by", "like", `%${me}%`]]);
-  const likeChanged = () => qc.invalidateQueries({ queryKey: ["list", doctype] });
+  useShortcuts([{ keys: "mod+b", description: `New ${doctype}`, group: "List", allowInInput: true, action: () => router.push(newDocHref(doctype)) }], [doctype, router]);
+  const deskCtx = { user, roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode };
+  const onLikeChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["list", doctype] }), [qc, doctype]);
   const dateFormat = String(ctx?.sysdefaults?.date_format ?? "yyyy-mm-dd");
-  const defaultCurrency = (ctx?.defaults?.currency as string) || undefined;
-  const subjectLabel = titleField ? fieldLabel(meta, titleField) : "ID";
+  const currency = (ctx?.defaults?.currency as string) || undefined;
+  const { titleField, listFields, hasIndicator } = columns;
+  const { disableCommentCount } = config;
+  const { addFilter } = state;
+  // stable across a selection change, so checking rows doesn't re-render every cell (largelist: 1000 rows)
+  const rowCtx = useMemo<RowContext>(
+    () => ({ doctype, meta, settings, user, titleField, listFields, hasIndicator, disableCommentCount, dateFormat, currency, filters, setFilters, addFilter, onLikeChanged }),
+    [doctype, meta, settings, user, titleField, listFields, hasIndicator, disableCommentCount, dateFormat, currency, filters, setFilters, addFilter, onLikeChanged],
+  );
 
   return (
     <div className="space-y-3">
-      {/* Title row */}
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{pageState.title || doctype}</h1>
-        {/* page.set_indicator from an app's onload / refresh */}
-        {pageState.indicator && <span data-page-indicator className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[pageState.indicator.color] ?? INDICATOR_PILL.gray}`}>{pageState.indicator.label}</span>}
-        {layoutsQuery.isSuccess && (
-          <LayoutMenu
-            layouts={layouts}
-            active={activeLayout ?? DEFAULT_LAYOUT}
-            user={ctx?.user ?? ""}
-            onSelect={selectLayout}
-            onCreate={() => setLayoutDialog({ layout: null, duplicateFrom: null })}
-            onManage={() => setManageLayouts(true)}
-          />
-        )}
-        {views.length > 1 && (
-          <nav aria-label="Views" className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
-            {views.map((v) => (
-              <Link key={v.id} href={v.href} prefetch={false} aria-current={v.id === "list" ? "page" : undefined} className={`rounded-md px-2.5 py-1 text-xs font-medium ${v.id === "list" ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>
-                {v.label}
-              </Link>
-            ))}
-          </nav>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <ToolbarButtons items={pageState.inner} />
-          <button type="button" onClick={refresh} aria-label="Refresh" className="rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
-            <RefreshCw className={`h-4 w-4 ${rowsQuery.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger aria-label="List settings" className="rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
-              <Settings2 className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/Customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/desk/doctype/DocType/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setListSettingsOpen(true)}>List settings</DropdownMenuItem>
-              {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
-              <DropdownMenuItem onClick={() => setExporting(true)}>Export</DropdownMenuItem>
-              {/* Desk list_view.js: System Manager only */}
-              {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/doctype/User%20Permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
-              {ctx?.roles.includes("System Manager") && <DropdownMenuItem onClick={() => router.push(`/desk/page/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
-              {/* page.add_menu_item from the app's listview_settings */}
-              {pageState.menu.length > 0 && <DropdownMenuSeparator />}
-              {pageState.menu.map((m) => (
-                <DropdownMenuItem key={m.label} onClick={() => runItem(m.action)}>
-                  {m.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {selected.size > 0 ? (
-            <BulkActions
-              meta={meta}
-              extraActions={pageState.actions}
-              rows={rows.filter((r) => selected.has(r.name))}
-              columns={listFields.map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname, fieldtype: f.fieldtype }))}
-              onDone={() => {
-                setSelected(new Set());
-                refresh();
-              }}
-            />
-          ) : (
-            canCreate && (
-              <button
-                type="button"
-                onClick={onAdd}
-                // the app's listview_settings (primary_action) must be in before Add means the same as in Desk
-                disabled={settings === undefined}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                <Plus className="h-4 w-4" /> Add {doctype}
-              </button>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-56">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${subjectLabel}`}
-            className="h-8 w-full rounded-md border border-zinc-200 bg-white pl-8 pr-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </div>
-        {phone && (standardFilters.length > 0 || !lvs?.disable_sidebar_stats) && (
-          <button
-            type="button"
-            onClick={() => setMoreFilters((v) => !v)}
-            aria-expanded={moreFilters}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            <ListFilter className="h-3.5 w-3.5" /> {moreFilters ? "Fewer filters" : "More filters"}
-          </button>
-        )}
-        {(!phone || moreFilters) && standardFilters.map((f) => {
-          const current = filters.find((x) => x[1] === f.fieldname && x[2] === "=");
-          const val = current ? String(current[3]) : "";
-          const set = (v: string) => setFilters(v ? [...filters.filter((x) => x[1] !== f.fieldname), [doctype, f.fieldname, "=", v]] : filters.filter((x) => x[1] !== f.fieldname));
-          return f.fieldtype === "Link" ? (
-            <LinkInput key={f.fieldname} doctype={String(f.options)} value={val} onChange={set} placeholder={f.label ?? f.fieldname} className="w-40" />
-          ) : f.fieldtype === "Select" ? (
-            <select aria-label={f.label ?? f.fieldname} key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-              <option value="">{f.label}</option>
-              {String(f.options ?? "").split("\n").filter(Boolean).map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          ) : f.fieldtype === "Check" ? (
-            <select aria-label={f.label ?? f.fieldname} key={f.fieldname} value={val} onChange={(e) => set(e.target.value)} className="h-8 w-36 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-              <option value="">{f.label}</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          ) : f.fieldtype === "Date" ? (
-            <div key={f.fieldname} className="w-40">
-              <DatePicker compact value={val || null} onChange={(v) => set(v ?? "")} ariaLabel={f.label ?? f.fieldname} />
-            </div>
-          ) : (
-            <input key={f.fieldname} type="text" defaultValue={val} title={f.label ?? f.fieldname} aria-label={f.label ?? f.fieldname} onBlur={(e) => set(e.target.value)} onKeyDown={(e) => e.key === "Enter" && set((e.target as HTMLInputElement).value)} placeholder={f.label ?? f.fieldname} className="h-8 w-40 rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100" />
-          );
-        })}
-
-        <Popover>
-          <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-            <FilterIcon className="h-3.5 w-3.5" /> Filter
-            {filters.length > 0 && <span className="rounded-full bg-zinc-900 px-1.5 text-[10px] font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">{filters.length}</span>}
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <FilterEditor meta={meta} onAdd={addFilter} />
-          </PopoverContent>
-        </Popover>
-
-        {(!phone || moreFilters) && (
-          <Popover>
-            <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-              <Layers className="h-3.5 w-3.5" /> Group by
-            </PopoverTrigger>
-            <PopoverContent className="w-72">
-              <GroupBy meta={meta} filters={allFilters} onPick={addFilter} />
-            </PopoverContent>
-          </Popover>
-        )}
-
-        {(!phone || moreFilters) && !lvs?.disable_sidebar_stats && <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={ctx?.user ?? ""} />}
-
-        <div className="ml-auto flex items-center gap-1">
-          <select
-            value={sort.field}
-            onChange={(e) => setSort({ field: e.target.value, order: sort.order })}
-            aria-label="Sort by"
-            className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-          >
-            {sortable.filter((s, i, a) => a.findIndex((x) => x.fieldname === s.fieldname) === i).map((s) => <option key={s.fieldname} value={s.fieldname}>{s.label}</option>)}
-          </select>
-          <button
-            type="button"
-            onClick={() => setSort({ field: sort.field, order: sort.order === "asc" ? "desc" : "asc" })}
-            aria-label={sort.order === "asc" ? "Ascending" : "Descending"}
-            className="rounded-md border border-zinc-200 p-1.5 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {sort.order === "asc" ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Active filters */}
-      {filters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {filters.map((f, i) => (
-            <span key={`${f[1]}|${f[2]}|${JSON.stringify(f[3])}`} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-              <ListFilter className="h-3 w-3 text-zinc-400" />
-              <span className="font-medium">{fieldLabel(meta, f[1])}</span>
-              <span className="text-zinc-400">{OPERATORS.find((o) => o.op === f[2])?.label ?? f[2]}</span>
-              <span>{describeValue(f[3]).replace(/^%|%$/g, "")}</span>
-              <button type="button" onClick={() => removeFilter(i)} aria-label={`Remove ${fieldLabel(meta, f[1])} filter`} className="rounded-full p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          <button type="button" onClick={() => setFilters([])} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        {phone ? (
-          // Phones: one card per row (title + status, up to three list fields, updated) instead of a wide table
-          <>
-          {rows.length > 0 && (
-            <div className="flex items-center gap-3 border-b border-zinc-200 bg-zinc-50/60 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <input
-                type="checkbox"
-                aria-label="Select all"
-                checked={allSelected}
-                onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
-                className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
-              />
-              <span>{selected.size > 0 ? `${selected.size} selected` : "Select all"}</span>
-              {!disableCount && <span className="ml-auto">{rows.length} of {total}</span>}
-            </div>
-          )}
-          <ul aria-label={`${doctype} list`} className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
-            {rows.map((r) => {
-              const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
-              const href = rowHref(r);
-              const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
-              return (
-                <li key={r.name} className={`relative flex gap-3 px-3 py-3 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${r.name}`}
-                    checked={selected.has(r.name)}
-                    onChange={() => {
-                      const next = new Set(selected);
-                      if (next.has(r.name)) next.delete(r.name);
-                      else next.add(r.name);
-                      setSelected(next);
-                    }}
-                    className="relative z-10 mt-0.5 h-4 w-4 shrink-0 rounded accent-zinc-900 dark:accent-zinc-100"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-2">
-                      {/* the link covers the card (after:inset-0) so the whole card opens the document */}
-                      <Link href={href} data-unread={unread(r) || undefined} className={`min-w-0 flex-1 truncate text-zinc-900 after:absolute after:inset-0 dark:text-zinc-100 ${unread(r) ? "font-bold" : "font-medium"}`}>
-                        {subject}
-                      </Link>
-                      {ind && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}>{ind[0]}</span>}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
-                      {subject !== r.name && !hideName && <span className="truncate">{r.name}</span>}
-                      <span className="ml-auto inline-flex shrink-0 items-center gap-2">
-                        <AssigneeAvatars users={jsonList(r._assign)} onFilter={filterAssigned} />
-                        {!disableCommentCount && <CommentCount count={r._comment_count} />}
-                        <LikeButton doctype={doctype} name={r.name} likedBy={r._liked_by} user={ctx?.user ?? ""} onChanged={likeChanged} />
-                        {timeAgo(r.modified)}
-                      </span>
-                    </div>
-                    {listFields.length > 0 && (
-                      <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
-                        {listFields.slice(0, 3).map((f) => {
-                          const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
-                          if (!text) return null;
-                          return (
-                            <Fragment key={f.fieldname}>
-                              <dt className="text-zinc-400">{f.label}</dt>
-                              <dd className="truncate text-zinc-700 dark:text-zinc-300">{text}</dd>
-                            </Fragment>
-                          );
-                        })}
-                      </dl>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          </>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 bg-zinc-50/60 text-left text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <th className="w-10 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all"
-                      checked={allSelected}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.name)))}
-                      className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
-                    />
-                  </th>
-                  <th className="px-3 py-2.5" style={colWidth(colSettings[0]?.fieldname ?? "name") ? { minWidth: colWidth(colSettings[0]?.fieldname ?? "name") } : undefined}>{subjectLabel}</th>
-                  {hasIndicator && <th className="px-3 py-2.5">Status</th>}
-                  {listFields.map((f) => (
-                    <th key={f.fieldname} style={colWidth(f.fieldname) ? { minWidth: colWidth(f.fieldname) } : undefined} className={`whitespace-nowrap px-3 py-2.5 ${["Currency", "Float", "Int", "Percent"].includes(f.fieldtype) ? "text-right" : ""}`}>{f.label}</th>
-                  ))}
-                  {hasRowButtons && <th className="px-3 py-2.5" />}
-                  <th className="w-24 px-3 py-2.5 text-right">
-                    <span className="inline-flex items-center gap-2">
-                      {!disableCount && `${rows.length} of ${total}`}
-                      {/* .list-liked-by-me: filter to what I liked */}
-                      <button type="button" aria-pressed={likedByMe} aria-label="Liked by me" title="Liked by me" onClick={toggleLikedByMe} className="rounded p-0.5 hover:text-zinc-700 dark:hover:text-zinc-200">
-                        <Heart className={`h-3.5 w-3.5 ${likedByMe ? "fill-red-500 text-red-500" : ""}`} aria-hidden />
-                      </button>
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const ind = hasIndicator ? getIndicator(r, meta, settings) : null;
-                  const href = rowHref(r);
-                  const subject = titleField && r[titleField] ? String(r[titleField]) : r.name;
-                  return (
-                    <tr
-                      key={r.name}
-                      onClick={(e) => {
-                        // controls inside the row (links, buttons, an app's row dropdown menu) don't open the record
-                        if ((e.target as HTMLElement).closest("a,button,input,[role=menu],[role=menuitem]")) return;
-                        if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
-                        else router.push(href);
-                      }}
-                      className={`group cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${selected.has(r.name) ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
-                    >
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${r.name}`}
-                          checked={selected.has(r.name)}
-                          onChange={() => {
-                            const next = new Set(selected);
-                            if (next.has(r.name)) next.delete(r.name);
-                            else next.add(r.name);
-                            setSelected(next);
-                          }}
-                          className="h-4 w-4 rounded accent-zinc-900 dark:accent-zinc-100"
-                        />
-                      </td>
-                      <td className="max-w-[18rem] px-3 py-2.5">
-                        <Link href={href} data-unread={unread(r) || undefined} className={`block truncate text-zinc-900 hover:underline dark:text-zinc-100 ${unread(r) ? "font-bold" : "font-medium"}`}>{subject}</Link>
-                        {subject !== r.name && !hideName && <span className="block truncate text-xs text-zinc-400">{r.name}</span>}
-                      </td>
-                      {hasIndicator && (
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          {ind && (
-                            <button
-                              type="button"
-                              title={`Filter by ${ind[0]}`}
-                              onClick={() => ind[2] && setFilters([...filters, ...(indicatorFilters(doctype, ind[2]) as Filter[])])}
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[ind[1]] ?? INDICATOR_PILL.gray}`}
-                            >
-                              {ind[0]}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {listFields.map((f) => {
-                        const text = formatCell(r[f.fieldname], f, r, { currency: defaultCurrency, dateFormat });
-                        const numeric = ["Currency", "Float", "Int", "Percent"].includes(f.fieldtype);
-                        return (
-                          <td key={f.fieldname} className={`max-w-[16rem] truncate whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-300 ${numeric ? "text-right tabular-nums" : ""}`}>
-                            {formatter(f.fieldname) ? (
-                              <span data-formatted={f.fieldname} dangerouslySetInnerHTML={{ __html: formatted(f, r) }} />
-                            ) : f.fieldtype === "Link" && text ? (
-                              <button type="button" onClick={() => addFilter([doctype, f.fieldname, "=", r[f.fieldname]])} className="truncate hover:underline" title={`Filter by ${text}`}>
-                                {text}
-                              </button>
-                            ) : (
-                              text
-                            )}
-                          </td>
-                        );
-                      })}
-                      {hasRowButtons && settings && (
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          <RowButtons settings={settings} doc={r} />
-                        </td>
-                      )}
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs text-zinc-400" title={String(r.modified ?? "")}>
-                        {/* get_meta_html: assignees · modified · comments · like */}
-                        <span className="inline-flex items-center gap-2">
-                          <AssigneeAvatars users={jsonList(r._assign)} onFilter={filterAssigned} />
-                          {timeAgo(r.modified)}
-                          {!disableCommentCount && <CommentCount count={r._comment_count} />}
-                          <LikeButton doctype={doctype} name={r.name} likedBy={r._liked_by} user={ctx?.user ?? ""} onChanged={likeChanged} />
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {!rowsQuery.isLoading && rows.length === 0 && (
-          <div className="px-6 py-14 text-center">
-            <p className="text-sm text-zinc-500">{filters.length || debounced ? `No ${doctype} matches these filters` : `You haven't created a ${doctype} yet`}</p>
-            {filters.length || debounced ? (
-              <button type="button" onClick={() => { setSearch(""); setFilters([]); }} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Clear filters</button>
-            ) : (
-              canCreate && <button type="button" onClick={onAdd} disabled={settings === undefined} className="mt-3 text-sm font-medium text-zinc-900 underline dark:text-zinc-100">Create your first {doctype}</button>
-            )}
-          </div>
-        )}
-        {rowsQuery.isLoading && <div className="h-40 animate-pulse bg-zinc-50 dark:bg-zinc-900" />}
-
-        {rows.length > 0 && (
-          <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
-            {[20, 100, 500].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => {
-                  setPageStep(n);
-                  setPageLength(n);
-                }}
-                className={`rounded-md px-2 py-1 ${pageStep === n ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}>
-                {n}
-              </button>
-            ))}
-            {moreRows && (
-              <button type="button" onClick={() => setPageLength(pageLength + pageStep)} className="ml-auto rounded-md border border-zinc-200 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                Load more
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <ListHeader
+        doctype={doctype}
+        meta={meta}
+        settings={settings}
+        pageState={pageState}
+        user={user}
+        systemManager={deskCtx.roles.includes("System Manager")}
+        layouts={state}
+        onCreateLayout={() => setLayoutDialog({ layout: null, duplicateFrom: null })}
+        onManageLayouts={() => setManageLayouts(true)}
+        refresh={refresh}
+        fetching={list.isFetching}
+        onListSettings={() => setListSettingsOpen(true)}
+        onExport={() => setExporting(true)}
+        selectedRows={rows.filter((r) => selected.has(r.name))}
+        listFields={columns.listFields}
+        onBulkDone={() => {
+          clearSelected();
+          refresh();
+        }}
+        onAdd={onAdd}
+      />
+      <ListFilterBar
+        doctype={doctype}
+        meta={meta}
+        user={user}
+        phone={phone}
+        standardFilters={standardFiltersOf(meta)}
+        showSidebar={config.showSidebar}
+        search={state.search}
+        setSearch={state.setSearch}
+        subjectLabel={columns.subjectLabel}
+        filters={filters}
+        allFilters={state.allFilters}
+        setFilters={setFilters}
+        addFilter={state.addFilter}
+        sort={state.sort}
+        setSort={state.setSort}
+      />
+      <ActiveFilters meta={meta} filters={filters} setFilters={setFilters} />
+      <ListBody
+        phone={phone}
+        list={list}
+        showCount={!config.disableCount}
+        colSettings={colSettings}
+        subjectLabel={columns.subjectLabel}
+        pageLength={pageLength}
+        setPageLength={setPageLength}
+        filtered={filters.length > 0 || !!state.debounced}
+        canCreate={!meta.istable}
+        addDisabled={settings === undefined}
+        onAdd={onAdd}
+        onClear={() => {
+          state.setSearch("");
+          setFilters([]);
+        }}
+        c={rowCtx}
+        sel={{ selected, setSelected, toggle }}
+      />
 
       {listSettingsOpen && (
         <ListSettingsDialog
           meta={meta}
-          settings={lvs ?? null}
-          hasIndicator={!!meta.is_submittable || hasStatusField || typeof settings?.get_indicator === "function" || !!meta.fields?.some((f) => f.fieldname === "enabled" || f.fieldname === "disabled")}
+          settings={config.lvs}
+          hasIndicator={columns.canIndicate}
           onClose={() => setListSettingsOpen(false)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: lvsKey(doctype) });
@@ -888,60 +196,19 @@ export default function ListView({ doctype }: { doctype: string }) {
           }}
         />
       )}
-
-      {layoutDialog && (
-        <LayoutDialog
-          meta={meta}
-          layout={layoutDialog.layout}
-          duplicateFrom={layoutDialog.duplicateFrom}
-          ctx={{ user: ctx?.user ?? "", roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode }}
-          layouts={layouts}
-          current={{
-            filters,
-            sort_field: sort.field,
-            sort_order: sort.order,
-            // get_current_columns_state: what the list shows now
-            columns: colSettings.length
-              ? colSettings
-              : [
-                  { fieldname: titleField || "name", label: subjectLabel },
-                  ...(hasIndicator ? [{ fieldname: "status_field", label: "Status" }] : []),
-                  ...listFields.map((f) => ({ fieldname: f.fieldname, label: f.label || f.fieldname })),
-                ],
-          }}
-          onClose={() => setLayoutDialog(null)}
-          onSaved={async (saved) => {
-            setLayoutDialog(null);
-            const fresh = (await layoutsQuery.refetch()).data ?? [];
-            // a layout just created or edited is applied (Desk re-applies the active one after on_save)
-            if ((activeLayout ?? DEFAULT_LAYOUT) === DEFAULT_LAYOUT) defaultSnapshot.current = { filters, sort: sortState };
-            applyLayout(saved.name, fresh);
-          }}
-        />
-      )}
-      {manageLayouts && (
-        <ManageLayoutsDialog
-          layouts={layouts}
-          ctx={{ user: ctx?.user ?? "", roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode }}
-          onClose={() => setManageLayouts(false)}
-          onEdit={(l) => {
-            setManageLayouts(false);
-            setLayoutDialog({ layout: l, duplicateFrom: null });
-          }}
-          onDuplicate={(l) => {
-            setManageLayouts(false);
-            setLayoutDialog({ layout: null, duplicateFrom: l });
-          }}
-          onDeleted={(l) => {
-            void layoutsQuery.refetch();
-            // delete_layout: deleting the active layout goes back to Default Layout
-            if (activeLayout === l.name) applyLayout(DEFAULT_LAYOUT);
-          }}
-        />
-      )}
-
-      {exporting && <ExportDialog doctype={doctype} filters={allFilters} onClose={() => setExporting(false)} />}
-
+      <ListLayoutDialogs
+        meta={meta}
+        ctx={deskCtx}
+        layouts={state.layouts}
+        dialog={layoutDialog}
+        setDialog={setLayoutDialog}
+        manage={manageLayouts}
+        setManage={setManageLayouts}
+        current={{ filters, sort_field: state.sort.field, sort_order: state.sort.order, columns: columns.currentColumns }}
+        onSaved={(l) => void state.onLayoutSaved(l)}
+        onDeleted={state.onLayoutDeleted}
+      />
+      {exporting && <ExportDialog doctype={doctype} filters={state.allFilters} onClose={() => setExporting(false)} />}
       {quickEntry && (
         <QuickEntry
           meta={meta}
@@ -949,7 +216,7 @@ export default function ListView({ doctype }: { doctype: string }) {
           onCreated={(name) => {
             setQuickEntry(false);
             refresh();
-            toast.success(`${doctype} ${name} created`, { action: { label: "Open", onClick: () => router.push(`/desk/doctype/${enc(doctype)}/${enc(name)}`) } });
+            toast.success(`${doctype} ${name} created`, { action: { label: "Open", onClick: () => router.push(docHref(doctype, name)) } });
           }}
         />
       )}
