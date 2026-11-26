@@ -53,6 +53,16 @@ export default function NotificationsPanel() {
     };
   }, [queryClient]);
 
+  // Escape closes the dropdown (the backdrop above is not focusable, so it can't take the key itself)
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
   const handleMarkRead = (name: string) => {
     markReadMutation.mutate(name);
   };
@@ -79,11 +89,7 @@ export default function NotificationsPanel() {
       {/* Notifications dropdown */}
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-            onKeyDown={(e) => { if (e.key === "Escape") setIsOpen(false); }}
-          />
+          <div className="fixed inset-0 z-40" role="presentation" aria-hidden="true" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 top-14 z-50 w-96 rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
             <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
               <div className="flex items-center gap-2">

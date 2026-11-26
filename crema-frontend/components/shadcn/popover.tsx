@@ -32,21 +32,23 @@ export function Popover({
     [openProp, onOpenChange],
   );
   const ref = React.useRef<HTMLDivElement>(null);
+  const close = React.useEffectEvent(() => setOpen(false));
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, setOpen]);
+  }, [open]);
+  const contextValue = React.useMemo(() => ({ open, setOpen }), [open, setOpen]);
   return (
-    <PopoverContext.Provider value={{ open, setOpen }}>
+    <PopoverContext.Provider value={contextValue}>
       <div ref={ref} className={`relative ${className}`}>{children}</div>
     </PopoverContext.Provider>
   );

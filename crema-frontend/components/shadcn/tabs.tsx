@@ -9,8 +9,9 @@ function useTabs() {
 }
 
 export function Tabs({ value, onValueChange, children, className = "" }: { value: string; onValueChange: (v: string) => void; children: React.ReactNode; className?: string }) {
+  const contextValue = React.useMemo(() => ({ value, onValueChange }), [value, onValueChange]);
   return (
-    <TabsContext.Provider value={{ value, onValueChange }}>
+    <TabsContext.Provider value={contextValue}>
       <div className={className}>{children}</div>
     </TabsContext.Provider>
   );

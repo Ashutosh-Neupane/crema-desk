@@ -14,6 +14,7 @@ import {
 } from "@/components/shadcn/select";
 import { Play, RefreshCw, Plus, Trash2, BarChart3 } from "lucide-react";
 import { useReportsList, useReportMeta, useReport } from "@/lib/hooks/useReport";
+import { objectKey } from "@/components/desk/objectKey";
 
 interface ReportFilter {
   id: string;
@@ -146,10 +147,8 @@ export function ReportQueryBuilder() {
     }
   };
 
-  const getColumnValue = (row: Record<string, unknown>, col: ReportColumn) => {
-    const key = col.fieldname;
-    return row[key] !== undefined ? String(row[key]) : "-";
-  };
+  const selectedSet = useMemo(() => new Set(selectedColumns), [selectedColumns]);
+  const shownColumns = selectedSet.size > 0 ? availableColumns.filter((c) => selectedSet.has(c.fieldname)) : availableColumns;
 
   return (
     <div className="space-y-6">
@@ -190,111 +189,8 @@ export function ReportQueryBuilder() {
 
         {selectedReport && (
           <div className="mt-4 space-y-4">
-            {/* Filters */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Filters</Label>
-                <Button variant="outline" size="sm" onClick={addFilter}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Filter
-                </Button>
-              </div>
-              {filters.length === 0 ? (
-                <p className="text-sm text-zinc-500">No filters applied.</p>
-              ) : (
-                <div className="space-y-2">
-                  {filters.map((filter) => (
-                    <div key={filter.id} className="flex flex-wrap items-center gap-2">
-                      <Select
-                        value={filter.fieldname}
-                        onValueChange={(value) => updateFilter(filter.id, { fieldname: value })}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableFields.map((field) => (
-                            <SelectItem key={field.fieldname} value={field.fieldname}>
-                              {field.label || field.fieldname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={filter.operator}
-                        onValueChange={(value) => updateFilter(filter.id, { operator: value })}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {FILTER_OPERATORS.map((op) => (
-                            <SelectItem key={op.value} value={op.value}>
-                              {op.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {filter.operator === "Between" ? (
-                        <>
-                          <Input
-                            value={filter.value}
-                            onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                            placeholder="From"
-                            className="w-[120px]"
-                          />
-                          <Input
-                            value={filter.value2 || ""}
-                            onChange={(e) => updateFilter(filter.id, { value2: e.target.value })}
-                            placeholder="To"
-                            className="w-[120px]"
-                          />
-                        </>
-                      ) : (
-                        <Input
-                          value={filter.value}
-                          onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                          placeholder="Value"
-                          className="w-[140px]"
-                        />
-                      )}
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFilter(filter.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Columns */}
-            {availableColumns.length > 0 && (
-              <div>
-                <Label className="mb-2 block">Columns</Label>
-                <div className="flex flex-wrap gap-2">
-                  {availableColumns.map((col) => (
-                    <button
-                      key={col.fieldname}
-                      onClick={() => toggleColumn(col.fieldname)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                        selectedColumns.includes(col.fieldname)
-                          ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-                          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700"
-                      }`}
-                    >
-                      {col.label || col.fieldname}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <FilterList filters={filters} fields={availableFields} onAdd={addFilter} onUpdate={updateFilter} onRemove={removeFilter} />
+            {availableColumns.length > 0 && <ColumnPicker columns={availableColumns} selected={selectedSet} onToggle={toggleColumn} />}
           </div>
         )}
       </Card>
@@ -313,50 +209,7 @@ export function ReportQueryBuilder() {
             </h3>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-                  {(selectedColumns.length > 0
-                    ? availableColumns.filter((c) => selectedColumns.includes(c.fieldname))
-                    : availableColumns
-                  ).map((col) => (
-                    <th
-                      key={col.fieldname}
-                      className="px-4 py-2 text-left text-xs font-medium text-zinc-500"
-                    >
-                      {col.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={selectedColumns.length > 0 ? selectedColumns.length : availableColumns.length}
-                      className="px-4 py-8 text-center text-sm text-zinc-500"
-                    >
-                      No results found.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row, idx) => (
-                    <tr key={String(row.__name || idx)} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                      {(selectedColumns.length > 0
-                        ? availableColumns.filter((c) => selectedColumns.includes(c.fieldname))
-                        : availableColumns
-                      ).map((col) => (
-                        <td key={col.fieldname} className="px-4 py-2 text-zinc-700 dark:text-zinc-300">
-                          {getColumnValue(row, col)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ResultsTable columns={shownColumns} rows={rows} />
 
           {reportData.chart && (
             <div className="border-t border-zinc-200 p-4 dark:border-zinc-700">
@@ -368,6 +221,164 @@ export function ReportQueryBuilder() {
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+type ReportField = NonNullable<ReportMeta["fields"]>[number];
+
+function FilterRow({
+  filter,
+  fields,
+  onUpdate,
+  onRemove,
+}: {
+  filter: ReportFilter;
+  fields: ReportField[];
+  onUpdate: (id: string, updates: Partial<ReportFilter>) => void;
+  onRemove: (id: string) => void;
+}) {
+  const set = (updates: Partial<ReportFilter>) => onUpdate(filter.id, updates);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={filter.fieldname} onValueChange={(value) => set({ fieldname: value })}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {fields.map((field) => (
+            <SelectItem key={field.fieldname} value={field.fieldname}>
+              {field.label || field.fieldname}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={filter.operator} onValueChange={(value) => set({ operator: value })}>
+        <SelectTrigger className="w-[140px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {FILTER_OPERATORS.map((op) => (
+            <SelectItem key={op.value} value={op.value}>
+              {op.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {filter.operator === "Between" ? (
+        <>
+          <Input value={filter.value} onChange={(e) => set({ value: e.target.value })} placeholder="From" className="w-[120px]" />
+          <Input value={filter.value2 || ""} onChange={(e) => set({ value2: e.target.value })} placeholder="To" className="w-[120px]" />
+        </>
+      ) : (
+        <Input value={filter.value} onChange={(e) => set({ value: e.target.value })} placeholder="Value" className="w-[140px]" />
+      )}
+
+      <Button variant="ghost" size="sm" onClick={() => onRemove(filter.id)}>
+        <Trash2 className="h-4 w-4 text-red-500" />
+      </Button>
+    </div>
+  );
+}
+
+function FilterList({
+  filters,
+  fields,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  filters: ReportFilter[];
+  fields: ReportField[];
+  onAdd: () => void;
+  onUpdate: (id: string, updates: Partial<ReportFilter>) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <Label>Filters</Label>
+        <Button variant="outline" size="sm" onClick={onAdd}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Filter
+        </Button>
+      </div>
+      {filters.length === 0 ? (
+        <p className="text-sm text-zinc-500">No filters applied.</p>
+      ) : (
+        <div className="space-y-2">
+          {filters.map((filter) => (
+            <FilterRow key={filter.id} filter={filter} fields={fields} onUpdate={onUpdate} onRemove={onRemove} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColumnPicker({ columns, selected, onToggle }: { columns: ReportColumn[]; selected: Set<string>; onToggle: (fieldname: string) => void }) {
+  return (
+    <div>
+      <Label className="mb-2 block">Columns</Label>
+      <div className="flex flex-wrap gap-2">
+        {columns.map((col) => (
+          <button
+            key={col.fieldname}
+            onClick={() => onToggle(col.fieldname)}
+            className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              selected.has(col.fieldname)
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+                : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700"
+            }`}
+          >
+            {col.label || col.fieldname}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function cellText(row: Record<string, unknown>, col: ReportColumn) {
+  return row[col.fieldname] !== undefined ? String(row[col.fieldname]) : "-";
+}
+
+function ResultsTable({ columns, rows }: { columns: ReportColumn[]; rows: Array<Record<string, unknown>> }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+            {columns.map((col) => (
+              <th key={col.fieldname} className="px-4 py-2 text-left text-xs font-medium text-zinc-500">
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-8 text-center text-sm text-zinc-500">
+                No results found.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              // report rows carry no id unless the report sets __name: fall back to the row object itself
+              <tr key={row.__name ? String(row.__name) : objectKey(row)} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                {columns.map((col) => (
+                  <td key={col.fieldname} className="px-4 py-2 text-zinc-700 dark:text-zinc-300">
+                    {cellText(row, col)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -32,6 +32,7 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
   React.useEffect(() => {
     onOpenChangeRef.current = onOpenChange;
   });
+  const setOpen = React.useCallback((next: boolean) => onOpenChangeRef.current(next), []);
   const close = React.useCallback(() => onOpenChangeRef.current(false), []);
   React.useEffect(() => {
     if (!open) return;
@@ -48,11 +49,13 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
       opener?.focus?.();
     };
   }, [open, close]);
+  const contextValue = React.useMemo(() => ({ open, setOpen, titleId, descriptionId, setWidth }), [open, setOpen, titleId, descriptionId]);
   return (
-    <DialogContext.Provider value={{ open, setOpen: onOpenChange, titleId, descriptionId, setWidth }}>
+    <DialogContext.Provider value={contextValue}>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} aria-hidden="true" />
+          {/* react-doctor-disable-next-line react-doctor/prefer-html-dialog -- showModal() puts the panel in the top layer, which would hide the body-portaled Link / Date pickers used inside dialogs */}
           <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className={`relative z-50 max-h-[90vh] w-full ${width} overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900`}>
             {children}
           </div>

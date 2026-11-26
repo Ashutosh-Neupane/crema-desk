@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { frappePost } from "@/lib/frappe/client";
+import { objectKey } from "@/components/desk/objectKey";
 import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
 import { Badge } from "@/components/shadcn/badge";
@@ -120,8 +121,9 @@ export function SystemConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.rows.map((row, i) => (
-                    <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800">
+                  {result.rows.map((row) => (
+                    // result rows have no id of their own: key by the row array, which is stable for this result
+                    <tr key={objectKey(row)} className="border-b border-zinc-100 dark:border-zinc-800">
                       {row.map((cell, j) => (
                         <td key={j} className="py-2 px-3 text-zinc-900 dark:text-zinc-100">
                           {cell === null ? <span className="text-zinc-400">NULL</span> : String(cell)}
@@ -152,9 +154,9 @@ export function SystemConsole() {
             </Button>
           </div>
           <div className="space-y-1">
-            {history.map((entry, i) => (
+            {history.map((entry) => (
               <button
-                key={i}
+                key={`${entry.timestamp}:${entry.query}`}
                 onClick={() => loadFromHistory(entry)}
                 className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
               >
