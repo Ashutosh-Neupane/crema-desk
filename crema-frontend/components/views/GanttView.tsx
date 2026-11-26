@@ -6,7 +6,7 @@
  * dragging a bar moves it, dragging its right edge changes the end; both save through
  * frappe.desk.gantt.update_task like Desk.
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -132,6 +132,16 @@ export default function GanttView({ doctype }: { doctype: string }) {
     return { ...b, start, end: end < start ? start : end };
   };
 
+  // Desk opens the chart at today and returns there when the scale changes or "Today" is pressed
+  // (views/gantt/gantt_view.js scroll_to_today; frappe-gantt `scroll_to: "today"`)
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const todayLeft = Math.max(0, x(day0(ymd(new Date()))!) - 3 * px);
+  const scrollToToday = () => timelineRef.current?.scrollTo({ left: todayLeft });
+  const hasBars = bars.length > 0;
+  useEffect(() => {
+    if (hasBars) timelineRef.current?.scrollTo({ left: todayLeft });
+  }, [hasBars, todayLeft]);
+
   if (error) return <p className="p-6 text-sm text-red-600">{(error as Error).message}</p>;
   if (!meta || !settings) return <div className="m-4 h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
   if (!fm?.start) return <p className="p-6 text-sm text-zinc-500">{doctype} has no date field for a Gantt chart.</p>;
@@ -169,6 +179,9 @@ export default function GanttView({ doctype }: { doctype: string }) {
             </button>
           ))}
         </div>
+        <button type="button" onClick={scrollToToday} className={btn}>
+          Today
+        </button>
         <FilterButton meta={meta} filters={filters} setFilters={setFilters} className={btn} />
       </div>
 
@@ -188,7 +201,7 @@ export default function GanttView({ doctype }: { doctype: string }) {
           {!rowsQ.isLoading && !bars.length && <p className="p-4 text-sm text-zinc-500">No {doctype} with dates</p>}
         </div>
         {/* timeline */}
-        <div className="min-w-0 flex-1 overflow-auto" onPointerMove={moveDrag} onPointerUp={() => void endDrag()}>
+        <div ref={timelineRef} className="min-w-0 flex-1 overflow-auto" onPointerMove={moveDrag} onPointerUp={() => void endDrag()}>
           <div className="relative" style={{ width }}>
             <div className="sticky top-0 z-10 h-9 border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
               {ticks.map((t) => (

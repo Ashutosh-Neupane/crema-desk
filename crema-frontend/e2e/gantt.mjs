@@ -19,6 +19,14 @@ await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: 
 await page.waitForURL(/\/view\/gantt/, { timeout: 60000 });
 const bar = page.getByRole("slider", { name: new RegExp(`^${tag}:`) });
 await bar.waitFor({ timeout: 60000 });
+// Desk opens the chart at today (views/gantt/gantt_view.js scroll_to_today), so a bar from tomorrow is in view
+const inView = await bar.evaluate((el) => {
+  const pane = el.closest(".overflow-auto").getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return r.left >= pane.left && r.left < pane.right;
+});
+check(inView, "chart opens at today (tomorrow's bar is in view horizontally)");
+await bar.scrollIntoViewIfNeeded(); // down to the row; many tasks may sit above it
 check((await bar.getAttribute("aria-label")).includes(`${ymd(addDays(base, 1))} to ${ymd(addDays(base, 3))}`), "bar spans the task dates");
 check((await bar.getAttribute("aria-valuenow")) === "40", "progress 40%");
 await shot("gantt", false);
