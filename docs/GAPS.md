@@ -36,7 +36,12 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M4 ✅ | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
 | M5 ✅ | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs`, `financials.mjs` | partly |
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
-| M7 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
+| M7 🟡 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
+
+M7 status (2026-11-26): ✅ DocForm and ListView split into hooks and parts; ✅ large lists measured (`e2e/largelist.mjs`);
+✅ suites read their data from the site (no names from one bench); React Doctor at 76 with 0 errors. Left to close
+phase 1: the last React Doctor areas (2.14), fix `gantt` (drag steps) and `reportgroupby` (item quantity check), both
+failing on main too, then `run-all.mjs` green twice in a row against a production build.
 
 ✅ **A day of work** — `e2e/dayofwork.mjs` does it through Crema's UI and checks the server after every step: buy
 (Purchase Order → Create → Purchase Receipt → Purchase Invoice → Payment), stock (a Stock Entry typed into a new
@@ -452,8 +457,17 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
 - ❌ **[Parity]** Auto Email Report setup, Notification (doctype) preview, Newsletter send/schedule dialogs.
 
 ### 2.14 Hardening
-- 🟡 React Doctor: 0 errors, score 57 (2026-11-18; was 35 with 7 errors); ~235 warnings left (complexity, index keys, Set lookups). Split DocForm/ListView further.
-- ❌ **[Parity]** Virtualized lists and report grids for large data.
+- 🟡 React Doctor: 0 errors, score 76, 58 warnings from 16 rules (2026-11-26; was 57 with 238 warnings on 2026-11-18).
+  ✅ 0 warnings in components/form, components/list, components/views, components/desk, components/print-builder,
+  lib/form, lib/desk-runtime, app/ and lib/frappe (#37, #39–#47); DocForm (complexity 146) and ListView (115) split
+  into hooks and parts. Left: lib/crema-form (35), components/features (11), components/shadcn (8), CommandPalette /
+  CremaShell / NotificationsPanel (4). The score counts which rules still fire anywhere, so it reaches 100 only when
+  the last rule is gone. Suppressions carry a one-line reason where a fix would break Desk parity (legacy page frame
+  sandbox, HTML field content, ordered route options, sequential bulk delete).
+- ✅ Large lists stay responsive (`e2e/largelist.mjs`, 1189 rows): the 500-row page renders in ~0.4 s, "Load more"
+  adds a page of the chosen size like Desk (`base_list.js` start += page_length), scrolling p95 frame gap 18 ms,
+  select-all on 1000 rows ~0.5–0.7 s (rows re-render only when their own data changes).
+- ❌ **[Parity]** Virtualized lists and report grids for 2000+ rows (`list_view_virtualization.js`).
 - ❌ **[P3-prep]** `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
 - ✅ Mobile layouts (M6): fluid spacing tokens (`--space-*` with `clamp()`, Tailwind `p-gutter` / `gap-field` …), form
   columns by container width (`@container`), sidebar closed on phones, compact header — no horizontal scroll at
@@ -467,6 +481,11 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
   buttons, greeting + user name) render after hydration.
 - ✅ Dialog width follows `max-w-*` on DialogContent (default max-w-lg).
 - ✅ Error reporting parity: server tracebacks behind **Details** for System Managers — `e2e/errordetails.mjs`.
+- 🟡 e2e on any site: suites take customers, items, warehouses, currency and series from the site and clean up in a
+  finally block (#33–#35). They SKIP only for environment limits, printed in the output: `realtime` without a socket.io
+  URL, the Server Script part of `errordetails` / `scripts.salesorder` when server scripts are disabled. Known failures
+  (also on main): `gantt` drag steps, `reportgroupby` item quantity check.
+- ✅ Agent / CI note: run e2e against `npm run build` + `next start`; a dev server grows to 10–20 GB on this app.
 
 ### 2.15 Field visibility rules (what decides if a field shows)
 Desk combines six rules; a field shows only if all of them allow it. Crema has each, listed so they can be audited
