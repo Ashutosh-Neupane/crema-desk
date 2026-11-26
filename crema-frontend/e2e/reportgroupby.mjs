@@ -53,7 +53,7 @@ await groupBtn().click();
 await grouped(() => page.getByLabel("Group by field").selectOption("Sales Order::customer"));
 await waitHeader("Count");
 let g = await groups();
-check(g.length === Object.keys(byCustomerCount).length, `one row per customer (${g.length})`);
+check(g.length === Math.min(Object.keys(byCustomerCount).length, 20), `one row per customer, first page (${g.length})`);
 check(g[0][0] === top(byCustomerCount)[0] && num(g[0][1]) === top(byCustomerCount)[1], `largest first: ${g[0].join(" = ")}`);
 check(g.every(([c, n]) => byCustomerCount[c] === num(n)), "every count matches the API");
 check((await groupBtn().innerText()).replace(/\s+/g, " ").includes("Grouped by Customer"), "button says Grouped by Customer");
@@ -80,7 +80,8 @@ await page.getByLabel("Group by field").selectOption("Sales Order Item::item_cod
 await grouped(() => page.getByLabel("Aggregate on").selectOption("Sales Order Item::qty"));
 await waitHeader("Sum of Quantity");
 g = await groups();
-check(g.length === Object.keys(byItemQty).length && g.every(([i, q]) => Math.abs(byItemQty[i] - num(q)) < 0.001), `item quantities match the API (${g[0].join(" = ")})`);
+// grouped results are paged like the rows (Desk base_list.js page_length, 20 by default): the first page is shown
+check(g.length === Math.min(Object.keys(byItemQty).length, 20) && g.every(([i, q]) => Math.abs(byItemQty[i] - num(q)) < 0.001), `item quantities match the API (${g[0].join(" = ")})`);
 await shot("reportgroupby_child", false);
 
 step("parent field over a child's numbers is refused (Desk's rule)");
@@ -100,7 +101,7 @@ step("a shared link opens grouped; reload keeps it");
 await saveReport({});
 await grouped(() => open(`?_group_by=${encodeURIComponent(JSON.stringify(["`tabSales Order`.`customer`", null, "count"]))}`));
 await waitHeader("Count");
-check((await groups()).length === Object.keys(byCustomerCount).length, "grouped by customer from the link");
+check((await groups()).length === Math.min(Object.keys(byCustomerCount).length, 20), "grouped by customer from the link");
 await page.waitForTimeout(1500);
 await page.reload({ waitUntil: "domcontentloaded" });
 await waitHeader("Count");
