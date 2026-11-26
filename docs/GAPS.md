@@ -795,6 +795,32 @@ Browser ◄── answer, confirm card, or the filled form
   read-only tools; (b) filled new form + confirm cards for update / submit / cancel; (c) setup changes through the
   builders; (d) timeline note, activity log and limits.
 
+### 3.10 Speed and Lighthouse
+Measured 2026-11-26 with Lighthouse 12.6 (desktop preset, logged in, one run per page), Frappe Desk on the bench vs
+Crema's production build (`next start`):
+
+| Page | Performance Desk → Crema | Accessibility Desk → Crema | Largest paint | Downloaded |
+|---|---|---|---|---|
+| Home `/desk` | 57 → 97 | 84 → 92 | 6.9 s → 1.2 s | 8.6 MB → 1.3 MB |
+| Sales Order list | 63 → 92 | 67 → 92 | 1.9 s → 1.9 s | 7.5 MB → 1.9 MB |
+| Sales Order form | 49 → 86 | 61 → 87 | 7.7 s → 2.6 s | 7.7 MB → 1.9 MB |
+| New Sales Invoice | 49 → 87 | 63 → 86 | 7.8 s → 2.4 s | 7.8 MB → 2.0 MB |
+| General Ledger | 53 → 90 | 72 → 92 | 7.2 s → 1.8 s | 7.2 MB → 1.4 MB |
+
+Best practices 96 everywhere; layout shift Desk 0.14–0.27, Crema ≤ 0.08. Caveat: the bench serves Desk's assets
+uncompressed (Lighthouse: 4.6 MB to save), so Desk behind nginx would score higher than shown.
+
+Goal: performance ≥ 95 and accessibility 100 on every page, desktop and phone. Work, in order:
+1. ❌ **[P2]** Compress Crema's own responses. `next start` gzips pages but not route handlers, so the Frappe proxy
+   (`lib/frappe/proxy.ts`), the site passthrough, the legacy-page route, the asset proxy and `/api/desk/context` go
+   out raw (Sales Order meta alone 573 KB; ~760 KB to save per form). One gzip helper for compressible types.
+2. ❌ **[P2]** Accessibility to 100: colour contrast, heading order, links without a name, labels that differ from the
+   visible text, `[role]` children without their parent role.
+3. ❌ **[P2]** Fewer requests (118–186 per page): batch the home / sidebar / form start-up calls.
+4. ❌ **[P2]** Form first paint (2.4–2.6 s): meta + doc loaded on the server (2.18 Server Components item).
+5. ❌ **[P2]** ~280 KB unused JavaScript per page, ~80 ms render-blocking CSS, 83 KB font (subset / `display: swap`).
+6. ❌ **[P2]** A Lighthouse script in `e2e/` (both apps, desktop and phone) whose numbers go into each phase 2 PR.
+
 ---
 
 ## 4. Phase 3 — Crema as a Frappe custom app
