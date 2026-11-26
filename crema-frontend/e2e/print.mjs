@@ -17,9 +17,9 @@ if (!SO) {
 console.log(`  data: ${SO}, formats ${JSON.stringify(formats)}, letter head ${LH}`);
 
 step("form → Print");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/${SO}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/sales-order/${SO}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("link", { name: "Print" }).click({ timeout: 90000 });
-await page.waitForURL(/\/desk\/print\/Sales%20Order\//, { timeout: 30000 });
+await page.waitForURL(/\/desk\/print\/sales-order\//, { timeout: 30000 });
 const preview = page.frameLocator(`iframe[title="Print preview of ${SO}"]`);
 const body = preview.locator("body");
 await body.waitFor({ timeout: 60000 });

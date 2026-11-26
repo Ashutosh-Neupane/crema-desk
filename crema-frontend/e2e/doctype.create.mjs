@@ -2,14 +2,14 @@
 // (from doctype_list.js primary_action, rendered by Crema's frappe.ui.Dialog)
 // → DocType inserted → DocType form opens to add fields → save → use it.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/doctype.create.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
 const NAME = `Crema Test ${Date.now().toString(36)}`;
 
 step("DocType list → Add opens the Create New DocType dialog");
-await page.goto(`${BASE}/desk/doctype/DocType`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/doctype`, { waitUntil: "domcontentloaded" });
 await page.getByRole("button", { name: /Add DocType/ }).click();
 const dlg = page.getByRole("dialog", { name: "Create New DocType" });
 await dlg.waitFor({ timeout: 20000 });
@@ -26,7 +26,7 @@ await page.getByRole("option", { name: MODULE, exact: true }).first().click();
 const custom = dlg.getByLabel(/Custom\?/);
 if (!(await custom.isChecked())) await custom.check();
 await dlg.getByRole("button", { name: "Create & Continue" }).click();
-await page.waitForURL(/\/desk\/doctype\/DocType\/Crema/, { timeout: 30000 });
+await page.waitForURL(/\/desk\/doctype\/Crema/, { timeout: 30000 });
 const created = (await api(`api/resource/DocType/${encodeURIComponent(NAME)}`)).data;
 check(created?.custom === 1 && created?.module === MODULE, `DocType created (custom=${created?.custom}, module=${created?.module})`);
 await page.waitForTimeout(3000);
@@ -52,7 +52,7 @@ check(fields.some((f) => f.fieldname === "book_title" && f.label === "Book Title
 check(fields.some((f) => f.fieldname === "pages" && f.label === "Pages" && f.fieldtype === "Int"), "pages saved as Int with its label");
 
 step("use the new DocType: create a record");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(NAME)}/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/${slug(NAME)}/new`, { waitUntil: "domcontentloaded" });
 try {
   await page.getByRole("textbox", { name: /^Book Title/ }).waitFor({ timeout: 60000 });
 } catch (e) {

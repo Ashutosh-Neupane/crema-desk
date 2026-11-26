@@ -18,7 +18,7 @@ const todo = (await post("frappe.client.insert", { doc: { doctype: "ToDo", descr
 const docinfo = async () => (await page.request.get(`${BASE}/api/frappe/api/method/frappe.desk.form.load.getdoc?doctype=ToDo&name=${todo}`).then((r) => r.json())).docinfo;
 const field = async (f) => (await post("frappe.client.get_value", { doctype: "ToDo", filters: { name: todo }, fieldname: [f] }))?.[f];
 
-await page.goto(`${BASE}/desk/doctype/ToDo/${todo}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/todo/${todo}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const side = page.getByRole("complementary", { name: "Document sidebar" });
 await side.waitFor({ timeout: 90000 });
 

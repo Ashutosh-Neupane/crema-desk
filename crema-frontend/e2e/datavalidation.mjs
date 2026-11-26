@@ -1,7 +1,7 @@
 // Data field `options` validation (Email / Phone / URL): Desk's message appears under the field,
 // the input is aria-invalid, and both clear when the value becomes valid.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/datavalidation.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -20,7 +20,7 @@ await post("frappe.client.insert", { doc: { doctype: "DocType", name: DT, module
 ], permissions: [{ role: "System Manager", read: 1, write: 1, create: 1, delete: 1 }] } });
 
 step("new doc: invalid values show Desk's message and aria-invalid");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 
 const email = page.getByLabel("Email", { exact: true });

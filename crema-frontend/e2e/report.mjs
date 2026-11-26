@@ -26,14 +26,14 @@ await from.press("Enter");
 await page.waitForTimeout(2500);
 const rows = await page.locator("tbody tr").count();
 check(rows > 0, `rows rendered (${rows})`);
-check(await page.locator("tbody a[href^='/desk/doctype/Sales%20Order/']").first().isVisible(), "Link column renders form links");
+check(await page.locator("tbody a[href^='/desk/sales-order/']").first().isVisible(), "Link column renders form links");
 check(await page.locator(".recharts-wrapper, .recharts-responsive-container").first().isVisible(), "chart rendered");
 check(await page.locator("tfoot").getByText("Total").isVisible(), "total row");
 await shot("report_so_analysis");
 
 step("search + sort");
 // a Sales Order from this site's data (any bench)
-const soName = (await page.locator("tbody a[href^='/desk/doctype/Sales%20Order/']").first().innerText()).trim();
+const soName = (await page.locator("tbody a[href^='/desk/sales-order/']").first().innerText()).trim();
 await page.getByLabel("Search in report").fill(soName);
 await page.waitForTimeout(400);
 const filtered = await page.locator("tbody tr").count();
@@ -41,8 +41,8 @@ check(filtered > 0 && filtered < rows, `search narrows rows (${filtered}/${rows}
 await page.getByLabel("Search in report").fill("");
 
 step("link click navigates in-app");
-await page.locator("tbody a[href^='/desk/doctype/Sales%20Order/']").first().click();
-await page.waitForURL(/\/desk\/doctype\/Sales%20Order\/SAL-ORD-/, { timeout: 30000 });
+await page.locator("tbody a[href^='/desk/sales-order/']").first().click();
+await page.waitForURL(/\/desk\/sales-order\/SAL-ORD-/, { timeout: 30000 });
 check(true, "opened Sales Order form");
 
 step("General Ledger: Select filters + rows");

@@ -2,7 +2,7 @@
 // <input type="time">: typing "2:30 pm" stores 14:30:00, picking from the columns changes one part, Now and Clear,
 // Datetime's time part, saved values checked through the API.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/timepicker.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -29,7 +29,7 @@ const timeFormat = (await post("frappe.client.get_single_value", { doctype: "Sys
 const secs = timeFormat.includes("ss");
 
 step("new form: no native time inputs");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const starts = page.getByLabel("Starts", { exact: true });
 await starts.waitFor({ timeout: 90000 });
 check((await page.locator('input[type="time"]').count()) === 0, "no <input type=time> on the form");

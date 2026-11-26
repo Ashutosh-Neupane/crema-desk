@@ -20,7 +20,7 @@ const so = (await api("api/resource/Sales Order", { data: { company, customer, d
 check(!!so, `draft Sales Order ${so}`);
 
 step("new Print Format → Name field (autoname Prompt) is required");
-await page.goto(`${BASE}/desk/doctype/Print%20Format/new`);
+await page.goto(`${BASE}/desk/print-format/new`);
 await page.getByRole("heading", { name: "New Print Format" }).waitFor({ timeout: 90000 });
 await page.waitForTimeout(1500);
 check(await field("Name").isVisible(), "Name field shown on the new form");
@@ -42,7 +42,7 @@ const editor = page.locator('[id$="html"] .cm-content').first();
 await editor.click();
 await page.keyboard.insertText("<h2>ORDER SLIP {{ doc.name }}</h2><p>Customer: {{ doc.customer_name }}</p><p>Items: {{ doc.items|length }}</p>");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL((u) => u.pathname.endsWith(`/Print%20Format/${encodeURIComponent(PF)}`) || u.pathname.endsWith(`/${PF.replace(/ /g, "%20")}`), { timeout: 30000 });
+await page.waitForURL((u) => u.pathname.endsWith(`/print-format/${encodeURIComponent(PF)}`) || u.pathname.endsWith(`/${PF.replace(/ /g, "%20")}`), { timeout: 30000 });
 const saved = (await api(`api/resource/Print Format/${encodeURIComponent(PF)}`)).data;
 check(saved?.doc_type === "Sales Order" && saved?.custom_format === 1 && saved?.print_format_type === "Jinja", `saved: ${saved?.doc_type}, custom ${saved?.custom_format}, ${saved?.print_format_type}`);
 check(/ORDER SLIP/.test(saved?.html ?? ""), "template stored in html");
@@ -60,7 +60,7 @@ check(!/\{\{|<h2>|<p>/.test(text), "no template or tags shown as text");
 await shot("printformat_custom", false);
 
 step("read-only Text Editor value renders as HTML on the form");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/${so}`);
+await page.goto(`${BASE}/desk/sales-order/${so}`);
 await page.getByRole("tab", { name: "Address & Contact" }).click({ timeout: 90000 });
 await page.waitForTimeout(800);
 const address = page.locator(".crema-rich").first();

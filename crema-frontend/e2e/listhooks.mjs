@@ -5,7 +5,7 @@
 //    add_inner_button groups, add_action_item + get_checked_items, set_indicator, refresh(listview) with
 //    get_filter_value, filter_area.add / clear
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/listhooks.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -15,7 +15,7 @@ const DT = "Crema Hooks";
 const q = (o) => encodeURIComponent(JSON.stringify(o));
 // Task is a tree DocType: Desk (and Crema) open those in Tree view unless the list is asked for
 const openList = async (doctype) => {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(doctype)}${doctype === "Task" ? "?view=list" : ""}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(doctype)}${doctype === "Task" ? "?view=list" : ""}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.locator("tbody tr").first().waitFor({ timeout: 90000 });
 };
 const errors = [];
@@ -66,11 +66,11 @@ const open = todoRow.locator(`[data-row-button="${todo}"]`);
 check((await open.innerText()) === "Open" && (await open.getAttribute("title")) === `Open Task: ${tasks[0]}`, "row button label + description");
 await shot("listhooks_todo", false);
 await open.click();
-await page.waitForURL(new RegExp(`/Task/${tasks[0]}`), { timeout: 15000 }).catch(() => {});
-check(page.url().includes(`/Task/${tasks[0]}`), "row button opened the Task");
+await page.waitForURL(new RegExp(`/task/${tasks[0]}`), { timeout: 15000 }).catch(() => {});
+check(page.url().includes(`/task/${tasks[0]}`), "row button opened the Task");
 
 step("tree DocType list keeps ?view=list and both kinds of URL filter");
-await page.goto(`${BASE}/desk/doctype/Task?view=list&status=Open&filters=${q([["Task", "priority", "!=", "Urgent"]])}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/task?view=list&status=Open&filters=${q([["Task", "priority", "!=", "Urgent"]])}`, { waitUntil: "domcontentloaded" });
 await page.getByRole("button", { name: /Remove .*Status/ }).waitFor({ timeout: 60000 }).catch(() => {});
 await page.waitForTimeout(1500);
 check(page.url().includes("view=list") && !page.url().includes("/view/tree"), "still the list (view=list kept)");

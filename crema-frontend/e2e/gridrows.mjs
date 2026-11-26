@@ -1,6 +1,6 @@
 // Grid row operations: Insert Above/Below, multi-select Delete, select-all, _add/_remove events, read-only.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/gridrows.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -43,7 +43,7 @@ const get = (name) => post("frappe.client.get", { doctype: P, name });
 const items = (d) => (d?.rows ?? []).map((r) => r.item).join(",");
 const idxOk = (d) => (d?.rows ?? []).every((r, i) => r.idx === i + 1);
 const open = async (name) => {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(P)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(P)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("checkbox", { name: "Select all rows" }).or(page.getByRole("button", { name: "Edit row 1", exact: true })).first().waitFor({ timeout: 120000 });
 };
 const save = async () => {

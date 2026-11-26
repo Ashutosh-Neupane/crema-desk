@@ -2,13 +2,13 @@
 // list's sort (newest first by default), "No further records" at the end, Shift+Ctrl+> shortcut; a missing document
 // shows "Not found" and a 403 shows "Not permitted" (pageview.js show_not_permitted) instead of a raw error.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/formnav.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
 const DT = "Crema Nav Doc";
-const url = (n) => `${BASE}/desk/doctype/${encodeURIComponent(DT)}/${n}`;
+const url = (n) => `${BASE}/desk/${slug(DT)}/${n}`;
 
 async function cleanup() {
   for (const d of (await post("frappe.client.get_list", { doctype: DT, fields: ["name"] }).catch(() => [])) ?? []) await post("frappe.client.delete", { doctype: DT, name: d.name });

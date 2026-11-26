@@ -8,7 +8,7 @@
 //            longer lists the paid invoice
 // Customer, supplier, item and warehouse come from the site; everything created is cancelled and deleted at the end.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/dayofwork.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -34,7 +34,7 @@ const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 
 const open = async (dt, name) => {
-  await page.goto(`${BASE}/desk/doctype/${enc(dt)}/${enc(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(dt)}/${enc(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   // the heading shows the title (party name); a submitted document is ready once ERPNext's Create group is up
   await page.getByRole("button", { name: /^Create/ }).first().waitFor({ timeout: 90000 });
   await page.waitForTimeout(1500);
@@ -64,7 +64,7 @@ const setLink = async (label, value) => {
 /** Save (→ the saved name in the URL), then Submit → Yes; returns the submitted doc from the server */
 const saveSubmit = async (dt) => {
   await page.getByRole("button", { name: /^Save$/ }).click();
-  await page.waitForURL((u) => u.pathname.startsWith(`/desk/doctype/${enc(dt)}/`) && !u.pathname.endsWith("/new"), { timeout: 60000 });
+  await page.waitForURL((u) => u.pathname.startsWith(`/desk/${slug(dt)}/`) && !u.pathname.endsWith("/new"), { timeout: 60000 });
   const name = decodeURIComponent(page.url().split("?")[0].split("/").pop());
   made.push([dt, name]);
   await page.getByRole("button", { name: /^Submit$/ }).waitFor({ timeout: 30000 });
@@ -109,7 +109,7 @@ try {
 
   // ── stock ──────────────────────────────────────────────────────────────────────────────────────────────
   step("stock: new Stock Entry (Material Receipt) typed in");
-  await page.goto(`${BASE}/desk/doctype/Stock%20Entry/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/stock-entry/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: "New Stock Entry" }).waitFor({ timeout: 90000 });
   await page.waitForTimeout(1500);
   await setLink("Stock Entry Type", "Material Receipt");

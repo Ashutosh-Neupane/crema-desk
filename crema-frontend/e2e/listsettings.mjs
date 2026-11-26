@@ -29,7 +29,7 @@ if (!(await post("frappe.client.get_count", { doctype: "ToDo" }))) seeded = (awa
 const headers = async () => (await page.locator("table thead th").allInnerTexts()).map((s) => s.trim());
 
 step("open the ToDo list and read the default columns");
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 240000 });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 240000 });
 await page.locator("table tbody tr").first().waitFor({ timeout: 240000 });
 const before = await headers();
 console.log("  headers:", JSON.stringify(before));
@@ -92,7 +92,7 @@ await page.locator("table tbody tr").first().waitFor({ timeout: 120000 });
 check((await headers()).some((h) => /\d+ of \d+/.test(h)), "count back after restoring");
 
 step("user settings: set a filter + sort");
-await page.goto(`${BASE}/desk/doctype/ToDo?priority=High`, { waitUntil: "domcontentloaded", timeout: 120000 });
+await page.goto(`${BASE}/desk/todo?priority=High`, { waitUntil: "domcontentloaded", timeout: 120000 });
 await page.getByLabel("Sort by").waitFor({ timeout: 60000 });
 await page.getByLabel("Sort by").selectOption("creation");
 await page.getByRole("button", { name: "Descending" }).click(); // -> ascending
@@ -109,7 +109,7 @@ check(JSON.stringify(us?.filters ?? []).includes('"priority","=","High"'), "filt
 check((await getUS()).last_view === "List", "last_view = List saved");
 
 step("bare list URL restores filter + sort");
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 120000 });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 120000 });
 await page.waitForFunction(() => decodeURIComponent(location.search).includes("priority=High"), null, { timeout: 60000 });
 check(true, `URL gained the saved filter (${decodeURIComponent(new URL(page.url()).search)})`);
 check((await page.getByLabel("Sort by").inputValue()) === "creation", "sort field restored (creation)");
@@ -118,7 +118,7 @@ check(await page.getByRole("button", { name: "Remove Priority filter" }).isVisib
 await shot("ls_restored");
 
 step("explicit ?field=value URL wins over the saved filter");
-await page.goto(`${BASE}/desk/doctype/ToDo?status=Cancelled`, { waitUntil: "domcontentloaded", timeout: 120000 });
+await page.goto(`${BASE}/desk/todo?status=Cancelled`, { waitUntil: "domcontentloaded", timeout: 120000 });
 await page.getByRole("button", { name: "Remove Status filter" }).waitFor({ timeout: 60000 });
 await page.waitForTimeout(1500);
 const u = decodeURIComponent(new URL(page.url()).search);

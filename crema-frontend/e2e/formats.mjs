@@ -3,7 +3,7 @@
 // scripts (format_currency, frappe.format) must follow; Datetime shows in the user's time zone. Settings are
 // restored at the end.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/formats.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -46,7 +46,7 @@ try {
   const expectAt = sys?.time_zone === "Asia/Kathmandu" && tz?.time_zone === "Asia/Kolkata" ? "21-10-2026 11:45" : null;
 
   step("list cells");
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(DT)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   const row = page.locator("#main-content").getByRole("row").filter({ hasText: "12,34,567.50" });
   await row.first().waitFor({ timeout: 60000 });
   const text = await row.first().innerText();
@@ -58,7 +58,7 @@ try {
   await shot("formats_list");
 
   step("form fields and inputs");
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${rec.name}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/desk/${slug(DT)}/${rec.name}`, { waitUntil: "domcontentloaded" });
   const amount = page.getByRole("textbox", { name: "Amount" });
   await amount.waitFor({ timeout: 60000 });
   check((await amount.inputValue()) === "₨ 12,34,567.50", `Amount input shows ${await amount.inputValue()}`);

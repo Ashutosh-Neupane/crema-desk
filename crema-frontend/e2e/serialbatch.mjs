@@ -64,7 +64,7 @@ if (!se?.name) {
 }
 
 step("open the draft in Crema and click the row's Add Serial / Batch No");
-await page.goto(`${BASE}/desk/doctype/Stock%20Entry/${encodeURIComponent(se.name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/stock-entry/${encodeURIComponent(se.name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("button", { name: "Edit row 1", exact: true }).waitFor({ timeout: 180000 });
 await page.getByRole("button", { name: "Edit row 1", exact: true }).click();
 const addBtn = page.getByRole("button", { name: "Add Serial / Batch No" });

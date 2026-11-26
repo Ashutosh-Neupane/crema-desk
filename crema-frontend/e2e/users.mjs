@@ -11,12 +11,12 @@ const PROFILE = `Crema E2E Profile ${Date.now() % 100000}`;
 await post("frappe.client.delete", { doctype: "Role Profile", name: PROFILE });
 
 step("create the user in the form");
-await page.goto(`${BASE}/desk/doctype/User/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/user/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: "New User" }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Email/ }).first().fill(EMAIL);
 await page.getByRole("textbox", { name: /^First Name/ }).first().fill("Crema Tester");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(new RegExp(`/User/${encodeURIComponent(EMAIL).replace(/\./g, "\\.")}`), { timeout: 60000 });
+await page.waitForURL(new RegExp(`/user/${encodeURIComponent(EMAIL).replace(/\./g, "\\.")}`), { timeout: 60000 });
 check(true, `user ${EMAIL} created`);
 
 step("roles + modules editors");
@@ -48,7 +48,7 @@ const u2 = await post("frappe.client.get", { doctype: "User", name: EMAIL });
 check(!(u2?.roles ?? []).some((x) => x.role === "Stock User"), "Stock User removed");
 
 step("Role Profile with the same editor");
-await page.goto(`${BASE}/desk/doctype/Role%20Profile/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/role-profile/new`, { waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { name: "New Role Profile" }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Role Name/ }).first().fill(PROFILE);
 const pr = page.getByRole("group", { name: "Roles" });

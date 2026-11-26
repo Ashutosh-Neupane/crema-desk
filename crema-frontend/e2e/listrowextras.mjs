@@ -2,7 +2,7 @@
 // assignee avatars that filter, a like heart per row and the "liked by me" filter, unread rows bold for a DocType that
 // tracks who opened each record (track_seen) — and opening a record clears it.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/listrowextras.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -34,7 +34,7 @@ check(r.ok(), `comment on Alpha (${r.status()})`);
 
 const row = (name) => page.locator("tbody tr").filter({ has: page.getByRole("link", { name, exact: true }) });
 const openList = async (q = "") => {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(DT)}${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await row("Alpha").waitFor({ timeout: 90000 });
 };
 await openList();

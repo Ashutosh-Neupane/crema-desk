@@ -21,7 +21,7 @@ check(!!so, `draft Sales Order ${so} with ${items.length} items`);
 await page.setViewportSize({ width: 390, height: 844 });
 
 step("list at 390px: cards, folded filters");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const cards = page.getByRole("list", { name: "Sales Order list" });
 await cards.waitFor({ timeout: 90000 });
 await cards.getByRole("listitem").first().waitFor({ timeout: 30000 });
@@ -38,8 +38,8 @@ await shot("mobile_list", false);
 
 step("tap a card → its form");
 await cards.getByRole("link", { name: new RegExp(customer) }).first().click();
-await page.waitForURL(/\/desk\/doctype\/Sales%20Order\/SAL-/, { timeout: 30000 });
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/${so}`, { waitUntil: "domcontentloaded" });
+await page.waitForURL(/\/desk\/sales-order\/SAL-/, { timeout: 30000 });
+await page.goto(`${BASE}/desk/sales-order/${so}`, { waitUntil: "domcontentloaded" });
 
 step("form at 390px: actions in the bottom bar, items as cards");
 const bar = page.getByRole("toolbar", { name: "Document actions" });
@@ -75,7 +75,7 @@ await page.setViewportSize({ width: 1280, height: 900 });
 await page.waitForTimeout(500);
 check(!(await page.getByRole("toolbar", { name: "Document actions" }).count()), "no bottom bar on desktop");
 check(!(await page.getByRole("list", { name: "Items rows" }).count()), "inline grid on desktop");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded" });
 await page.locator("table").first().waitFor({ timeout: 60000 });
 check(true, "list is a table on desktop");
 

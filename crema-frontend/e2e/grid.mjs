@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -29,7 +29,7 @@ const csv = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "crema-grid-")), "ro
 fs.writeFileSync(csv, ["Item,Qty", ...Array.from({ length: 55 }, (_, i) => `"Row ${i + 1}, x",${i + 1}`)].join("\n"));
 
 step("new doc: upload 55 rows from CSV");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(P)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(P)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${P}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Grid test");
 await page.getByLabel("Upload rows to Rows").setInputFiles(csv);
@@ -52,7 +52,7 @@ void r1;
 
 step("save → server order and values");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(new RegExp(`${encodeURIComponent(P)}/(?!new)`), { timeout: 60000 });
+await page.waitForURL(new RegExp(`${slug(P)}/(?!new)`), { timeout: 60000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const doc = await post("frappe.client.get", { doctype: P, name });
 check(doc?.rows?.length === 55, `55 rows saved (${doc?.rows?.length})`);

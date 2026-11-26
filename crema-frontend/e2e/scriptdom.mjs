@@ -1,7 +1,7 @@
 // L2 script DOM: real jQuery in HTML fields — a Client Script draws markup, binds clicks, calls a missing
 // plugin (must not abort), and sets HTML via set_df_property.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/scriptdom.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -36,7 +36,7 @@ frappe.ui.form.on("${DT}", {
 });` } });
 
 step("new doc: script draws into the HTML field");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 const box = page.locator(".crema-box");
 await box.waitFor({ timeout: 20000 });

@@ -3,7 +3,7 @@
 // picking values asks for the quantity, adds rows (row events run), and a value already in the table gets the new
 // quantity instead of a second row. The grid's set_query filters apply to the search. Saved rows checked via API.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/gridmulti.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -68,7 +68,7 @@ frappe.ui.form.on(${JSON.stringify(CHILD)}, {
 });
 check(r.ok(), `Client Script (${r.status()})`);
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${PARENT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Add multiple");
 
@@ -118,7 +118,7 @@ await shot("gridmulti_rows", false);
 
 step("save → rows in the database");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(new RegExp(`${encodeURIComponent(PARENT)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(PARENT)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const doc = (await api(`api/resource/${encodeURIComponent(PARENT)}/${name}`)).data;
 const saved = (doc?.lines ?? []).map((l) => [l.currency, l.qty, l.note]);
@@ -127,7 +127,7 @@ check(JSON.stringify(saved) === JSON.stringify([[A, 15, `event:${A}`], [B, 2, `e
 
 step("no script → no Add Multiple");
 await post("frappe.client.set_value", { doctype: "Client Script", name: SCRIPT, fieldname: "enabled", value: 0 });
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${PARENT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("button", { name: "Add row" }).waitFor({ timeout: 30000 });
 check(!(await page.getByRole("button", { name: "Add Multiple" }).isVisible()), "hidden without set_multiple_add");

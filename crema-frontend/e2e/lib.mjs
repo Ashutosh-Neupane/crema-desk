@@ -3,6 +3,8 @@ import { chromium } from "@playwright/test";
 import fs from "node:fs";
 
 export const BASE = process.env.BASE ?? "http://localhost:3001";
+/** Desk's URL slug for a doctype or workspace (router.slug): "Sales Invoice" → "sales-invoice", URL-encoded */
+export const slug = (name) => encodeURIComponent(String(name).toLowerCase().replace(/ /g, "-"));
 export const OUT = process.env.OUT ?? "./smoke-shots";
 
 export async function start() {

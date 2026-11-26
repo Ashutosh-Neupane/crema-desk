@@ -1,6 +1,6 @@
 // Awesomebar (⌘K) special results, transcribed from Desk's awesome_bar.js / search_utils.js:
-//   "new todo" → "New ToDo" → /desk/doctype/ToDo/new; "3*7+2" → "3*7+2 = 23" (copies 23);
-//   "crema in todo" → "Find crema in ToDo" → /desk/doctype/ToDo?q=crema
+//   "new todo" → "New ToDo" → /desk/todo/new; "3*7+2" → "3*7+2 = 23" (copies 23);
+//   "crema in todo" → "Find crema in ToDo" → /desk/todo?q=crema
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/awesomebar.mjs
 // Logs in through the API and starts on a list page (lib.mjs start() waits for the /desk home page, which
 // was not rendering on the shared dev server while this was written).
@@ -40,7 +40,7 @@ const openPalette = async () => {
 };
 
 step("open the palette with the shortcut");
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await openPalette();
 check(await input().isVisible(), "⌘K opens the awesomebar");
 
@@ -50,11 +50,11 @@ await option("New ToDo").waitFor({ timeout: 30000 });
 check(await option("New ToDo").isVisible(), "\"New ToDo\" listed for \"new todo\"");
 await shot("awesomebar_new");
 await option("New ToDo").click();
-await page.waitForURL(/\/desk\/doctype\/ToDo\/new$/, { timeout: 60000 });
-check(true, "selecting it opens /desk/doctype/ToDo/new");
+await page.waitForURL(/\/desk\/todo\/new$/, { timeout: 60000 });
+check(true, "selecting it opens /desk/todo/new");
 
 step("calculator: 3*7+2 = 23, copies the result");
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded" });
 await openPalette();
 await input().fill("3*7+2");
 const calcRow = page.getByRole("option", { name: /3\*7\+2 = 23/ });
@@ -68,14 +68,14 @@ check(!(await input().isVisible().catch(() => false)), "palette closes after cop
 
 step("crema in todo → Find crema in ToDo → ToDo list filtered by the text");
 // start on the ToDo list itself: the list must follow ?q= without remounting
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded" });
 await openPalette();
 await input().fill("crema in todo");
 await option("Find crema in ToDo").waitFor({ timeout: 15000 });
 check(await option("Find crema in ToDo").isVisible(), "\"Find crema in ToDo\" listed");
 await option("Find crema in ToDo").click();
-await page.waitForURL(/\/desk\/doctype\/ToDo\?q=crema$/, { timeout: 60000 });
-check(true, "routes to /desk/doctype/ToDo?q=crema");
+await page.waitForURL(/\/desk\/todo\?q=crema$/, { timeout: 60000 });
+check(true, "routes to /desk/todo?q=crema");
 await page.waitForFunction(() => [...document.querySelectorAll("input")].some((i) => i.placeholder?.startsWith("Search") && i.value === "crema"), null, { timeout: 30000 }).then(() => check(true, "the list's search box holds \"crema\""), () => check(false, "the list's search box holds \"crema\""));
 await shot("awesomebar_find");
 

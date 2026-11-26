@@ -73,7 +73,7 @@ check(r.ok(), `Server Script (Before Save) created (${r.status()})`);
 }
 
 step("new Sales Order: refresh handler ran");
-await page.goto(`${BASE}/desk/doctype/Sales%20Order/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/sales-order/new`, { waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { name: "New Sales Order" }).waitFor({ timeout: 90000 });
 await page.waitForTimeout(1500);
 check(await page.getByText("Crema client script active").isVisible(), "frm.set_intro shown");
@@ -151,7 +151,7 @@ await jumpTo("Customer's Purchase Order");
 await po.fill(PO_AUTO);
 await po.press("Tab");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(/Sales%20Order\/SAL-ORD-/, { timeout: 30000 });
+await page.waitForURL(/sales-order\/SAL-ORD-/, { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 saved = name;
 const so = (await api(`api/resource/Sales Order/${encodeURIComponent(name)}`)).data;

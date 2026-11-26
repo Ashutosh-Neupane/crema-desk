@@ -13,6 +13,10 @@ let names = [];
 async function cleanup() {
   const rows = (await post("frappe.client.get_list", { doctype: "ToDo", filters: [["description", "like", `%${PFX}%`]], fields: ["name"], limit_page_length: 0 })) ?? [];
   for (const r of rows) await post("frappe.client.delete", { doctype: "ToDo", name: r.name });
+  // the assignments made below are ToDos too ("lsb assignment"). Frappe removes a deleted document's assignments in a
+  // background job (model/delete_doc.py delete_dynamic_links, enqueued), which a site without workers never runs
+  const assigned = (await post("frappe.client.get_list", { doctype: "ToDo", filters: [["description", "=", "lsb assignment"], ["reference_type", "=", "ToDo"]], fields: ["name"], limit_page_length: 0 })) ?? [];
+  for (const r of assigned) await post("frappe.client.delete", { doctype: "ToDo", name: r.name });
   await post("frappe.client.delete", { doctype: "Tag", name: TAG });
   await post("frappe.model.utils.user_settings.save", { doctype: "ToDo", user_settings: JSON.stringify({ group_by_fields: null }) });
 }
@@ -33,7 +37,7 @@ const apiOwner = (await apiCounts("owner")).find((r) => r.name === "Administrato
 console.log(`  API: assigned_to Administrator=${apiAssigned}, owner Administrator=${apiOwner}`);
 check(apiOwner >= 4, "API owner count covers the seeded rows");
 
-const url = `${BASE}/desk/doctype/ToDo?filters=${encodeURIComponent(JSON.stringify(filt))}`;
+const url = `${BASE}/desk/todo?filters=${encodeURIComponent(JSON.stringify(filt))}`;
 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 240000 });
 const grp = page.getByRole("group", { name: "List sidebar" });
 await grp.waitFor({ timeout: 240000 });

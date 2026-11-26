@@ -3,7 +3,7 @@
 // script fills with jQuery), reset on every refresh (no duplicates after save), and Desk's "Submit this document
 // to confirm" for a saved draft of a submittable doctype.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/dashboard.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -40,7 +40,7 @@ const rec = await post("frappe.client.insert", { doc: { doctype: DT, qty: 3 } })
 const main = page.locator("#main-content");
 
 step("headlines");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${rec.name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${rec.name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await main.getByText("Intro two").waitFor({ timeout: 90000 });
 check(!(await main.getByText("Intro one").count()), "set_intro replaces its previous intro");
 check(await main.getByText("Submit this document to confirm").isVisible(), "Desk's submit message for a saved draft");

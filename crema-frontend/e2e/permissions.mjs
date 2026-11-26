@@ -2,7 +2,7 @@
 // Only if Creator, filter by role, users of a role, remove, restore originals — each verified via the API.
 // Also frappe.set_route from a Client Script: Desk page routes and route_options.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/permissions.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -25,7 +25,7 @@ await post("frappe.client.insert", { doc: { doctype: "DocType", name: DT, module
 ], permissions: [{ role: "System Manager", read: 1, write: 1, create: 1, delete: 1 }] } });
 
 step("open with a doctype in the route");
-await page.goto(`${BASE}/desk/page/permission-manager/${encodeURIComponent(DT)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/permission-manager/${encodeURIComponent(DT)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: "Role Permissions Manager" }).waitFor({ timeout: 90000 });
 const table = page.getByRole("table", { name: "Permission rules" });
 await table.waitFor({ timeout: 30000 });
@@ -74,7 +74,7 @@ check(true, "users dialog");
 await page.keyboard.press("Escape");
 
 step("filter by role");
-await page.goto(`${BASE}/desk/page/permission-manager/${encodeURIComponent(DT)}?role=${encodeURIComponent(ROLE)}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/permission-manager/${encodeURIComponent(DT)}?role=${encodeURIComponent(ROLE)}`, { waitUntil: "domcontentloaded" });
 await table.waitFor({ timeout: 30000 });
 check((await table.getByRole("row").count()) === 2, "only the role's rule shown (header + 1)");
 
@@ -84,7 +84,7 @@ await page.getByText("No Permissions set for this criteria.").waitFor({ timeout:
 check(!(await rule(ROLE)), "rule removed on the server");
 
 step("restore original permissions");
-await page.goto(`${BASE}/desk/page/permission-manager/${encodeURIComponent(DT)}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/permission-manager/${encodeURIComponent(DT)}`, { waitUntil: "domcontentloaded" });
 await table.waitFor({ timeout: 30000 });
 await table.getByRole("row", { name: `${DT} System Manager level 0` }).getByRole("group").getByLabel("Delete", { exact: true }).uncheck();
 await page.waitForTimeout(1500);
@@ -106,13 +106,13 @@ frappe.ui.form.on("${DT}", {
     frm.add_custom_button("Qty 5 List", () => { frappe.route_options = { qty: 5 }; frappe.set_route("List", frm.doctype); });
   },
 });` } });
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded" });
 await page.getByRole("button", { name: "Open Permissions" }).click({ timeout: 60000 });
-await page.waitForURL(/\/desk\/page\/permission-manager\/Crema/, { timeout: 30000 });
+await page.waitForURL(/\/desk\/permission-manager\/Crema/, { timeout: 30000 });
 check(true, "set_route(page, doctype) → native Permission Manager");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded" });
 await page.getByRole("button", { name: "Qty 5 List" }).click({ timeout: 60000 });
-await page.waitForURL(/\/desk\/doctype\/Crema%20Perm%20Test\?qty=5$/, { timeout: 30000 });
+await page.waitForURL(/\/desk\/crema-perm-test\?qty=5$/, { timeout: 30000 });
 check(true, "route_options → list filter in the URL");
 
 step("cleanup");

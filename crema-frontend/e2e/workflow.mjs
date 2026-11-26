@@ -2,7 +2,7 @@
 // apply_workflow transitions (docstatus follows the state), end of workflow; the workflow bar (stepper, "Waiting on
 // you" buttons, condition hint, history), Desk's Help dialog, Workflow Action list rows opening the document.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/workflow.mjs
-import { start, BASE, OUT } from "./lib.mjs";
+import { start, BASE, OUT, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -71,11 +71,11 @@ r = await post("frappe.client.insert", {
 check(r.ok(), `Workflow created (${r.status()})`);
 
 async function newDoc(title) {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
   await page.getByRole("textbox", { name: /^Title/ }).fill(title);
   await page.getByRole("button", { name: /^Save$/ }).click();
-  await page.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });
+  await page.waitForURL(new RegExp(`${slug(DT)}/(?!new)`), { timeout: 30000 });
   await page.waitForTimeout(1500);
   return decodeURIComponent(page.url().split("/").pop());
 }
@@ -130,12 +130,12 @@ check(!(await page.getByRole("region", { name: "Waiting on you" }).isVisible()),
 
 step("Workflow Action list: an open action opens the document");
 const b = await newDoc("Reject me");
-await page.goto(`${BASE}/desk/doctype/Workflow%20Action?reference_name=${encodeURIComponent(b)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/workflow-action?reference_name=${encodeURIComponent(b)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const waRow = page.getByRole("link", { name: b }).first();
 await waRow.waitFor({ timeout: 60000 });
 check(true, "Workflow Action row for the pending doc");
 await waRow.click();
-await page.waitForURL(new RegExp(`${encodeURIComponent(DT).replace(/%20/g, "(%20| )")}/${b}`), { timeout: 60000 }).catch(() => {});
+await page.waitForURL(new RegExp(`${slug(DT)}/${b}`), { timeout: 60000 }).catch(() => {});
 check(decodeURIComponent(page.url()).includes(`${DT}/${b}`), `row opened the document (${decodeURIComponent(page.url()).replace(BASE, "")})`);
 await page.getByRole("region", { name: "Waiting on you" }).waitFor({ timeout: 30000 });
 
@@ -174,10 +174,10 @@ await p2.fill("input:not([type=password])", USER);
 await p2.fill("input[type=password]", USER_PASS);
 await p2.click("button[type=submit]");
 await p2.waitForURL(/\/desk/, { timeout: 120000 });
-await p2.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await p2.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await p2.getByRole("textbox", { name: /^Title/ }).fill("Mine to approve");
 await p2.getByRole("button", { name: /^Save$/ }).click();
-await p2.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });
+await p2.waitForURL(new RegExp(`${slug(DT)}/(?!new)`), { timeout: 30000 });
 const own = decodeURIComponent(p2.url().split("/").pop());
 const w2 = p2.getByRole("region", { name: "Waiting on you" });
 await w2.waitFor({ timeout: 30000 });

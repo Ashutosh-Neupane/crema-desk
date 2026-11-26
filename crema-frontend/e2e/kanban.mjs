@@ -25,7 +25,7 @@ for (const n of [1, 2]) {
 check(names.length === 2, `created ${names.join(", ")}`);
 
 step("create a board from the Kanban view");
-await page.goto(`${BASE}/desk/doctype/ToDo`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Kanban" }).click();
 await page.waitForURL(/\/view\/kanban/, { timeout: 30000 });
 await page.getByRole("button", { name: "New Kanban Board" }).click({ timeout: 30000 });
@@ -66,13 +66,13 @@ check(d?.status === "Cancelled", `status after menu move: ${d?.status}`);
 
 step("+ on a column opens New with the column value");
 await closed.getByRole("button", { name: "Add to Closed" }).click();
-await page.waitForURL(/ToDo\/new/, { timeout: 30000 });
+await page.waitForURL(/todo\/new/, { timeout: 30000 });
 await page.getByRole("heading", { name: "New ToDo" }).waitFor({ timeout: 60000 });
 const status = page.getByRole("combobox", { name: /^Status/ }).first();
 check((await status.inputValue()) === "Closed", `status prefilled: ${await status.inputValue()}`);
 
 step("archive + restore a column");
-await page.goto(`${BASE}/desk/doctype/ToDo/view/kanban/${encodeURIComponent(BOARD)}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/todo/view/kanban/${encodeURIComponent(BOARD)}`, { waitUntil: "domcontentloaded" });
 const cancelled = page.getByRole("region", { name: "Cancelled column" });
 await cancelled.waitFor({ timeout: 60000 });
 await cancelled.getByRole("button", { name: "Cancelled column menu" }).click();

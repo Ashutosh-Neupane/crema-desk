@@ -3,7 +3,7 @@
 // The failing save comes from a Server Script, so that part runs only when the site has server scripts enabled
 // (`server_script_enabled` in site config); otherwise it prints a SKIP line and the email check still runs.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/errordetails.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -37,7 +37,7 @@ await post("frappe.client.insert", { doc: { doctype: "Server Script", name: SS, 
   doctype_event: "Before Save", disabled: 0, script: "1 / 0\n" } });
 
 step("failing save → error toast with Details → traceback dialog");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Boom");
 await page.getByRole("button", { name: "Save", exact: true }).first().click();
@@ -45,7 +45,7 @@ const toast = page.locator("[data-sonner-toast]").filter({ hasText: /division by
 await toast.waitFor({ timeout: 30000 });
 check(true, "error toast shows the server message");
 const details = toast.getByRole("button", { name: "Details" });
-check(await details.isVisible({ timeout: 5000 }).catch(() => false), "toast offers a Details action");
+check(await details.waitFor({ timeout: 5000 }).then(() => true, () => false), "toast offers a Details action");
 await details.click();
 const errDlg = page.getByRole("dialog", { name: "Server Error" });
 await errDlg.waitFor({ timeout: 10000 });
@@ -62,7 +62,7 @@ await post("frappe.client.set_value", { doctype: "Server Script", name: SS, fiel
 
 step("saved doc → email composer dialog is wider than max-w-lg");
 const name = (await post("frappe.client.insert", { doc: { doctype: DT, title: "Saved" } })).name;
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/${name}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("textbox", { name: /^Title/ }).waitFor({ timeout: 90000 });
 await page.getByRole("region", { name: "Activity" }).getByRole("button", { name: "New Email" }).click();
 const mail = page.getByRole("dialog");

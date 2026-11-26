@@ -11,7 +11,7 @@ step("sidebar POS → framed Point of Sale");
 // builds the POS app (.point-of-sale-app → .items-selector), otherwise it opens "Create POS Opening Entry".
 // Expect whichever the site's own data calls for.
 const opening = (await (await page.request.post(`${BASE}/api/frappe/api/method/erpnext.selling.page.point_of_sale.point_of_sale.check_opening_entry`, { data: { user: process.env.CREMA_USER ?? "Administrator" } })).json()).message ?? [];
-await page.goto(`${BASE}/desk/page/point-of-sale`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/point-of-sale`, { waitUntil: "domcontentloaded", timeout: 180000 });
 const frame = page.frameLocator('iframe[title="Frappe page point-of-sale"]');
 if (opening.length) {
   await frame.locator(".point-of-sale-app .items-selector").waitFor({ timeout: 90000 });
@@ -43,7 +43,7 @@ await inner.waitForFunction(() => window.__cremaBridgeReady === true, null, { ti
 // any customer of this site
 const CUSTOMER = (await (await page.request.post(`${BASE}/api/frappe/api/method/frappe.client.get_list`, { data: { doctype: "Customer", fields: ["name"], limit_page_length: 1 } })).json()).message?.[0]?.name ?? "Guest Customer";
 await inner.evaluate((c) => window.frappe.set_route("Form", "Customer", c), CUSTOMER).catch(() => {});
-await page.waitForURL(new RegExp(`/desk/doctype/Customer/${encodeURIComponent(CUSTOMER).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`/desk/customer/${encodeURIComponent(CUSTOMER).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), { timeout: 30000 });
 check(true, "navigated to Crema's Customer form");
 
 check(!errors.some((e) => /socket\.io|ERR_CONNECTION_REFUSED/.test(e)), "no socket errors from the framed page");

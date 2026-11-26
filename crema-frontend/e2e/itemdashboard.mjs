@@ -40,7 +40,7 @@ const data = (await msg("erpnext.stock.dashboard.item_dashboard.get_data", { ite
 check(data.length === 1 && data[0].actual_qty === 7, `get_data: ${data[0]?.warehouse} actual ${data[0]?.actual_qty}`);
 
 step("item form shows stock levels");
-await page.goto(`${BASE}/desk/doctype/Item/${ITEM}`, { waitUntil: "domcontentloaded", timeout: 240000 });
+await page.goto(`${BASE}/desk/item/${ITEM}`, { waitUntil: "domcontentloaded", timeout: 240000 });
 await page.getByRole("tab", { name: "Inventory" }).click();
 const lvl = page.locator(".stock-levels");
 await lvl.locator(".dashboard-list-item").first().waitFor({ timeout: 120000 });
@@ -60,7 +60,7 @@ check((await dlg.innerText()).includes("Add Item"), "Add Item dialog");
 await shot("item_stock_add");
 await dlg.getByLabel("Quantity").fill("3");
 await dlg.getByRole("button", { name: "Create Stock Entry" }).click();
-await page.waitForURL(/doctype\/Stock(%20| )Entry\/new/, { timeout: 60000 });
+await page.waitForURL(/\/desk\/stock-entry\/new/, { timeout: 60000 });
 await page.waitForFunction((it) => [...document.querySelectorAll("input")].some((i) => i.value === it), ITEM, { timeout: 90000 });
 check(true, "navigated to a new Stock Entry carrying the item row");
 const vals = await page.locator("input").evaluateAll((els) => els.map((e) => e.value));
@@ -69,7 +69,7 @@ check(vals.includes(wh) && vals.includes("3"), "target warehouse and qty 3 prefi
 await shot("item_stock_add_entry");
 
 step("Move opens the Move Item dialog");
-await page.goto(`${BASE}/desk/doctype/Item/${ITEM}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/item/${ITEM}`, { waitUntil: "domcontentloaded" });
 await page.getByRole("tab", { name: "Inventory" }).click();
 await lvl.locator(".dashboard-list-item").first().waitFor({ timeout: 90000 });
 await lvl.getByRole("button", { name: "Move", exact: true }).click();

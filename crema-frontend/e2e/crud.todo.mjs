@@ -32,7 +32,7 @@ await page.click("button[type=submit]");
 await page.waitForURL(/\/desk/);
 
 step("open New ToDo");
-await page.goto(`${BASE}/desk/doctype/ToDo/new`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/desk/todo/new`, { waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { name: "New ToDo" }).waitFor();
 check(await page.getByText("Not Saved").isVisible(), "indicator shows Not Saved");
 check((await page.locator("select").first().inputValue()) === "Open", "status default = Open (Desk default)");
@@ -91,7 +91,7 @@ step("delete via … menu");
 await page.getByRole("button", { name: "More actions" }).click();
 await page.getByRole("menuitem", { name: /Delete/ }).click();
 await page.getByRole("button", { name: "Yes" }).click();
-await page.waitForURL(/\/desk\/doctype\/ToDo$/, { timeout: 15000 });
+await page.waitForURL(/\/desk\/todo$/, { timeout: 15000 });
 const gone = await page.request.get(`${BASE}/api/frappe/api/resource/ToDo/${encodeURIComponent(name)}`);
 check(gone.status() === 404, `backend returns 404 for deleted ${name}`);
 await shot("4_list_after_delete");

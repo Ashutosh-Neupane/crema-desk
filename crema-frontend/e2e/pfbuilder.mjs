@@ -81,7 +81,7 @@ check(data.sections?.length === 1 && !JSON.stringify(data).includes("Hello block
 
 step("back to the form");
 await page.getByRole("link", { name: `Back to ${PF}` }).click();
-await page.waitForURL(/\/desk\/doctype\/Print%20Format\//, { timeout: 30000 });
+await page.waitForURL(/\/desk\/print-format\//, { timeout: 30000 });
 check(true, "back on the Print Format form");
 
 step("cleanup");

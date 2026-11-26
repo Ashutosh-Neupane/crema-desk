@@ -3,7 +3,7 @@
 // Shift+Alt+↓ duplicate, Esc drops a new empty row, tab-separated paste fills rows (with and without a header row);
 // a value set while a cell is focused survives its blur. Saved rows are checked through the API.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/gridkeys.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -55,7 +55,7 @@ const values = async (col) => {
   return out;
 };
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${PARENT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("Grid keys");
 
@@ -148,7 +148,7 @@ await shot("gridkeys_paste", false);
 
 step("save → rows in the database");
 await page.keyboard.press(`${mod}+s`);
-await page.waitForURL(new RegExp(`${encodeURIComponent(PARENT)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(PARENT)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const doc = (await api(`api/resource/${encodeURIComponent(PARENT)}/${name}`)).data;
 const saved = (doc?.lines ?? []).map((l) => [l.item, l.qty, l.rate, l.due]);

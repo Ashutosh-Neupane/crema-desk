@@ -8,7 +8,7 @@ const t = await start();
 const { page, check, step, shot, api } = t;
 const warnings = [];
 page.on("console", (m) => m.type() === "warning" && /\[form\]|\[erpnext|desk-runtime/.test(m.text()) && warnings.push(m.text().slice(0, 240)));
-const SO = `${BASE}/desk/doctype/Sales%20Order`;
+const SO = `${BASE}/desk/sales-order`;
 const field = (label) => page.getByLabel(label, { exact: true }).first();
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const money = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -86,7 +86,7 @@ await shot("so_new_filled");
 
 step("save → server totals");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(/Sales%20Order\/SAL-ORD-/, { timeout: 30000 });
+await page.waitForURL(/sales-order\/SAL-ORD-/, { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const saved = (await api(`api/resource/Sales Order/${encodeURIComponent(name)}`)).data;
 check(saved?.customer === CUSTOMER, `saved ${name} for ${CUSTOMER}`);
@@ -125,7 +125,7 @@ step("delete the amended draft");
 await page.getByRole("button", { name: "More actions" }).click();
 await page.getByRole("menuitem", { name: /Delete/ }).click();
 await page.getByRole("button", { name: "Yes" }).click();
-await page.waitForURL(/Sales%20Order$/, { timeout: 20000 });
+await page.waitForURL(/sales-order$/, { timeout: 20000 });
 const gone = await page.request.get(`${BASE}/api/frappe/api/resource/Sales%20Order/${encodeURIComponent(amended)}`);
 check(gone.status() === 404, "deleted on server");
 

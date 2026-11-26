@@ -14,7 +14,7 @@ const userReport = async () => JSON.parse((await (await post("frappe.model.utils
 const grid = page.getByRole("table", { name: "Sales Order report" });
 const groupBtn = () => page.getByRole("button", { name: /^(Add Group|Grouped by)/ });
 const open = async (q = "") => {
-  await page.goto(`${BASE}/desk/doctype/Sales%20Order/view/report${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/sales-order/view/report${q}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await grid.locator("tbody tr").first().waitFor({ timeout: 90000 });
 };
 // rows of the grouped grid → [value, aggregate] (the first column is the row number)

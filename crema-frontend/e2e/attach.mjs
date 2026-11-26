@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -39,7 +39,7 @@ const txt = path.join(dir, "notes.txt");
 fs.writeFileSync(txt, "hello crema");
 
 step("new doc: upload image + file, save");
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DT}` }).waitFor({ timeout: 90000 });
 await page.getByRole("textbox", { name: /^Title/ }).fill("With files");
 await page.getByLabel("Photo", { exact: true }).setInputFiles(png);
@@ -51,7 +51,7 @@ const img = page.locator("img[alt='Photo']");
 await page.waitForFunction(() => { const el = document.querySelector("img[alt='Photo']"); return !!el && el.complete && el.naturalWidth > 0; }, null, { timeout: 15000 }).catch(() => {});
 check(await img.evaluate((el) => el.complete && el.naturalWidth > 0), "preview loads through /files proxy");
 await page.getByRole("button", { name: /^Save$/ }).click();
-await page.waitForURL(new RegExp(`${encodeURIComponent(DT)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(DT)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 const d = (await api(`api/resource/${encodeURIComponent(DT)}/${name}`)).data;
 check(/^\/files\/pixel.*\.png$/.test(d?.photo ?? ""), `photo saved (${d?.photo})`);

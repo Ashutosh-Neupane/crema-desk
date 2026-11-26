@@ -3,7 +3,7 @@
 // Fields" shows the title while the name is stored; "Create a new X" needs create permission and is hidden with
 // only_select, as is "Advanced Search"; Advanced Search picks a value through the selector dialog.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/linkfield.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -58,7 +58,7 @@ check(r.ok(), `Client Script setting only_select (${r.status()})`);
 await post("frappe.sessions.clear", {});
 await page.request.post(`${BASE}/api/desk/shell`, { data: { action: "clear-cache" } });
 
-await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(DOC)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/${slug(DOC)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("heading", { name: `New ${DOC}` }).waitFor({ timeout: 90000 });
 const target = page.getByRole("combobox", { name: "Target" });
 const list = page.locator("#target-listbox");
@@ -77,7 +77,7 @@ step("the title is shown, the name is stored");
 await list.getByRole("option", { name: /Alpha Co/ }).click();
 check((await target.inputValue()) === "Alpha Co", `box shows the title (${await target.inputValue()})`);
 await page.keyboard.press(process.platform === "darwin" ? "Meta+s" : "Control+s");
-await page.waitForURL(new RegExp(`${encodeURIComponent(DOC)}/(?!new)`), { timeout: 30000 });
+await page.waitForURL(new RegExp(`${slug(DOC)}/(?!new)`), { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 let saved = (await api(`api/resource/${encodeURIComponent(DOC)}/${name}`)).data;
 check(saved?.target === alpha, `saved the name ${alpha} (${saved?.target})`);

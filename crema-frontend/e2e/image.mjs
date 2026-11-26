@@ -14,7 +14,7 @@ check(!!ITEM, `site data: item ${ITEM?.name}`);
 await post("frappe.client.set_value", { doctype: "Item", name: ITEM.name, fieldname: "image", value: file.file_url });
 
 step("Item list → Image view");
-await page.goto(`${BASE}/desk/doctype/Item`, { waitUntil: "domcontentloaded", timeout: 180000 });
+await page.goto(`${BASE}/desk/item`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Image" }).click({ timeout: 90000 });
 await page.waitForURL(/\/view\/image/, { timeout: 60000 });
 const grid = page.getByRole("list", { name: "Item images" });
@@ -32,7 +32,7 @@ await page.waitForTimeout(1200);
 const narrowed = await grid.getByRole("listitem").count();
 check(narrowed >= 1 && narrowed <= n, `search narrows the cards (${narrowed} of ${n})`);
 await grid.getByRole("link").first().click();
-await page.waitForURL(/\/desk\/doctype\/Item\/(?!view)/, { timeout: 30000 });
+await page.waitForURL(/\/desk\/item\/(?!view)/, { timeout: 30000 });
 check(true, "card opens the form");
 
 step("cleanup");

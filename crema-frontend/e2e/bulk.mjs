@@ -15,7 +15,7 @@ for (const n of [1, 2]) {
 }
 
 const openList = async () => {
-  await page.goto(`${BASE}/desk/doctype/ToDo?filters=${encodeURIComponent(JSON.stringify([["description", "like", `%${tag}%`]]))}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/todo?filters=${encodeURIComponent(JSON.stringify([["description", "like", `%${tag}%`]]))}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByLabel(`Select ${names[0]}`).waitFor({ timeout: 60000 });
   for (const n of names) await page.getByLabel(`Select ${n}`).check();
   await page.getByRole("button", { name: /^Actions \(2\)/ }).click();

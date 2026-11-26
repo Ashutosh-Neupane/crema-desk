@@ -1,7 +1,7 @@
 // Preview ▸ Accounting Ledger / Stock Ledger (erpnext.accounts.ledger_preview) on draft documents,
 // compared with the whitelisted methods' own response.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/ledgerpreview.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, slug } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -19,7 +19,7 @@ async function cleanup() {
   for (const [doctype, name] of created.splice(0).reverse()) await post("frappe.client.delete", { doctype, name });
 }
 const open = async (dt, name, wait) => {
-  await page.goto(`${BASE}/desk/doctype/${encodeURIComponent(dt)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.goto(`${BASE}/desk/${slug(dt)}/${encodeURIComponent(name)}`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("button", { name: /^Preview/ }).waitFor({ timeout: wait ?? 60000 });
 };
 
