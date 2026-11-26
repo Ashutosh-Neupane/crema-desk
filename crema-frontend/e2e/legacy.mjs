@@ -20,7 +20,13 @@ if (opening.length) {
   await frame.getByText("Create POS Opening Entry").waitFor({ timeout: 90000 });
   check(true, "POS opening dialog rendered by ERPNext's own page code (no open entry)");
 }
-await page.getByRole("heading", { name: "Point of Sale" }).waitFor({ timeout: 15000 });
+// the framed page's own title becomes Crema's heading ("Point of Sale", or the POS app's current
+// "New Sales Invoice …" once an opening entry is open — Desk shows the same title)
+await page.waitForFunction(() => {
+  const f = document.querySelector('iframe[title="Frappe page point-of-sale"]');
+  const title = f?.contentDocument?.title?.trim();
+  return !!title && [...document.querySelectorAll("h1, h2, [role=heading]")].some((h) => h.textContent?.trim() === title);
+}, null, { timeout: 30000 });
 check(true, "title bridged to Crema");
 const innerFrame = () => page.frames().find((f) => f !== page.mainFrame());
 const chromeHidden = await innerFrame()?.evaluate(() => {
