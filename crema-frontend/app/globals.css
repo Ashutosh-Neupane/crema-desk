@@ -615,3 +615,129 @@ a:focus-visible,
 @media (max-width: 639.98px) {
   .crema-panel { animation-name: crema-sheet-in; }
 }
+
+/* ============================================================================
+ * Phase 2 tokens, second block (docs/PHASE2_DESIGN.md § 2.1): surfaces, ink, outline, accent, AI tint, layout sizes,
+ * one z-index scale, breakpoints. Aliases of the espresso tokens above, so dark and high contrast follow them.
+ * ==========================================================================*/
+:root {
+  /* surfaces: cards separate from the page by a border + --elevation-1, never by background alone */
+  --surface-base: var(--gray-50);
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--gray-100);
+  --surface-overlay: #ffffff;
+  --surface-hover: var(--gray-100);
+  --surface-selected: #eef6fe;
+
+  /* ink (text); --ink-subtle is for decoration only, not guaranteed 4.5:1 */
+  --ink-default: var(--text-color);
+  --ink-muted: var(--text-muted);
+  --ink-subtle: var(--text-light);
+  --ink-inverse: #ffffff;
+  --ink-link: var(--link-color, var(--blue-700));
+  --ink-disabled: var(--gray-500, #999999);
+
+  /* outlines */
+  --outline-default: var(--border-color);
+  --outline-strong: var(--dark-border-color);
+  --outline-focus: var(--focus-color);
+
+  /* accent: primary button, selected nav item, progress; never a status */
+  --accent: var(--gray-900);
+  --accent-fg: #ffffff;
+  --accent-soft: var(--gray-100);
+
+  /* status marks (dots, chart marks): ≥ 3:1 against the surface */
+  --status-neutral-solid: #6b6b6b;
+  --status-info-solid: #0a5aa8;
+  --status-success-solid: #1b8a47;
+  --status-warning-solid: #b05e00;
+  --status-danger-solid: #c62828;
+
+  /* assistant chrome only (panel header, "filled by the assistant" marker); never on data */
+  --ai-tint: #f4f1fe;
+  --ai-fg: #5b3fc4;
+
+  /* layout */
+  --header-height: 48px;
+  --sidebar-rail: 56px;
+  --rail-width: 400px;
+  --bottomnav-height: 56px;
+  --measure: 75ch;
+  --field-max: 32rem;
+  --pane-left: 260px;
+  --outline-width: 200px;
+
+  /* one layer scale for new code */
+  --z-header: 40;
+  --z-sidebar: 35;
+  --z-rail: 45;
+  --z-toast: 60;
+  --z-popover: 70;
+}
+
+[data-theme="dark"] {
+  --surface-base: #171717;
+  --surface-raised: #1f1f1f;
+  --surface-sunken: #141414;
+  --surface-overlay: #242424;
+  --surface-hover: #292929;
+  --surface-selected: #0f2a45;
+  --ink-inverse: #171717;
+  --ink-disabled: #6b6b6b;
+  --accent: #f3f3f3;
+  --accent-fg: #171717;
+  --accent-soft: #292929;
+  --status-neutral-solid: #a3a3a3;
+  --status-info-solid: #5aa9f0;
+  --status-success-solid: #4cc27a;
+  --status-warning-solid: #e9a23b;
+  --status-danger-solid: #f06565;
+  --ai-tint: #211b38;
+  --ai-fg: #c4b5fd;
+}
+
+[data-contrast="more"] {
+  --accent: #000000;
+  --ink-disabled: #525252;
+  --ai-fg: #3b2391;
+}
+[data-theme="dark"][data-contrast="more"],
+[data-theme="dark"] [data-contrast="more"] {
+  --accent: #ffffff;
+  --ink-disabled: #b3b3b3;
+  --ai-fg: #ddd6fe;
+}
+
+/* Tailwind utilities for the tokens above (bg-surface-raised, text-ink-muted, border-outline; layers as z-(--z-rail)) and the
+ * breakpoints of § 3.4: 2xl is 1600px (was 1536), 3xl 2240px (media queries use 16px rem) */
+@theme inline {
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-selected: var(--surface-selected);
+  --color-ink: var(--ink-default);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-ink-link: var(--ink-link);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-outline: var(--outline-default);
+  --color-outline-strong: var(--outline-strong);
+  --color-accent-solid: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-ai-tint: var(--ai-tint);
+  --color-ai: var(--ai-fg);
+}
+@theme {
+  --breakpoint-2xl: 100rem;
+  --breakpoint-3xl: 140rem;
+}
+
+/* numbers in tables line up */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
