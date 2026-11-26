@@ -36,6 +36,7 @@ await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { t
 // clean prefs for a deterministic start (server copy + local cache)
 await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
+await page.context().clearCookies({ name: "crema_ui" });
 
 step("ui-kit renders every primitive in both densities");
 await page.goto(`${BASE}/desk/ui-kit`, { waitUntil: "domcontentloaded" });
@@ -121,6 +122,12 @@ check((await page.getByTestId("current-density").innerText()).includes("compact"
 await page.reload({ waitUntil: "domcontentloaded" });
 await page.getByRole("heading", { level: 1, name: "UI kit" }).waitFor({ timeout: 120000 });
 check((await page.evaluate(() => document.documentElement.dataset.density)) === "compact", "density from localStorage cache on reload");
+// the server renders the chosen layout from the crema_ui cookie, so nothing switches after hydration
+const cookie = (await page.context().cookies()).find((c) => c.name === "crema_ui");
+check(cookie?.value === "Administrator~1~c", `crema_ui cookie mirrors the prefs (${cookie?.value})`);
+const html = await (await page.request.get(`${BASE}/desk/ui-kit`)).text();
+const htmlTag = html.match(/<html[^>]*>/)?.[0] ?? "";
+check(/data-layout="new"/.test(htmlTag) && /data-density="compact"/.test(htmlTag), `server HTML already in the chosen layout (${htmlTag.slice(0, 120)})`);
 
 step("high contrast + dark keep AA");
 await page.getByLabel("High contrast").check();
@@ -131,6 +138,31 @@ await page.evaluate(() => document.documentElement.setAttribute("data-theme", "d
 await page.waitForTimeout(600);
 for (const p of await pillContrasts()) check(p.ratio >= 4.5, `dark pill ${p.tone} ${p.ratio.toFixed(2)} ≥ 4.5`);
 await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+
+step("Tooltip names the icon button and shows its shortcut; undo toast");
+const iconBtn = page.getByRole("button", { name: "Search (Comfortable)" });
+await iconBtn.focus();
+const tip = page.getByRole("tooltip");
+check(await tip.waitFor({ timeout: 5000 }).then(() => true, () => false), "tooltip shows on keyboard focus");
+check(/Search/.test(await tip.innerText().catch(() => "")), "tooltip text");
+check((await page.locator('[role="tooltip"] kbd, [data-radix-popper-content-wrapper] kbd').first().getAttribute("aria-label").catch(() => null))?.endsWith("K") ?? false, "shortcut spoken as words (… K)");
+await page.keyboard.press("Escape");
+await page.getByRole("button", { name: "Delete a row (Comfortable)" }).click();
+const undo = page.getByRole("button", { name: "Undo" });
+check(await undo.waitFor({ timeout: 5000 }).then(() => true, () => false), "toast offers Undo");
+await undo.click();
+check(await page.getByText("Row restored").waitFor({ timeout: 5000 }).then(() => true, () => false), "Undo runs");
+
+step("axe: no serious accessibility problems in light, dark and high contrast");
+await t.axeCheck("light", '[data-testid="ui-kit"]');
+await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+await page.waitForTimeout(600);
+await t.axeCheck("dark", '[data-testid="ui-kit"]');
+await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+await page.getByLabel("High contrast").check();
+await page.waitForTimeout(600);
+await t.axeCheck("high contrast", '[data-testid="ui-kit"]');
+await page.getByLabel("High contrast").uncheck();
 
 step("bottom sheet at 390px");
 await page.setViewportSize({ width: 390, height: 844 });
@@ -154,5 +186,7 @@ await page.setViewportSize({ width: 1440, height: 1000 });
 await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
 await t.shot("p2-foundation-1440");
+// leave the user on the classic layout for the suites that follow
+await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 if (originalTheme !== "Light") await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { theme: originalTheme } });
 await t.finish();
