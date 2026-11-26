@@ -15,6 +15,19 @@ import { PREFILL_KEY } from "@/lib/form/prefill";
 import { MultiSelectDialog, type MultiSelectOptions } from "@/lib/desk-runtime/multiSelect";
 import { installShims } from "./shims";
 
+/** A fresh copy of a filters / query object per call, like JSON.parse(JSON.stringify(x)) did: undefined and functions
+ * are dropped and Dates become strings, so a script mutating the returned filters never changes the original */
+function plainClone<T>(v: T): T {
+  if (Array.isArray(v)) return v.map((x) => (x === undefined || typeof x === "function" ? null : plainClone(x))) as T;
+  if (v instanceof Date) return v.toJSON() as T;
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) if (x !== undefined && typeof x !== "function") out[k] = plainClone(x);
+    return out as T;
+  }
+  return v;
+}
+
 export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unknown>; navigate?: (href: string) => void }) {
   const g = rt.globals;
   const frappe = rt.frappe as unknown as Record<string, Record<string, unknown>>;
@@ -194,7 +207,7 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
       setters: o.setters,
       read_only_setters: o.read_only_setters,
       date_field: o.date_field,
-      get_query: o.get_query ?? (q.filters || q.query ? () => JSON.parse(JSON.stringify(q)) : undefined),
+      get_query: o.get_query ?? (q.filters || q.query ? () => plainClone(q) : undefined),
       action: (selections, args) => {
         if (!selections.length) return;
         o.source_name = [...new Set(selections)];
