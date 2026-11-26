@@ -79,6 +79,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/showdown": "2.0.6",
+    "axe-core": "4.12.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
