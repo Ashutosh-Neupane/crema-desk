@@ -1,7 +1,7 @@
 # Crema ↔ Frappe Desk: what's left, and how we get there
 
 Last audit: 2026-10-18 (Frappe v16 + ERPNext v16 on a local bench, and a second site without ERPNext); plan updated 2026-10-28.
-Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing.
+Legend: ✅ done + e2e · 🟡 partial / exists but unverified · ❌ missing, tagged [P2] / [Parity] / [P3-prep] / [Out] for where it gets done (§ 0.2).
 Order inside each section = impact on daily use. `node e2e/run-all.mjs` runs every suite (52 today).
 
 **Where to go:** § 0.1 is the plan to finish phase 1, § 2 the item-by-item checklist, § 3 the phase 2 UI/UX plan.
@@ -46,6 +46,21 @@ it creates is cancelled and deleted. Stock Balance is a prepared report: on a be
 stays queued (in Desk too), so the suite checks the live Stock Ledger there.
 
 Left for later (not needed to call phase 1 done): builders (2.9), workspace editing and the v16 dock (2.7), Map /
+
+### 0.2 Where the remaining ❌ items go (roadmap)
+
+Phase 1 deliberately leaves the ❌ items in § 2 open: none is needed for a normal user's day of work. Each one is tagged
+with where it gets done:
+
+| Tag | Meaning | When |
+|---|---|---|
+| **[P2]** | A Desk feature that belongs inside a phase 2 screen (record preview, link hover card, undo, success action, attachment gallery, camera / barcode, saved views, Kanban v2, report column state, composer replies, ⌘K results, keyboard / a11y) | Built into that screen in phase 2 (§ 3), not as a copy of Desk's look |
+| **[Parity]** | Desk parity that implementers and admins use more than daily users (workspace editing, sidebar dock, desktop icons, map view, form tours, translations / RTL, tree drag, bulk rename, raw printing, script containers like `frm.page.body`, admin pages) | The **parity track**, worked alongside phase 2, most-used first |
+| **[P3-prep]** | Native rebuilds of framed (L4) pages and infrastructure that only fits once Crema is a Frappe app (Bank Reconciliation, BOM configurator, plant floor, realtime on the same host, legacy URL clean-up, run-all in CI) | Before / during phase 3 |
+| **[Out]** | Not planned (Frappe Cloud-only features) | — |
+
+Rule: phase 3 (Crema installed as the Frappe app, Desk switchable off) starts only when every [P2] and [Parity] item is
+✅ or knowingly kept as a framed (L4) Desk page, and the [P3-prep] items are planned in § 4.
 Kanban v2 (2.5), telephony, BOM configurator, Bank Reconciliation (2.11, via L4 meanwhile), translations / RTL (2.8).
 
 ---
@@ -100,19 +115,19 @@ Order of work: the milestones in § 0.1.
   `set_headline_alert`, `add_comment` expiring after 10 s, `frm.set_intro` replacing its own, `layout.show_message`,
   colours, dismiss), `add_indicator`, `add_progress` / `show_progress` / `hide_progress`, `add_section` (a real node for
   jQuery), reset on every refresh, Desk's "Submit this document to confirm" — `e2e/dashboard.mjs`.
-- ❌ Dashboard heatmap (`timeline_data` from `get_open_count`) and graph (`data.graph_method`).
-- ❌ `frm.page.body`, `frm.layout.wrapper`, `frm.toolbar` containers for scripts (L2 for the rest of the page).
+- ❌ **[Parity]** Dashboard heatmap (`timeline_data` from `get_open_count`) and graph (`data.graph_method`).
+- ❌ **[Parity]** `frm.page.body`, `frm.layout.wrapper`, `frm.toolbar` containers for scripts (L2 for the rest of the page).
 - ✅ Previous / next document (`form.js` `navigate_records`, `frappe.desk.form.utils.get_next` with the list's
   saved filters and sort, keeps the tab hash, "No further records", Shift+Ctrl+< / >, hidden when Desk Settings turn
   `form_navigation_buttons` off), title editing for `title_field` (click the title; name too when `allow_rename`),
   Jump to field (Ctrl+J) — `e2e/formnav.mjs`, `e2e/formmenu.mjs`.
-- ❌ Form toolbar extras still open: indicator click actions, star/like in the header, `frm.page.add_menu_item` /
+- ❌ **[Parity]** Form toolbar extras still open: indicator click actions, star/like in the header, `frm.page.add_menu_item` /
   `add_action_item` verification.
-- ❌ Undo / redo (`form/undo_manager.js`, Ctrl+Z / Ctrl+Y on field changes).
-- ❌ Form tour (`form_tour.js`, Form Tour doctype, `onboarding_tours.bundle.js`).
-- ❌ Success action after submit/save (`success_action.js`, Success Action doctype).
-- ❌ Info card (`form/info_card.js`) and side panel record preview (`ui/side_panel.js`) — v16.
-- ❌ Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
+- ❌ **[P2]** Undo / redo (`form/undo_manager.js`, Ctrl+Z / Ctrl+Y on field changes).
+- ❌ **[Parity]** Form tour (`form_tour.js`, Form Tour doctype, `onboarding_tours.bundle.js`).
+- ❌ **[P2]** Success action after submit/save (`success_action.js`, Success Action doctype).
+- ❌ **[P2]** Info card (`form/info_card.js`) and side panel record preview (`ui/side_panel.js`) — v16.
+- ❌ **[P2]** Header image / avatar from `image_field`, editable from the header (`form/sidebar/user_image.js`).
 - ✅ Field permlevels (`lib/form/perm.ts`, Desk `model/perm.js`): a field at a level the user cannot read is hidden,
   one they cannot write is read-only; `frm.perm`, `frm.has_perm`, `frappe.perm.*` for scripts (`e2e/permlevel.mjs`).
 - ✅ "Not permitted" / "Not found" pages instead of a raw error (`pageview.js` `show_not_permitted`), for the
@@ -139,10 +154,10 @@ Order of work: the milestones in § 0.1.
   (`data` / `fields` / `get_data`, `grid.refresh / add_new_row / delete_rows / get_selected_children`, child `onchange`
   / `get_query`), `depends_on` / `mandatory_depends_on`, HTML `$wrapper` as a real node, `set_indicator`,
   `disable_primary_action`, `add_custom_action`, `set_secondary_action_label` — `e2e/dialogs.mjs` (agent-built, judged).
-- ❌ Dialog grids: child-field `depends_on`, row form, pagination, drag-reorder; Table MultiSelect in dialogs.
-- ❌ Translation of field values (`views/translation_manager.js`, `translatable` fields).
-- ❌ Interaction composer: New Event / ToDo from a document (`views/interaction.js`).
-- ❌ Print: raw / QZ Tray printing (`form/print_utils.js`), network printer selection, letter head preview in the composer.
+- ❌ **[Parity]** Dialog grids: child-field `depends_on`, row form, pagination, drag-reorder; Table MultiSelect in dialogs.
+- ❌ **[Parity]** Translation of field values (`views/translation_manager.js`, `translatable` fields).
+- ❌ **[Parity]** Interaction composer: New Event / ToDo from a document (`views/interaction.js`).
+- ❌ **[Parity]** Print: raw / QZ Tray printing (`form/print_utils.js`), network printer selection, letter head preview in the composer.
 
 ### 2.2 Grid / child tables (`form/grid.js`, `grid_row.js`, `grid_row_form.js`, `grid_pagination.js`)
 - ✅ Add/remove/duplicate rows, drag reorder, 50-row pages, CSV download/upload (allow_bulk_edit), row form.
@@ -164,8 +179,8 @@ Order of work: the milestones in § 0.1.
   Desk v16's `GridView[<child>]` user setting (legacy `columns` units read); Reset drops only that table (Desk drops
   all) — `e2e/gridcols.mjs`.
 - ✅ Row menu (⋯ on hover, Crema): Insert Above / Below, Duplicate, Move Up / Down, Delete without opening the row form.
-- ❌ Sticky columns and drag-to-resize column edges (Desk v16).
-- ❌ Grid row `form_render` events, `frm.fields_dict.items.grid.get_field().get_query`, `grid.update_docfield_property`,
+- ❌ **[P2]** Sticky columns and drag-to-resize column edges (Desk v16).
+- ❌ **[Parity]** Grid row `form_render` events, `frm.fields_dict.items.grid.get_field().get_query`, `grid.update_docfield_property`,
   `grid.toggle_enable/display/reqd`, `cannot_add_rows`, `cannot_delete_rows` — verify each via ERPNext scripts.
 
 ### 2.3 Field controls (`form/controls/*`)
@@ -213,7 +228,7 @@ Order of work: the milestones in § 0.1.
   `autocompletions` from `set_df_property` (Server Script, System Console); HTML Editor is code + Preview (scripts
   removed) — it was a WYSIWYG box; Markdown Editor is code + Preview through `frappe.markdown` (showdown 2.1.0 +
   Desk's sanitizer, also exposed to app scripts) and uploads dropped images as `![](url)` — `e2e/editors.mjs`.
-- ❌ Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
+- ❌ **[P2]** Attachment Gallery (`attachment_gallery.js`, v16) and image lightbox (`photoswipe.bundle.js`).
 - ✅ Data `options` validation (`lib/crema-form/validators.ts`, Desk `data.js` + `validate_type`): Email (comma lists),
   Phone, URL, Name — red field + message, `aria-invalid`; native email/tel/url inputs — `e2e/datavalidation.mjs`
   (agent-built, judged). IBAN: Desk has no client check either.
@@ -221,10 +236,10 @@ Order of work: the milestones in § 0.1.
   `link_filters` from Customize Form applied (with `eval:` values) — they were ignored before; "Filtered by: …"
   line (`get_filter_description`, or `filter_description`); "Create a new X" only with create permission and not
   for `only_select`; "Advanced Search" → the link selector dialog — `e2e/linkfield.mjs`.
-- ❌ Link: hover preview card (`ui/link_preview.js`, `components/hover_card.js`), `ignore_user_permissions`,
+- ❌ **[P2]** Link: hover preview card (`ui/link_preview.js`, `components/hover_card.js`), `ignore_user_permissions`,
   custom `ControlLink.link_options`.
-- ❌ Camera capture for Attach (`ui/capture.js`) and barcode/QR scanner dialog (`scanner/`, `frappe.ui.Scanner`).
-- ❌ Address autocomplete (`ui/address_autocomplete`, geocoder setting).
+- ❌ **[P2]** Camera capture for Attach (`ui/capture.js`) and barcode/QR scanner dialog (`scanner/`, `frappe.ui.Scanner`).
+- ❌ **[P2]** Address autocomplete (`ui/address_autocomplete`, geocoder setting).
 - ✅ Formatting from settings (`lib/frappe/format.ts` — transcribes `number_format.js`, `form/formatters.js`,
   `datetime.js`): System Settings / Currency `number_format` (`#,##,###.##` lakh/crore, `#.###,##`, …), currency
   symbol + `symbol_on_right` from boot `:Currency`, `get_field_currency` (incl. `Company:company:default_currency`),
@@ -232,7 +247,7 @@ Order of work: the milestones in § 0.1.
   Datetime shown in the user's time zone and saved in the system one, typed numbers parsed with the site's format.
   Lists, reports, grid, kanban, number inputs, `frappe.format`, `format_currency`, `format_number`, `precision()`,
   `frappe.datetime.*` — `e2e/formats.mjs`.
-- ❌ Number systems for words / `number_systems.js` short forms (lakh/crore abbreviations in charts), Time and
+- ❌ **[Parity]** Number systems for words / `number_systems.js` short forms (lakh/crore abbreviations in charts), Time and
   Date inputs typed in the user's format (DatePicker shows it; free-typing in other orders).
 
 ### 2.4 Lists (`list/list_view.js`, `base_list.js`, `bulk_operations.js`, `list_settings.js`, `list_filter/`)
@@ -250,7 +265,7 @@ Order of work: the milestones in § 0.1.
   no column resize).
 - ✅ List Settings dialog (`components/list/ListSettingsDialog.tsx`, Desk `list_settings.js`): columns add / remove /
   reorder / width, Disable Count / Comment Count / Sidebar Stats / Auto Refresh via `save_listview_settings`, honoured
-  by the list — `e2e/listsettings.mjs` (agent-built, judged). ❌ allow_edit, disable_scrolling, show_tags, recency filters.
+  by the list — `e2e/listsettings.mjs` (agent-built, judged). ❌ **[Parity]** allow_edit, disable_scrolling, show_tags, recency filters.
 - ✅ Row extras (`list_view.js` get_meta_html): assignee avatars (click filters to that user), comment count (99+,
   always shown unless disabled), a like heart per row (`toggle_like`) and the header's "liked by me" filter, unread
   rows bold for `track_seen` DocTypes (opening one clears it) — `e2e/listrowextras.mjs`.
@@ -260,19 +275,19 @@ Order of work: the milestones in § 0.1.
   `primary_action` from before. The `listview` object: `page.add_action_item` / `add_menu_item` /
   `add_inner_button` (groups) / `set_indicator` / `set_title`, `get_checked_items`, `call_for_selected_items`,
   `refresh`, `get_filter_value`, `filter_area.*` — `e2e/listhooks.mjs` (ERPNext Task, Frappe ToDo, a List client
-  script). ❌ Not ported: `listview.page.page_form` / jQuery access to the list's DOM (`$result`), `me.on(...)`
+  script). ❌ **[Parity]** Not ported: `listview.page.page_form` / jQuery access to the list's DOM (`$result`), `me.on(...)`
   events, `has_indicator_for_draft`, "Edit" inline for Check fields.
-- ❌ Restricted-by-user-permission banner (`list_view_permission_restrictions.html`).
+- ❌ **[Parity]** Restricted-by-user-permission banner (`list_view_permission_restrictions.html`).
 - ✅ Per-user list state (`lib/list/useUserListState.ts`, Desk `model/user_settings.js`): filters + sort saved under
   `List` (+ `last_view`) and restored on a bare list URL; URL filters win — `e2e/listsettings.mjs`.
-- ❌ `filter_conditions`, `load_last_view` redirect, report-view column state.
-- ❌ Virtualized list for 2000+ rows (`list_view_virtualization.js`).
-- ❌ Bulk actions: "Apply Assignment Rule", "Delete" progress via realtime for >500 docs, bulk rename (`bulk_rename`).
+- ❌ **[Parity]** `filter_conditions`, `load_last_view` redirect, report-view column state.
+- ❌ **[Parity]** Virtualized list for 2000+ rows (`list_view_virtualization.js`).
+- ❌ **[Parity]** Bulk actions: "Apply Assignment Rule", "Delete" progress via realtime for >500 docs, bulk rename (`bulk_rename`).
 
 ### 2.5 Views (`views/*`)
 - ✅ Report view, Kanban, Calendar, Gantt, Tree, Image, Inbox, File manager, Dashboard view.
-- ❌ Map view (`views/map`, `leaflet.bundle.js`): Geolocation / latitude+longitude doctypes.
-- ❌ Kanban v2 (`views/kanban_v2`, v16): board settings, card fields, column colours/priority styles, swimlanes —
+- ❌ **[Parity]** Map view (`views/map`, `leaflet.bundle.js`): Geolocation / latitude+longitude doctypes.
+- ❌ **[P2]** Kanban v2 (`views/kanban_v2`, v16): board settings, card fields, column colours/priority styles, swimlanes —
   Crema has the classic Kanban Board doctype flow only.
 - ✅ Report view group-by (`ui/group_by/group_by.js`): a field of the DocType or of a child table, Count / Sum /
   Average over the DocType's or a child table's numbers, applied as soon as it is complete, Desk's parent-to-child
@@ -280,11 +295,11 @@ Order of work: the milestones in § 0.1.
   read), `?_group_by=` share links, click a group to see its rows — `e2e/reportgroupby.mjs` (numbers checked
   against the API).
 - ✅ Report view columns from child tables and Save As (Report Builder report) — `e2e/reportview.mjs`.
-- ❌ Report view extras: column resize/reorder persisted, print/PDF, link side panel (`link_side_panel.js`).
-- ❌ Tree view extras: drag to move node, "Add Child" with quick entry fields, expand all, root filters per company.
-- ❌ Calendar: Desk's calendar view settings per doctype (`calendar_settings`), quick create on date click with
+- ❌ **[P2]** Report view extras: column resize/reorder persisted, print/PDF, link side panel (`link_side_panel.js`).
+- ❌ **[Parity]** Tree view extras: drag to move node, "Add Child" with quick entry fields, expand all, root filters per company.
+- ❌ **[P2]** Calendar: Desk's calendar view settings per doctype (`calendar_settings`), quick create on date click with
   quick entry, filter sidebar.
-- ❌ Communication view features in Inbox: reply / reply-all / forward, "Relink" to a document, assign, email
+- ❌ **[P2]** Communication view features in Inbox: reply / reply-all / forward, "Relink" to a document, assign, email
   thread grouping, attachments preview.
 
 ### 2.6 Reports (`views/reports/query_report.js`, `report_view.js`, `report_utils.js`)
@@ -292,7 +307,7 @@ Order of work: the milestones in § 0.1.
 - ✅ Query Report "Save As" (`save_report` → Custom Report; saved filters/columns restored via `are_default_filters`
   + `custom_filters`; custom reports run their reference report's JS) and "PDF" (orientation / include filters /
   pick columns → print_grid HTML → `report_to_pdf`) — `e2e/reportsave.mjs` (agent-built, judged).
-- ❌ Report PDF with Print Format / Letter Head, report `get_pdf_format` / `html_format`, print.bundle.css styling,
+- ❌ **[Parity]** Report PDF with Print Format / Letter Head, report `get_pdf_format` / `html_format`, print.bundle.css styling,
   Print (`frappe.render_grid`), print_tree.html, CSV/Excel export options dialog (with/without
   indentation), "Setup Auto Email" from the menu, "Add to Workspace", column reorder/resize persistence, "Pick
   columns" / custom columns from linked doctypes, report link side panel.
@@ -308,7 +323,7 @@ Order of work: the milestones in § 0.1.
   Fixed on the way: jQuery objects handed back to jQuery (`$($x)`, `$x.wrap(…)`) failed inside the lenient wrapper,
   which made every formatter that builds jQuery fall back to the plain value; `frappe.set_route` from report JS
   didn't navigate.
-- ❌ `get_datatable_options` → `checkboxColumn` + `events.onCheckRow` (Sales / Purchase / Stock Analytics plot the
+- ❌ **[Parity]** `get_datatable_options` → `checkboxColumn` + `events.onCheckRow` (Sales / Purchase / Stock Analytics plot the
   checked rows; ~10 stock reports act on checked rows). Needs DataTable-shaped cells (`{content, html}`) and
   `frappe.query_report.chart` / `render_chart`. `stock_analytics.js`, `stock_grid_report.js` not loaded yet.
 
@@ -318,13 +333,13 @@ Order of work: the milestones in § 0.1.
 - ✅ Workspace onboarding block (`components/desk/OnboardingWidget.tsx`: `get_desktop_page` onboardings honouring
   `enable_onboarding`, steps, progress, skip, step actions via `update_onboarding_step`, 24 h dismiss) and Custom HTML
   Block (`CustomBlock.tsx`: shadow root, scoped style, script with `root_element`) — `e2e/workspaceblocks.mjs`
-  (agent-built, judged). ❌ Form-tour / route_hooks auto-tick, quick entry and Import from a step.
-- ❌ Workspace editing (`views/workspace/blocks`, Editor.js): add/move/resize blocks, new widget dialogs
+  (agent-built, judged). ❌ **[Parity]** Form-tour / route_hooks auto-tick, quick entry and Import from a step.
+- ❌ **[Parity]** Workspace editing (`views/workspace/blocks`, Editor.js): add/move/resize blocks, new widget dialogs
   (`widget_dialog.js`, `new_widget.js`), create/duplicate/delete/hide workspace, public vs private, workspace restore.
-- ❌ v16 sidebar: dock (`ui/sidebar/dock.js`, pinned/floating), sidebar arrangement editor
+- ❌ **[Parity]** v16 sidebar: dock (`ui/sidebar/dock.js`, pinned/floating), sidebar arrangement editor
   (`arrangement_editor.js` — reorder/hide items per user), sidebar sections/cards (`card.js`), Workspace Sidebar doctype.
-- ❌ v16 desktop icons: drag to arrange, folders, hide (`desktop_icons.bundle.js`, Desktop Icon doctype).
-- ❌ Number card / chart widget menus: refresh, filters dialog, "Set Filters", "Edit", chart type switch, time span.
+- ❌ **[Parity]** v16 desktop icons: drag to arrange, folders, hide (`desktop_icons.bundle.js`, Desktop Icon doctype).
+- ❌ **[Parity]** Number card / chart widget menus: refresh, filters dialog, "Set Filters", "Edit", chart type switch, time span.
 
 ### 2.8 Shell, navigation, search (`ui/toolbar/*`, `ui/keyboard.js`, `router.js`)
 - ✅ ⌘K awesomebar (doctypes, records, reports, pages), keyboard shortcuts dialog, notifications panel, breadcrumbs,
@@ -332,7 +347,7 @@ Order of work: the milestones in § 0.1.
 - ✅ Awesomebar extras (`lib/search/*`, Desk `awesome_bar.js` / `search_utils.js`): "new <DocType>" (can_create),
   calculator (safe parser, no eval; copies the result), "<text> in <DocType>" → list `?q=` (the list follows `?q=`
   while mounted) — `e2e/awesomebar.mjs` (agent-built, judged).
-- ❌ Global search results page ("Search for '<text>'"), `#tag` search, help articles, recents ranking (`fuzzy_match.js`).
+- ❌ **[P2]** Global search results page ("Search for '<text>'"), `#tag` search, help articles, recents ranking (`fuzzy_match.js`).
 - ✅ Desk URLs resolved like Desk's router (`app/(desk)/desk/[slug]`, `resolveDeskPath`): shell prefix, workspace
   slug, DocType slug (list / `view/x` / `new` / record), standard routes (`List/User`), else Desk Page; query kept.
   Used by pasted Desk links, Navbar Settings routes and `frappe.set_route("/app/…")` (`e2e/usermenu.mjs`).
@@ -342,38 +357,38 @@ Order of work: the milestones in § 0.1.
   `frappe.utils.eval`), theme saved to `User.desk_theme` (`switch_theme`) — `e2e/usermenu.mjs`.
 - ✅ Toggle Full Width (Desk `localStorage.container_fullwidth`; content capped at Desk's 1290px container otherwise)
   and the saved `User.desk_theme` applied on a browser with no stored choice — `e2e/fullwidth.mjs` (agent-built, judged).
-- ❌ Apps switcher page (`/apps`), "Edit Sidebar" item.
-- ❌ v16 user settings dialog (`user_settings_dialog.bundle.js`, `ui/settings_dialog.js`): Profile, Email signature +
+- ❌ **[Parity]** Apps switcher page (`/apps`), "Edit Sidebar" item.
+- ❌ **[P2]** v16 user settings dialog (`user_settings_dialog.bundle.js`, `ui/settings_dialog.js`): Profile, Email signature +
   options, Appearance, Language, Notifications, API access.
 - ✅ Site banners (`ui/site_banners.js`): read-only mode, impersonation ("Impersonating X — Stop") — `e2e/impersonation.mjs`.
-- ❌ Alt-key accelerators (`alt_keyboard_shortcuts.js`), Ctrl+G go-to, `frappe.ui.keys.add_shortcut` from scripts.
-- ❌ Language: `__()` with `lang_dict` from boot, RTL layout, user language switch.
-- ❌ Notifications panel tabs (`ui/notifications/notifications.js`): Today's Events, Notification Settings link,
+- ❌ **[P2]** Alt-key accelerators (`alt_keyboard_shortcuts.js`), Ctrl+G go-to, `frappe.ui.keys.add_shortcut` from scripts.
+- ❌ **[Parity]** Language: `__()` with `lang_dict` from boot, RTL layout, user language switch.
+- ❌ **[P2]** Notifications panel tabs (`ui/notifications/notifications.js`): Today's Events, Notification Settings link,
   energy-point / mention / assignment types with icons, open-in-place.
-- ❌ Telemetry / billing banners (Frappe Cloud only) — out of scope.
+- ❌ **[Out]** Telemetry / billing banners (Frappe Cloud only) — out of scope.
 
 ### 2.9 Customization and builders
 - ✅ DocType create + form builder, Client/Server Scripts, Customize Form opens with doc_type.
 - 🟡 Customize Form: verify field edits save, Reset to defaults, "Customize Form" from list/form menus.
-- ❌ v16 DocType Settings dialog (`form/doctype_settings/*`, `embedded_list.bundle.js`): tabs General, Naming,
+- ❌ **[Parity]** v16 DocType Settings dialog (`form/doctype_settings/*`, `embedded_list.bundle.js`): tabs General, Naming,
   Workflow, Print Formats, Roles, User Permissions, Notifications, Email Templates, Global Search — from the list menu.
-- ❌ DocType permission editor dialog (`ui/permission_dialog.js`, v16) used by the form builder / DocType form.
+- ❌ **[Parity]** DocType permission editor dialog (`ui/permission_dialog.js`, v16) used by the form builder / DocType form.
 - ✅ Print Format editing (Jinja + CSS) from Crema's form: the new-form Name field for prompt-named DocTypes, Custom
   Format, the template in a Code field, then the format in the print view's picker — `e2e/printformat.mjs`.
 - 🟡 Print Format Builder: "Edit Format" opens Desk's v16 Vue builder (`print_format_builder_beta`) framed (L4).
   Problems found and the plan to fix them are in § 2.19.
-- ❌ Web Form builder (`web_form/`, field list editor), Workflow builder parity (`workflow_builder/` Vue flow),
+- ❌ **[Parity]** Web Form builder (`web_form/`, field list editor), Workflow builder parity (`workflow_builder/` Vue flow),
   Custom Field from the form menu, Translation tool, Naming Series dialog (`ui/naming_series.js`, v16 Document
   Naming Settings), Letter Head builder, Email Template preview (`utils/preview_email.js`, `views/render_preview.js`).
-- ❌ Onboarding: Module Onboarding steps (create/show/watch video), Onboarding Tours, What's New / changelog
+- ❌ **[P2]** Onboarding: Module Onboarding steps (create/show/watch video), Onboarding Tours, What's New / changelog
   dialog, setup wizard native (`ui/slides.js`) — currently via L4.
 
 ### 2.10 Pages (Page doctype — 17 on this site)
 | Page | Plan | Status |
 |---|---|---|
 | permission-manager | L3 native on `core.page.permission_manager.*` | ✅ native |
-| print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ (L4 works) |
-| backups | L3 native (backup files, schedule files backup) | ❌ (redirects) |
+| print-format-builder (+ beta) | L3 native builder on Print Format `format_data` | ❌ **[Parity]** (L4 works) |
+| backups | L3 native (backup files, schedule files backup) | ❌ **[Parity]** (redirects) |
 | setup-wizard | L4 host, later native | ✅ via L4 |
 | point-of-sale | L4 host now, native later | ✅ via L4 |
 | sales-funnel, stock-balance, warehouse-capacity-summary, bom-comparison-tool, visual-plant-floor | L4 host | ✅ via L4 |
@@ -393,60 +408,60 @@ Rebuild natively keyed by DocType + field, or host Desk's widget; each is daily-
   AddressContact.tsx`, Desk `address_and_contact.js` + templates): cards from `__onload`, Edit, Primary badge, Set /
   Unset Primary, Unlink (`remove_link`), New Address / Contact pre-linked via the form prefill, hidden on new docs —
   `e2e/addresscontact.mjs` (agent-built, judged; judge replaced a Storage monkey-patch with `takePrefill`).
-- ❌ Address autocompletion dialog, Contact quick-entry dialog (phone/email → child rows).
+- ❌ **[P2]** Address autocompletion dialog, Contact quick-entry dialog (phone/email → child rows).
 - ✅ Item stock levels (`lib/form/shims/itemDashboard.ts`, Desk `item_dashboard.js` + templates): per-warehouse qty bars
   from `item_dashboard.get_data`, More, Move / Add dialogs → prefilled Stock Entry (`make_stock_entry`) —
-  `e2e/itemdashboard.mjs` (agent-built, judged). ❌ Putaway Rule edit, warehouse-capacity variant.
+  `e2e/itemdashboard.mjs` (agent-built, judged). ❌ **[Parity]** Putaway Rule edit, warehouse-capacity variant.
 - ✅ Serial & Batch selector (`lib/form/shims/serialBatch.ts` + `SerialBatchDialog.tsx`, Desk
   `serial_no_batch_selector.js`): `erpnext.SerialBatchPackageSelector` / `show_serial_batch_selector` /
   `select_batch_and_serial_no`, opened by ERPNext's own row button; batch rows → `add_serial_batch_ledgers`,
   bundle on the row, submit + SLE verified — `e2e/serialbatch.mjs` (agent-built, judged; judge wired row-form
   Button fields to child events).
-- ❌ Selector auto-open from the transaction controller on PR / PI / DN, serial-number + outward + CSV flows
+- ❌ **[Parity]** Selector auto-open from the transaction controller on PR / PI / DN, serial-number + outward + CSV flows
   untested, DeskDialog Table fields (selector uses its own dialog), barcode scanning (`utils/barcode_scanner.js`).
 - ✅ Accounting / Stock Ledger preview (`lib/form/shims/ledgerPreview.ts`, `utils/ledger_preview.js`): Preview ▸ buttons
   on drafts, same methods, rows in a dialog (static table, no datatable filters) — `e2e/ledgerpreview.mjs`
   (agent-built, judged; Sales Invoice + Purchase Receipt).
-- ❌ Unreconcile dialog (`utils/unreconcile.js`), Payment Reconciliation allocation, Bank Reconciliation Tool
+- ❌ **[P3-prep]** Unreconcile dialog (`utils/unreconcile.js`), Payment Reconciliation allocation, Bank Reconciliation Tool
   (`bank-reconciliation-tool.bundle.js` — datatable + dialogs inside a Single doctype).
-- ❌ Item selector / quick add (`utils/item_selector.js`), party quick entries (`customer_quick_entry.js`,
+- ❌ **[P2]** Item selector / quick add (`utils/item_selector.js`), party quick entries (`customer_quick_entry.js`,
   `supplier_quick_entry.js`, `contact_address_quick_entry.js` — extended quick entry dialogs).
-- ❌ BOM configurator (`bom_configurator/`, tree editor), Project / Task gantt in forms, CRM activities on Lead /
+- ❌ **[P3-prep]** BOM configurator (`bom_configurator/`, tree editor), Project / Task gantt in forms, CRM activities on Lead /
   Opportunity (`utils/crm_activities.js` — notes, events, todos tabs).
-- ❌ Telephony / call popup (`call_popup/`, `telephony.js`), SMS manager (`sms_manager.js`).
-- ❌ Stock reservation dialogs (`stock_reservation.js`), bulk transaction processing (`bulk_transaction_processing.js`).
-- ❌ Plant floor visual (`plant_floor_visual/`) — via L4 page today.
+- ❌ **[Parity]** Telephony / call popup (`call_popup/`, `telephony.js`), SMS manager (`sms_manager.js`).
+- ❌ **[Parity]** Stock reservation dialogs (`stock_reservation.js`), bulk transaction processing (`bulk_transaction_processing.js`).
+- ❌ **[P3-prep]** Plant floor visual (`plant_floor_visual/`) — via L4 page today.
 
 ### 2.12 Admin and integrations
 - ✅ Users + role/module editors, Permission Manager, generic forms for settings, Data Import, Inbox.
 - 🟡 System Console (verify), Data Import wizard parity (`data_import_wizard.bundle.js`, v16 wizard).
-- ❌ User Permissions UX (add from the User form, "Show User Permissions" on a doctype, `Apply To All Doctypes`).
+- ❌ **[Parity]** User Permissions UX (add from the User form, "Show User Permissions" on a doctype, `Apply To All Doctypes`).
 - ✅ User form buttons from Frappe's own user.js (`e2e/useractions.mjs`): Permissions ▾ (Set User Permissions, View
   Permitted Documents, View Doctype Permissions), Password ▾ (Change Password, Reset Password), Impersonate prompt,
   Generate Keys → API Keys dialog, Create User Email.
-- ✅ Impersonation end-to-end (session switch + banner) — `e2e/impersonation.mjs`. ❌ Reset OTP Secret / LDAP reset (need 2FA / LDAP enabled).
-- ❌ Backups page, scheduler / RQ job status (RQ Job, RQ Worker virtual doctypes), Recorder UI, Error Log viewer
+- ✅ Impersonation end-to-end (session switch + banner) — `e2e/impersonation.mjs`. ❌ **[Parity]** Reset OTP Secret / LDAP reset (need 2FA / LDAP enabled).
+- ❌ **[Parity]** Backups page, scheduler / RQ job status (RQ Job, RQ Worker virtual doctypes), Recorder UI, Error Log viewer
   with traceback formatting, Log settings.
-- ❌ OAuth / Connected Apps flows, Email Account setup messages (OAuth authorize buttons), Social Login Keys.
-- ❌ Document Follow digest settings, Energy Point log/leaderboard, Auto Repeat dialog from the form menu.
+- ❌ **[Parity]** OAuth / Connected Apps flows, Email Account setup messages (OAuth authorize buttons), Social Login Keys.
+- ❌ **[Parity]** Document Follow digest settings, Energy Point log/leaderboard, Auto Repeat dialog from the form menu.
 
 ### 2.13 Email and notifications
 - ✅ Timeline email, composer, Inbox (read/unread, trash, close).
-- ❌ Composer: Email Template picker, reply / reply-all / forward from a timeline email, attach existing files and
+- ❌ **[P2]** Composer: Email Template picker, reply / reply-all / forward from a timeline email, attach existing files and
   uploads, print format + letter head attachment preview, signature, "Send After", read receipt, CC/BCC defaults.
-- ❌ Auto Email Report setup, Notification (doctype) preview, Newsletter send/schedule dialogs.
+- ❌ **[Parity]** Auto Email Report setup, Notification (doctype) preview, Newsletter send/schedule dialogs.
 
 ### 2.14 Hardening
 - 🟡 React Doctor: 0 errors, score 57 (2026-11-18; was 35 with 7 errors); ~235 warnings left (complexity, index keys, Set lookups). Split DocForm/ListView further.
-- ❌ Virtualized lists and report grids for large data.
-- ❌ `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
+- ❌ **[Parity]** Virtualized lists and report grids for large data.
+- ❌ **[P3-prep]** `e2e/run-all.mjs` on both benches in CI (`SKIP_ERPNEXT=1` on the hub).
 - ✅ Mobile layouts (M6): fluid spacing tokens (`--space-*` with `clamp()`, Tailwind `p-gutter` / `gap-field` …), form
   columns by container width (`@container`), sidebar closed on phones, compact header — no horizontal scroll at
   390 / 768 / 1280 px on workspace, list, form, report. ✅ Phones (< 640px, `lib/hooks/useIsPhone.ts`, one layout
   rendered): list rows as cards (title, status, three list fields, select all), standard filters / Group by / stats
   behind "More filters"; child tables as row cards that open the row form; form actions (Save / Submit / workflow /
   custom buttons) in a bottom bar; toasts lifted above it; no native date / time inputs left — `e2e/mobile.mjs`.
-- ❌ Keyboard-only pass, a11y labels everywhere (✅ dialogs are now named by their title). ✅ Pointer cursor on
+- ❌ **[P2]** Keyboard-only pass, a11y labels everywhere (✅ dialogs are now named by their title). ✅ Pointer cursor on
   everything clickable (base CSS: buttons, `role=button/tab/menuitem/option`, labels, selects, checkboxes).
 - ✅ No hydration mismatches on home / forms / reports: client-only values (stored theme icon, report-manager
   buttons, greeting + user name) render after hydration.
@@ -461,7 +476,7 @@ together (source: `form/layout.js` `refresh_dependency`, `model/perm.js`, `form/
 |---|---|---|---|
 | `hidden` | DocField / Customize Form / Property Setter | static, from meta | ✅ |
 | `depends_on` (`eval:doc.x == 1` or a fieldname) | DocField | on load and after every change | ✅ |
-| `read_only_depends_on`, `mandatory_depends_on` | DocField | same | ✅ (❌ re-check after save, 2.1) |
+| `read_only_depends_on`, `mandatory_depends_on` | DocField | same | ✅ (❌ **[Parity]** re-check after save, 2.1) |
 | permlevel | DocPerm rows per level | per user and document | ✅ hidden if no read, read-only if no write |
 | `frm.toggle_display / set_df_property` | form scripts | when the script runs | ✅ |
 | empty read-only fields | Desk hides read-only fields with no value when System Settings "Hide Empty Read-Only Fields" is on (default), except HTML / Image / Button / Geolocation / Attachment Gallery (`base_control.js` `get_status`) | on refresh | ✅ |
@@ -486,8 +501,8 @@ action runs `apply_workflow`; read-only states lock the form. On top of Desk (`c
 - ✅ Desk's **Help** (Actions → Help, or the workflow name in the bar): current state, editable-by roles, next actions.
 - ✅ **Workflow Action list**: open rows open the document waiting on you (`listview_settings.get_form_link`, now
   honoured by every list; `frappe.router.slug` shim).
-- ❌ Workspace number card "Pending approvals" (Workflow Action, status Open) and the email action links page.
-- ❌ Workflow builder parity (`workflow_builder/`, 2.9).
+- ❌ **[Parity]** Workspace number card "Pending approvals" (Workflow Action, status Open) and the email action links page.
+- ❌ **[Parity]** Workflow builder parity (`workflow_builder/`, 2.9).
 Source: `frappe/public/js/frappe/form/workflow.js`, `frappe/model/workflow.py`,
 `frappe/workflow/doctype/workflow_action/`. Proof: `e2e/workflow.mjs` (incl. a second user without every role).
 Frappe quirk: deleting a doc removes its Workflow Actions but not their permitted-role rows, so a role used in a
@@ -502,21 +517,21 @@ workflow can't be deleted afterwards.
 - ✅ Timeline wording ported from `version_timeline_content_builder.js`: "submitted / cancelled this document",
   "changed the value of A from x to y" (HTML turned into text, 40 characters), at most 3 changes per line, added /
   removed rows counted per table, hidden and unreadable fields left out — `e2e/formsave.mjs`.
-- ❌ Desk's "click" sound and `route_hooks.after_save`; save via `frm.save("Update")` on submitted docs with
+- ❌ **[Parity]** Desk's "click" sound and `route_hooks.after_save`; save via `frm.save("Update")` on submitted docs with
   `allow_on_submit` fields verified.
 
 ### 2.18 Data path: every call through the Next server
 All data calls already go browser → `app/api/frappe/[...path]` / `app/api/*` → `lib/frappe/server.ts` → Frappe; the
 browser never sends a request to Frappe directly (cookies, CSRF and the site header are added on the server).
 Left:
-- ❌ Realtime: socket.io connects from the browser to `NEXT_PUBLIC_SOCKETIO_URL`. Next route handlers can't proxy a
+- ❌ **[P3-prep]** Realtime: socket.io connects from the browser to `NEXT_PUBLIC_SOCKETIO_URL`. Next route handlers can't proxy a
   WebSocket; options are a rewrite of `/socket.io/*` to the socket server in `next.config` (same origin, still
   direct underneath), a small custom Node server, or SSE from a route handler fed by the server's own socket
   client. Recommended: the rewrite now, SSE only if the socket port must stay private. Goes away in phase 3 (§ 4: same origin).
-- ❌ `app/layout.tsx` preconnects to the Frappe URL — useless now that the browser never calls it; remove.
-- ❌ `getFrappeBaseUrl()` in `lib/frappe/client.ts` (legacy) — remove once nothing imports it; "View Website" in the
+- ❌ **[P3-prep]** `app/layout.tsx` preconnects to the Frappe URL — useless now that the browser never calls it; remove.
+- ❌ **[P3-prep]** `getFrappeBaseUrl()` in `lib/frappe/client.ts` (legacy) — remove once nothing imports it; "View Website" in the
   user menu is a link out and stays.
-- ❌ Server Components for first paint: load meta + doc on the server for `/desk/doctype/X/Y` so the form renders
+- ❌ **[P2]** Server Components for first paint: load meta + doc on the server for `/desk/doctype/X/Y` so the form renders
   without a client round trip (TanStack Query hydration).
 
 ### 2.19 Print Format Builder (plan)
