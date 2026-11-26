@@ -4,68 +4,41 @@
  * Server error details (Desk's "Server Error" dialog, request.js report_error): the message and the
  * server traceback in a <pre>, with copy. Opened from toasts via showErrorDetails(); mounted once in app/providers.tsx.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { usePathname } from "next/navigation";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
+import { closeErrorDetails, getErrorDetails, setTracebacksAllowed, subscribeErrorDetails, type ErrorDetailsInfo } from "@/components/desk/errorDetailsStore";
 
-export interface ErrorDetailsInfo {
-  message: string;
-  traceback: string;
-}
+// importers (lib/frappe/errors.ts) open the dialog through these; the state lives in errorDetailsStore
+export { showErrorDetails, tracebacksAllowed, type ErrorDetailsInfo } from "@/components/desk/errorDetailsStore";
 
-let current: ErrorDetailsInfo | null = null;
-const listeners = new Set<() => void>();
-// Desk shows tracebacks to System Managers only (the host keeps this in sync with the desk context roles)
-let systemManager = false;
-
-/** Whether the current user may see server tracebacks (Desk: System Manager) */
-export function tracebacksAllowed(): boolean {
-  return systemManager;
-}
-
-/** Open the error details dialog for an error with a server traceback */
-export function showErrorDetails(info: ErrorDetailsInfo) {
-  current = info;
-  listeners.forEach((l) => l());
-}
+const noInfo = () => null;
 
 export function ErrorDetailsHost() {
-  const [info, setInfo] = useState<ErrorDetailsInfo | null>(null);
-  const [copied, setCopied] = useState(false);
+  const info = useSyncExternalStore(subscribeErrorDetails, getErrorDetails, noInfo);
+  // "Copied" belongs to the error it was copied from: a newly shown error starts at "Copy"
+  const [copiedFor, setCopiedFor] = useState<ErrorDetailsInfo | null>(null);
+  const copied = !!info && copiedFor === info;
   // mounted app-wide (providers.tsx): only signed-in Desk pages have a context to load; /login has no session
   const inDesk = usePathname()?.startsWith("/desk") ?? false;
   const { data: ctx } = useDeskContext({ enabled: inDesk });
   useEffect(() => {
-    systemManager = !!ctx?.roles?.includes("System Manager");
+    setTracebacksAllowed(!!ctx?.roles?.includes("System Manager"));
   }, [ctx]);
-  useEffect(() => {
-    const sync = () => {
-      setInfo(current);
-      setCopied(false);
-    };
-    listeners.add(sync);
-    return () => {
-      listeners.delete(sync);
-    };
-  }, []);
-  const close = useCallback(() => {
-    current = null;
-    setInfo(null);
-  }, []);
   const copy = async () => {
     if (!info) return;
     try {
       await navigator.clipboard.writeText(info.traceback);
-      setCopied(true);
+      setCopiedFor(info);
     } catch {
       /* clipboard unavailable — the text stays selectable in the <pre> */
     }
   };
   return (
-    <Dialog open={!!info} onOpenChange={(o) => !o && close()}>
+    <Dialog open={!!info} onOpenChange={(o) => !o && closeErrorDetails()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Server Error</DialogTitle>
@@ -81,7 +54,7 @@ export function ErrorDetailsHost() {
             {copied ? <Check className="mr-1 h-4 w-4" /> : <Copy className="mr-1 h-4 w-4" />}
             {copied ? "Copied" : "Copy"}
           </Button>
-          <Button type="button" onClick={close}>Close</Button>
+          <Button type="button" onClick={closeErrorDetails}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
