@@ -2,6 +2,20 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-27 — Desk parity: views, saved-form fields, print
+- View menu like Desk's `list_view_select.js`: one "View: …" dropdown; Report, Calendar, Gantt, Image and Tree only
+  when the DocType qualifies; Kanban lists the boards, plus "New Kanban board".
+- Saved documents show the fields Desk shows. Ported form.js `cleanup_refresh` and ERPNext's `transaction.js` /
+  `sales_common.js` / `buying.js` refresh rules, which hide Company (one company), Customer / Supplier Name when it
+  repeats the ID, and empty Net Total and tax totals, and add currency labels. `depends_on` expressions see
+  `frappe` / `erpnext`, so "Currency and Price List" starts closed like Desk. e2e `form.deskparity` (both layouts).
+- Print: the last picked format is kept per DocType, and a format with unapplied builder changes says so (Apply /
+  Open builder). `/desk/print-format-builder-beta/<name>` opens Crema's builder (it used to frame Crema inside
+  itself). e2e `print.remember`.
+- Tabs left open across a deploy reload once instead of showing "Failed to load chunk".
+- Not done: Desk's "Address & Contact" tab on Sales Order. Next: bottom chat button, Crema login page, print builder
+  HTML editor, then C2.
+
 ## 2026-11-27 — Phase 2 C1: Connect Claude
 - The crema Frappe app (private repo `Ashutosh-Neupane/crema`) adds what the server has to do. Claude uses Frappe
   v16's own MCP endpoint (`/api/v2/mcp`) with OAuth.
