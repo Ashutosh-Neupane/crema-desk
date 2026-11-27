@@ -108,7 +108,8 @@ function StandardFilter({
   );
 }
 
-function SortControl({
+/** sort field + order; lives in the list's title row (ListHeader) so it doesn't wrap onto a row of its own */
+export function SortControl({
   meta,
   sort,
   setSort,
@@ -118,12 +119,12 @@ function SortControl({
   setSort: (s: Sort) => void;
 }) {
   return (
-    <div className="ml-auto flex items-center gap-1">
+    <div className="flex items-center gap-1">
       <select
         value={sort.field}
         onChange={(e) => setSort({ field: e.target.value, order: sort.order })}
         aria-label="Sort by"
-        className={`px-2 ${controlCls}`}
+        className={`max-w-[11rem] px-2 ${controlCls}`}
       >
         {sortableFields(meta).map((s) => (
           <option key={s.fieldname} value={s.fieldname}>
@@ -166,8 +167,7 @@ export function ListFilterBar({
   allFilters,
   setFilters,
   addFilter,
-  sort,
-  setSort,
+  facetsPane = false,
 }: {
   doctype: string;
   meta: DocTypeMeta;
@@ -182,8 +182,8 @@ export function ListFilterBar({
   allFilters: Filter[];
   setFilters: (f: Filter[]) => void;
   addFilter: (f: Filter) => void;
-  sort: Sort;
-  setSort: (s: Sort) => void;
+  /** the filters pane is open: it already shows Assigned To, Created By and Tags, so the bar doesn't repeat them */
+  facetsPane?: boolean;
 }) {
   // phones: standard filters, Group by and sidebar stats fold behind "More filters"
   const [moreFilters, setMoreFilters] = useState(false);
@@ -253,7 +253,7 @@ export function ListFilterBar({
         </Popover>
       )}
 
-      {expanded && showSidebar && (
+      {expanded && showSidebar && !facetsPane && (
         <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={user} />
       )}
 
@@ -264,7 +264,6 @@ export function ListFilterBar({
         </button>
       )}
 
-      <SortControl meta={meta} sort={sort} setSort={setSort} />
     </div>
   );
 }

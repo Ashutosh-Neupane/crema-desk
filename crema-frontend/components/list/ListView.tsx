@@ -31,7 +31,7 @@ import { useListColumns, useListViewConfig } from "@/components/list/useListColu
 import { useListRows, useListviewHooks, useSelection } from "@/components/list/useListRows";
 import { useAddAction, useListRedirects } from "@/components/list/useListNavigation";
 import { ListHeader } from "@/components/list/ListHeader";
-import { ActiveFilters, ListFilterBar } from "@/components/list/ListFilterBar";
+import { ActiveFilters, ListFilterBar, SortControl } from "@/components/list/ListFilterBar";
 import { ListBody } from "@/components/list/ListBody";
 import type { RowContext } from "@/components/list/ListRows";
 import { ListLayoutDialogs, type LayoutDialogState } from "@/components/list/ListLayoutDialogs";
@@ -254,6 +254,7 @@ function ListPage({
             refresh();
           }}
           onAdd={onAdd}
+          sortControl={<SortControl meta={meta} sort={state.sort} setSort={state.setSort} />}
         />
         <div className="flex items-start gap-2">
           <ShowFiltersButton pane={pane} />
@@ -273,8 +274,7 @@ function ListPage({
               allFilters={state.allFilters}
               setFilters={setFilters}
               addFilter={state.addFilter}
-              sort={state.sort}
-              setSort={state.setSort}
+              facetsPane={pane.open}
             />
           </div>
         </div>

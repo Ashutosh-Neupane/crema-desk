@@ -179,6 +179,7 @@ export function ListHeader({
   listFields,
   onBulkDone,
   onAdd,
+  sortControl,
 }: {
   doctype: string;
   meta: DocTypeMeta;
@@ -202,6 +203,8 @@ export function ListHeader({
   listFields: DocField[];
   onBulkDone: () => void;
   onAdd: () => void;
+  /** the sort field and order (ListFilterBar's SortControl) */
+  sortControl?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -219,6 +222,7 @@ export function ListHeader({
       <ViewSwitcher views={listViews(meta, doctype)} />
       <div className="ml-auto flex items-center gap-2">
         <ToolbarButtons items={pageState.inner} />
+        {sortControl}
         <RefreshButton onClick={refresh} spinning={fetching} />
         <ListSettingsMenu
           doctype={doctype}
