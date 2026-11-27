@@ -108,7 +108,8 @@ function StandardFilter({
   );
 }
 
-function SortControl({
+/** sort field + order; lives in the list's title row (ListHeader) so it doesn't wrap onto a row of its own */
+export function SortControl({
   meta,
   sort,
   setSort,
@@ -118,12 +119,12 @@ function SortControl({
   setSort: (s: Sort) => void;
 }) {
   return (
-    <div className="ml-auto flex items-center gap-1">
+    <div className="flex items-center gap-1">
       <select
         value={sort.field}
         onChange={(e) => setSort({ field: e.target.value, order: sort.order })}
         aria-label="Sort by"
-        className={`px-2 ${controlCls}`}
+        className={`max-w-[11rem] px-2 ${controlCls}`}
       >
         {sortableFields(meta).map((s) => (
           <option key={s.fieldname} value={s.fieldname}>
@@ -147,6 +148,11 @@ function SortControl({
   );
 }
 
+/** an "=" filter on a field shown as an inline standard filter */
+function isInline(f: Filter, standard: Pick<DocField, "fieldname">[]) {
+  return f[2] === "=" && standard.some((d) => d.fieldname === f[1]);
+}
+
 export function ListFilterBar({
   doctype,
   meta,
@@ -161,8 +167,7 @@ export function ListFilterBar({
   allFilters,
   setFilters,
   addFilter,
-  sort,
-  setSort,
+  facetsPane = false,
 }: {
   doctype: string;
   meta: DocTypeMeta;
@@ -177,8 +182,8 @@ export function ListFilterBar({
   allFilters: Filter[];
   setFilters: (f: Filter[]) => void;
   addFilter: (f: Filter) => void;
-  sort: Sort;
-  setSort: (s: Sort) => void;
+  /** the filters pane is open: it already shows Assigned To, Created By and Tags, so the bar doesn't repeat them */
+  facetsPane?: boolean;
 }) {
   // phones: standard filters, Group by and sidebar stats fold behind "More filters"
   const [moreFilters, setMoreFilters] = useState(false);
@@ -232,8 +237,8 @@ export function ListFilterBar({
             </span>
           )}
         </PopoverTrigger>
-        <PopoverContent className="w-80">
-          <FilterEditor meta={meta} onAdd={addFilter} />
+        <PopoverContent align="start" className="w-96 max-w-[calc(100vw-1.5rem)]">
+          <FilterEditor meta={meta} onAdd={addFilter} filters={filters} setFilters={setFilters} />
         </PopoverContent>
       </Popover>
 
@@ -248,11 +253,17 @@ export function ListFilterBar({
         </Popover>
       )}
 
-      {expanded && showSidebar && (
+      {expanded && showSidebar && !facetsPane && (
         <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={user} />
       )}
 
-      <SortControl meta={meta} sort={sort} setSort={setSort} />
+      {/* every filter sits in an inline field (no chip row below): Clear all lives here instead */}
+      {filters.length > 0 && !phone && filters.every((f) => isInline(f, standardFilters)) && (
+        <button type="button" onClick={() => setFilters([])} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
+          Clear all
+        </button>
+      )}
+
     </div>
   );
 }
@@ -261,15 +272,19 @@ export function ActiveFilters({
   meta,
   filters,
   setFilters,
+  inline = [],
 }: {
   meta: DocTypeMeta;
   filters: Filter[];
   setFilters: (f: Filter[]) => void;
+  /** fields shown as inline standard filters: their "=" filter is already visible there, so no chip */
+  inline?: string[];
 }) {
-  if (!filters.length) return null;
+  const shown = filters.map((f, i) => ({ f, i })).filter(({ f }) => !isInline(f, inline.map((fieldname) => ({ fieldname }))));
+  if (!shown.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {filters.map((f, i) => (
+      {shown.map(({ f, i }) => (
         <span
           key={`${f[1]}|${f[2]}|${JSON.stringify(f[3])}`}
           className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"

@@ -68,8 +68,8 @@ const customer = (await api(`api/resource/Sales%20Order?fields=${encodeURICompon
 const byCustomer = Math.min(20, await soCount([["customer", "=", customer]]));
 step(`filter editor: Customer = ${customer}`);
 await page.getByRole("button", { name: /^Filter/ }).click();
-await page.locator("select").filter({ hasText: "Customer" }).first().selectOption({ label: "Customer" });
-const linkInput = page.locator(".w-80 input").first();
+await page.getByLabel("Filter field").selectOption({ label: "Customer" });
+const linkInput = page.locator("[data-filter-editor] input").first();
 await linkInput.fill(customer);
 await linkInput.press("Tab");
 await page.getByRole("button", { name: "Add filter" }).click();

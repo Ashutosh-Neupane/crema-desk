@@ -281,7 +281,7 @@ export function NewDocTypeStart() {
             value={module}
             onChange={setModule}
             placeholder="e.g. Custom"
-            className={field}
+            inputClassName={field}
           />
           <Msg err={show(moduleErr, false)} hint="Groups it in the sidebar and in permissions." />
         </div>

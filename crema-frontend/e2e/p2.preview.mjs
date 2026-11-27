@@ -1,6 +1,6 @@
 // Phase 2 list record preview (docs/PHASE2_DESIGN.md § 3.8): on a wide screen in the New layout, clicking a list row
 // previews the record beside the list; ↓ / ↑ move to the next / previous row, Esc closes, "Open" goes to the form,
-// ⌘/Ctrl-click still opens, and switching preview off makes a click open the record again.
+// ⌘/Ctrl-click and double-click open, and switching preview off makes a click open the record again.
 //   BASE=http://localhost:3001 NEW_LAYOUT=1 OUT=/tmp/shots node e2e/p2.preview.mjs
 import { start, BASE } from "./lib.mjs";
 
@@ -49,6 +49,14 @@ check(/\/desk\/sales-order\/?$/.test(new URL(page.url()).pathname), "title link 
 await pane.getByRole("link", { name: /Open/ }).click();
 await page.waitForURL((u) => u.pathname.includes(encodeURIComponent(second)) || u.pathname.includes(second), { timeout: 30000 });
 check(true, "Open goes to the record");
+
+step("double-click a row: opens the record (preview mode on)");
+await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded" });
+await rows.first().waitFor({ timeout: 60000 });
+const target = await rows.nth(0).getAttribute("data-row");
+await rows.nth(0).locator("td").nth(3).dblclick();
+await page.waitForURL((u) => u.pathname.includes(encodeURIComponent(target)) || u.pathname.includes(target), { timeout: 30000 });
+check(true, `double-click opened ${target}`);
 
 step("preview off: a row click opens the record");
 await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded" });

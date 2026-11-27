@@ -4,7 +4,7 @@
  * The list's rows (list_view.js get_list_row_html): a table on wider screens, one card per row on phones.
  * Title (title_field / name) · status indicator · list fields · assignees, modified, comments, like.
  */
-import { Fragment, memo } from "react";
+import { Fragment, memo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
@@ -202,6 +202,9 @@ const RowCard = memo(function RowCard({
   );
 });
 
+/** preview mode: the row the last click previewed, so a double-click opens it (ListTable) */
+let lastPreviewClick: { href: string; at: number } | null = null;
+
 export function ListCards({
   rows,
   total,
@@ -299,14 +302,20 @@ const TableRow = memo(function TableRow({
   const onRowClick = (e: React.MouseEvent) => {
     // controls inside the row (links, buttons, an app's row dropdown menu) don't open the record
     if ((e.target as HTMLElement).closest("a,button,input,[role=menu],[role=menuitem]")) return;
+    if (c.onPreview && e.detail >= 2) return; // the second click of a double-click: the table opens the record
     if (e.metaKey || e.ctrlKey) window.open(href, "_blank", "noopener");
-    else if (c.onPreview) c.onPreview(r.name);
+    else if (c.onPreview) {
+      lastPreviewClick = { href, at: Date.now() };
+      c.onPreview(r.name);
+    }
     else router.push(href);
   };
   // in preview mode the title link previews too (it stays a real link: ⌘/Ctrl-click, middle-click, copy)
   const onTitleClick = (e: React.MouseEvent) => {
     if (!c.onPreview || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
+    if (e.detail >= 2) return;
+    lastPreviewClick = { href, at: Date.now() };
     c.onPreview(r.name);
   };
   const active = c.previewing === r.name;
@@ -314,6 +323,7 @@ const TableRow = memo(function TableRow({
     // the row is a shortcut for its title link, which is the keyboard / screen reader path to the record
     <tr
       onClick={onRowClick}
+      title={c.onPreview ? "Click to preview, double-click to open" : undefined}
       aria-current={active || undefined}
       data-row={r.name}
       // focusable like Desk's .list-row-container, for ↑ / ↓ / Enter / Space (useListKeys)
@@ -389,6 +399,7 @@ export function ListTable({
   c: RowContext;
   sel: Selection;
 }) {
+  const router = useRouter();
   const widths = new Map(colSettings.map((x) => [x.fieldname, x.width]));
   const minWidth = (fieldname: string) => {
     const w = widths.get(fieldname);
@@ -403,9 +414,27 @@ export function ListTable({
         ? c.filters.filter((f) => f[1] !== "_liked_by")
         : [...c.filters, [c.doctype, "_liked_by", "like", `%${c.user}%`]]
     );
+  // preview mode: a double-click opens the row its first click previewed. Handled here, not on the row: opening the
+  // pane can move the list, so the second click may land on another row or the header.
+  // (a listener rather than onClick: a table isn't interactive itself; Enter opens the focused row, useListKeys)
+  const tableRef = useRef<HTMLTableElement>(null);
+  const previewMode = !!c.onPreview;
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el || !previewMode) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.detail < 2 || !lastPreviewClick || Date.now() - lastPreviewClick.at > 600) return;
+      const { href } = lastPreviewClick;
+      lastPreviewClick = null;
+      window.getSelection()?.removeAllRanges();
+      router.push(href);
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, [previewMode, router]);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table ref={tableRef} className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50/60 text-left text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60">
             <th className="w-10 px-3 py-2.5">

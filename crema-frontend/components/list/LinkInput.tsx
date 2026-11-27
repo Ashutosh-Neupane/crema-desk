@@ -10,6 +10,7 @@ export default function LinkInput({
   onChange,
   placeholder,
   className = "",
+  inputClassName,
   autoFocus,
   getQuery,
   id,
@@ -19,6 +20,8 @@ export default function LinkInput({
   onChange: (v: string) => void;
   placeholder?: string;
   className?: string;
+  /** replaces the input's own look (border, height, padding); className styles the wrapper */
+  inputClassName?: string;
   autoFocus?: boolean;
   id?: string;
   getQuery?: () =>
@@ -108,7 +111,7 @@ export default function LinkInput({
             pick(results[active]?.value ?? text);
           } else if (e.key === "Escape") setOpen(false);
         }}
-        className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        className={inputClassName ?? "h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"}
       />
       {open && results.length > 0 && (
         <ul

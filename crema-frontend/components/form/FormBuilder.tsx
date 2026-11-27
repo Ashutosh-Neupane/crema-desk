@@ -204,7 +204,7 @@ export default function FormBuilder({
           )}
         </div>
 
-        <aside className="p-4 lg:sticky lg:top-14 lg:max-h-[calc(100vh-4.5rem)] lg:self-start lg:overflow-y-auto">
+        <aside className="p-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain">
           {sel ? (
             <Properties
               key={sel.name}

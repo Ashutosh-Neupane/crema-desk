@@ -852,3 +852,19 @@ a:focus-visible,
 .crema-form-layout:has(.crema-builder) > :is(.crema-form-side, .crema-form-activity) { display: none; }
 .crema-form-layout:has(.crema-builder) > .crema-form-body { grid-column: 1; grid-row: auto; }
 section:has([data-fieldname="form_builder"]):not(:has([data-fieldtype]:not([data-fieldname="form_builder"]))) { display: none; }
+
+/* Native selects: our own chevron with room on the right, so the arrow never touches the border (the browser's
+   arrow sits flush against the edge). Unlayered so it wins over px-* utilities; multi-line selects keep theirs. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 0.875rem;
+  padding-right: 2rem;
+  text-overflow: ellipsis;
+}
+:root[data-theme="dark"] select:not([multiple]):not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
