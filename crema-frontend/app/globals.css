@@ -747,6 +747,10 @@ a:focus-visible,
 :root[data-layout="new"]:not([data-theme="dark"]):not([data-contrast="more"]) {
   --text-muted: #6b6b6b;
 }
+/* text-zinc-500 (tabs, hints, grid headers) in the same AA grey; the theme is inline, so the class is what to change */
+:root[data-layout="new"]:not([data-theme="dark"]):not([data-contrast="more"]) .text-zinc-500 {
+  color: #6b6b6b;
+}
 
 /* Small motion for the New layout (docs/PHASE2_DESIGN.md § 2.3). Every duration and delay is a token, and the tokens
  * are 0 under prefers-reduced-motion, so nothing moves for people who asked for less motion. */
