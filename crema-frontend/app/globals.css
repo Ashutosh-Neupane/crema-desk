@@ -741,3 +741,9 @@ a:focus-visible,
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* New layout, light theme: muted text at AA (#6b6b6b is 5.3:1 on white, 4.8:1 on gray-100; the shared #7c7c7c is
+ * 4.2:1). Classic keeps its colours; dark and high contrast already pass and keep theirs. */
+:root[data-layout="new"]:not([data-theme="dark"]):not([data-contrast="more"]) {
+  --text-muted: #6b6b6b;
+}
