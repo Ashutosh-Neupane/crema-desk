@@ -445,7 +445,6 @@ function ShellHeader({ apps, onShortcuts }: { apps: NonNullable<DeskNavigation["
 
         <div className="flex min-w-0 items-center justify-end gap-0.5">
           <CommandPalette />
-          <AskClaude />
           <ThemeMenu />
           <NotificationsPanel />
           {/* User menu (Desk v16 sidebar_header.js + Navbar Settings rows) */}
@@ -527,6 +526,7 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
             {children}
           </div>
         </main>
+        <AskClaude />
         <DialogHost />
         <MultiSelectHost />
         <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

@@ -13,8 +13,8 @@ Newest entries on top. Each session: append what was done, what's verified, what
   Open builder). `/desk/print-format-builder-beta/<name>` opens Crema's builder (it used to frame Crema inside
   itself). e2e `print.remember`.
 - Tabs left open across a deploy reload once instead of showing "Failed to load chunk".
-- Not done: Desk's "Address & Contact" tab on Sales Order. Next: bottom chat button, Crema login page, print builder
-  HTML editor, then C2.
+- Ask in Claude is a chat button at the bottom right; the login page is Crema's own.
+- Not done: Desk's "Address & Contact" tab on Sales Order. Next: print builder HTML editor, then C2.
 
 ## 2026-11-27 — Phase 2 C1: Connect Claude
 - The crema Frappe app (private repo `Ashutosh-Neupane/crema`) adds what the server has to do. Claude uses Frappe

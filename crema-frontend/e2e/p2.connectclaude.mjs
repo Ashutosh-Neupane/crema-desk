@@ -62,8 +62,13 @@ check(codes.some((c) => c.includes('"mcp-remote"')), "Claude Desktop config");
 await shot("p2_connectclaude_local", false);
 await t.axeCheck("connect claude local", "main");
 
-step("header ✦: Ask in Claude");
-await page.getByRole("button", { name: "Ask in Claude" }).click();
+step("✦ chat button at the bottom right: Ask in Claude");
+const chatBtn = page.getByRole("button", { name: "Ask in Claude" });
+check((await page.locator("header").getByRole("button", { name: "Ask in Claude" }).count()) === 0, "not in the header");
+const vp = page.viewportSize();
+const at = await chatBtn.boundingBox();
+check(!!at && !!vp && at.x + at.width > vp.width - 64 && at.y + at.height > vp.height - 64, "floats at the bottom right");
+await chatBtn.click();
 const ask = page.getByLabel("Ask in Claude", { exact: true }).last();
 await ask.waitFor({ timeout: 10000 });
 check(await page.getByRole("button", { name: "Open in Claude app" }).isDisabled(), "needs a question first");
