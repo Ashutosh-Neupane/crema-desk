@@ -150,7 +150,7 @@ function FieldControl({ field, value, onChange, error, disabled = false, doc, ge
   const showLabel = !["HTML", "Button", "Heading", "Check"].includes(field.fieldtype);
 
   return (
-    <div className={`flex flex-col gap-1.5 ${field.fullWidth ? "col-span-full" : ""} ${field.bold ? "crema-bold" : ""}`}>
+    <div data-fieldtype={field.fieldtype} className={`flex min-w-0 flex-col gap-1.5 ${field.fullWidth ? "col-span-full" : ""} ${field.bold ? "crema-bold" : ""}`}>
       {showLabel && (
         <label htmlFor={inputId} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {field.label || field.fieldname}

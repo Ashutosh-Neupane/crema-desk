@@ -61,6 +61,17 @@ function lenientObject<T extends object>(o: T): T {
   });
 }
 
+/** each field's Tab Break (fields before the first one have none) */
+function tabsOfFields(fields: DocField[]): Map<string, DocField> {
+  const out = new Map<string, DocField>();
+  let tab: DocField | null = null;
+  for (const f of fields) {
+    if (f.fieldtype === "Tab Break") tab = f;
+    else if (tab) out.set(f.fieldname, tab);
+  }
+  return out;
+}
+
 export class FormController {
   meta: DocTypeMeta;
   metas: Record<string, DocTypeMeta>;
@@ -627,15 +638,42 @@ export class FormController {
     return el;
   }
 
+  /** Desk's Tab object (form/tab.js): df (writes go through set_df_property), toggle(show), set_active() */
+  private tabShim(tab: DocField) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    const df = new Proxy(tab, {
+      get: (t, prop) => (typeof prop === "string" && self.overrides[tab.fieldname] && prop in self.overrides[tab.fieldname] ? self.overrides[tab.fieldname][prop] : Reflect.get(t, prop)),
+      set: (_t, prop, value) => {
+        if (typeof prop === "string") self.setDf(tab.fieldname, prop, value);
+        return true;
+      },
+    });
+    return lenientObject({
+      df,
+      label: tab.label,
+      fieldname: tab.fieldname,
+      toggle: (show: boolean) => self.setDf(tab.fieldname, "hidden", show ? 0 : 1),
+      hide: () => self.setDf(tab.fieldname, "hidden", 1),
+      show: () => self.setDf(tab.fieldname, "hidden", 0),
+      // FormBody opens the tab with the newest stamp
+      set_active: () => self.setDf(tab.fieldname, "__activate", Date.now()),
+      is_active: () => false,
+    });
+  }
+
   // ── frm (what scripts see) ──────────────────────────────────────────────
   private buildFrm(): Record<string, unknown> {
     // getters on frm must read the controller's current doc, not a snapshot
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     const fieldsDict: Record<string, unknown> = {};
+    const tabOf = tabsOfFields(this.meta.fields ?? []);
     for (const f of this.meta.fields ?? []) {
       fieldsDict[f.fieldname] = {
         df: f,
+        // Desk layout.js: field.tab is the Tab it sits in (scripts show / hide / open it, e.g. ERPNext's Proforma tab)
+        tab: tabOf.has(f.fieldname) ? this.tabShim(tabOf.get(f.fieldname)!) : undefined,
         get value() {
           return self.doc[f.fieldname];
         },

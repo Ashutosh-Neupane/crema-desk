@@ -42,12 +42,14 @@ const noSubscribe = () => () => {};
 const transitionName = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 /** column span per card size: one column on phones, 2 / 3 per row on tablets, the 12-col grid from 1024 */
+// 12 columns; 16 once the home is ≥ 110rem wide (§ 3.4: wide screens add columns, cards keep their size)
 const SPAN: Record<CardSize, string> = {
-  2: "col-span-6 md:col-span-4 lg:col-span-2",
-  4: "col-span-12 md:col-span-6 lg:col-span-4",
-  6: "col-span-12 lg:col-span-6",
-  12: "col-span-12",
+  2: "col-span-6 md:col-span-4 lg:col-span-2 @min-[110rem]:col-span-2",
+  4: "col-span-12 md:col-span-6 lg:col-span-4 @min-[110rem]:col-span-4",
+  6: "col-span-12 lg:col-span-6 @min-[110rem]:col-span-8",
+  12: "col-span-12 @min-[110rem]:col-span-16",
 };
+const GRID = "grid grid-cols-12 gap-4 @min-[110rem]:grid-cols-16";
 /** Needs you spans two rows when it has a list to show */
 const rowSpan = (card: HomeCard) =>
   card.type === "needs-you" && card.items.length > 2 ? "lg:row-span-2" : "";
@@ -131,44 +133,51 @@ export default function DynamicHome() {
 
       {editing && <EditBanner onReset={reset} />}
 
-      {loading ? (
-        <HomeSkeleton />
-      ) : (
-        <ul className="grid grid-flow-row-dense grid-cols-12 gap-4" aria-label="Home cards">
-          {shown.map((card, i) => (
-            <li
-              key={card.id}
-              className={`${SPAN[card.size]} ${rowSpan(card)} crema-rise relative min-w-0`}
-              style={{ "--i": Math.min(i, 8), viewTransitionName: `home-${transitionName(card.id)}` } as CSSProperties}
-              data-card={card.id}
-            >
-              {editing && card.type !== "needs-you" && (
-                <CardControls
-                  pinned={pinnedIds.has(card.id)}
-                  title={card.title}
-                  onPin={() => togglePin(card.id)}
-                  onHide={() => hide(card.id)}
+      <div className="@container">
+        {loading ? (
+          <HomeSkeleton />
+        ) : (
+          <ul className={`${GRID} grid-flow-row-dense`} aria-label="Home cards">
+            {shown.map((card, i) => (
+              <li
+                key={card.id}
+                className={`${SPAN[card.size]} ${rowSpan(card)} crema-rise relative min-w-0`}
+                style={
+                  {
+                    "--i": Math.min(i, 8),
+                    viewTransitionName: `home-${transitionName(card.id)}`,
+                  } as CSSProperties
+                }
+                data-card={card.id}
+              >
+                {editing && card.type !== "needs-you" && (
+                  <CardControls
+                    pinned={pinnedIds.has(card.id)}
+                    title={card.title}
+                    onPin={() => togglePin(card.id)}
+                    onHide={() => hide(card.id)}
+                  />
+                )}
+                <CardBody
+                  card={card}
+                  q={q}
+                  retry={() => void work.refetchMine()}
+                  loadingDrafts={work.draftsLoading}
                 />
-              )}
-              <CardBody
-                card={card}
-                q={q}
-                retry={() => void work.refetchMine()}
-                loadingDrafts={work.draftsLoading}
-              />
-            </li>
-          ))}
-          {!shown.length && (
-            <li className="col-span-12">
-              <EmptyNext
-                icon={<Search className="h-5 w-5" />}
-                message={`Nothing on this page matches “${query}”.`}
-                action={{ label: "Clear filter", onClick: () => setQuery("") }}
-              />
-            </li>
-          )}
-        </ul>
-      )}
+              </li>
+            ))}
+            {!shown.length && (
+              <li className="col-span-12">
+                <EmptyNext
+                  icon={<Search className="h-5 w-5" />}
+                  message={`Nothing on this page matches “${query}”.`}
+                  action={{ label: "Clear filter", onClick: () => setQuery("") }}
+                />
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
 
       {more > 0 && (
         <button
@@ -520,7 +529,7 @@ function CardBody({
 
 function HomeSkeleton() {
   return (
-    <div className="grid grid-cols-12 gap-4" role="status" aria-label="Loading your home">
+    <div className={GRID} role="status" aria-label="Loading your home">
       {[4, 4, 4, 2, 2, 2, 2].map((w, i) => (
         <div
           key={i}

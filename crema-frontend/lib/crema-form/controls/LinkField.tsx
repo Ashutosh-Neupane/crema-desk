@@ -296,7 +296,7 @@ function LinkEditor({ field, inputId, onChange, error, getQuery, compact, doc, e
     const hit = isTitleLink ? results.find((r) => r.label === t) : undefined;
     commit(hit ? hit.value : t, hit?.label);
   };
-  const extras = linkExtras(!!field.only_select, !!canCreateDoctype, doctype, () => setCreating(true), () => (setOpen(false), setAdvanced(true)));
+  const extras = linkExtras(!!field.only_select, !!canCreateDoctype, doctype, () => (setOpen(false), setCreating(true)), () => (setOpen(false), setAdvanced(true)));
 
   const keyCtx: KeyCtx = {
     results,

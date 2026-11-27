@@ -11,33 +11,15 @@
  * ("No Tags" → is not set), others → `field = value` (empty → is not set).
  */
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, Settings2 } from "lucide-react";
 import { deskCall } from "@/lib/frappe/form";
-import { fetchGroupByCount, type Filter } from "@/lib/list/api";
+import type { Filter } from "@/lib/list/api";
+import { FIELD_TYPES, toggleGroupFilter, useGroupByFields, useGroupCounts } from "./groupCounts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
 import type { DocTypeMeta } from "@/lib/frappe/types";
 
-type Count = { name: string | null; count: number; title?: string };
-type Item = { key: string; label: string; count: number };
 
-const STANDARD = [
-  { fieldname: "assigned_to", label: "Assigned To" },
-  { fieldname: "owner", label: "Created By" },
-  { fieldname: "tags", label: "Tags" },
-];
-const FIELD_TYPES = ["Select", "Link", "Data", "Int", "Check"];
-const filterField = (f: string) => (f === "assigned_to" ? "_assign" : f === "tags" ? "_user_tags" : f);
-
-async function loadGroupByFields(doctype: string): Promise<string[]> {
-  const { env } = await deskCall("frappe.model.utils.user_settings.get", { doctype }, { get: true });
-  try {
-    const s = typeof env.message === "string" ? JSON.parse(env.message) : (env.message ?? {});
-    return Array.isArray(s?.group_by_fields) ? (s.group_by_fields as string[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 export default function ListSidebar({
   meta,
@@ -52,40 +34,8 @@ export default function ListSidebar({
 }) {
   const qc = useQueryClient();
   const doctype = meta.name;
-  const { data: saved = [] } = useQuery({ queryKey: ["list-group-by-fields", doctype], queryFn: () => loadGroupByFields(doctype), staleTime: 60_000 });
-  const fields = useMemo(() => {
-    const out = [...STANDARD];
-    const byName = new Map((meta.fields ?? []).map((f) => [f.fieldname, f]));
-    const seen = new Set(out.map((o) => o.fieldname));
-    for (const fn of saved) {
-      const df = byName.get(fn);
-      if (df && !seen.has(fn)) {
-        seen.add(fn);
-        out.push({ fieldname: fn, label: df.label ?? fn });
-      }
-    }
-    return out;
-  }, [saved, meta]);
-  const fieldtypeOf = (fn: string) => meta.fields?.find((f) => f.fieldname === fn)?.fieldtype;
-
-  const apply = (fieldname: string, value: string | null, selected: boolean) => {
-    const ff = filterField(fieldname);
-    // Desk: filter_area.remove(fieldname), then add unless the value was already applied
-    const rest = filters.filter((f) => f[1] !== ff);
-    if (selected) return setFilters(rest);
-    let op = "=";
-    let v: unknown = value ?? "";
-    if (v === "" || (ff === "_user_tags" && value === "No Tags")) {
-      op = "is";
-      v = "not set";
-    } else if (ff === "_assign") {
-      op = "like";
-      v = `%${value}%`;
-    } else if (ff === "_user_tags") {
-      op = "like";
-    }
-    setFilters([...rest, [doctype, ff, op, v]]);
-  };
+  const { fields, saved, fieldtypeOf } = useGroupByFields(meta);
+  const apply = (fieldname: string, value: string | null, selected: boolean) => setFilters(toggleGroupFilter(doctype, filters, fieldname, value, selected));
 
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="List sidebar">
@@ -116,40 +66,7 @@ function GroupByDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const ff = filterField(fieldname);
-  const applied = filters.find((f) => f[1] === ff);
-  // Desk removes the field's own filter so every value keeps its count; tags keep all filters
-  const countFilters = useMemo(() => (fieldname === "tags" ? filters : filters.filter((f) => f[1] !== ff)), [filters, fieldname, ff]);
-
-  const { data, isLoading } = useQuery<Item[]>({
-    queryKey: ["list-sidebar", doctype, fieldname, countFilters],
-    enabled: open,
-    staleTime: 0,
-    queryFn: async () => {
-      if (fieldname === "tags") {
-        const { env } = await deskCall("frappe.desk.reportview.get_sidebar_stats", { stats: ["_user_tags"], doctype, filters: countFilters }, { get: true });
-        const stats = ((env.message as { stats?: Record<string, Array<[string, number]>> })?.stats?._user_tags ?? []) as Array<[string, number]>;
-        return stats.map(([name, count]) => ({ key: name, label: name, count }));
-      }
-      let rows: Count[] = (await fetchGroupByCount(doctype, countFilters, fieldname)).filter((r) => r.count !== 0);
-      const me = rows.find((r) => r.name === user);
-      rows = rows.filter((r) => !["Guest", "Administrator", user].includes(String(r.name)));
-      if (me) rows.unshift(me);
-      return rows.map((r) => ({
-        key: r.name == null ? "" : String(r.name),
-        count: r.count,
-        label: r.name == null ? "Not Set" : r.name === user ? "Me" : fieldtype === "Check" ? (String(r.name) === "0" ? "No" : "Yes") : fieldtype === "Link" && r.title ? r.title : String(r.name),
-      }));
-    },
-  });
-
-  const isApplied = (key: string) => {
-    if (!applied) return false;
-    const v = String(applied[3] ?? "");
-    if (fieldname === "assigned_to") return v === `%${key}%`;
-    if (fieldname === "tags") return key === "No Tags" ? applied[2] === "is" : v === key;
-    return key === "" ? applied[2] === "is" : v === key;
-  };
+  const { data, isLoading, applied, isApplied } = useGroupCounts({ doctype, fieldname, fieldtype, filters, user, enabled: open });
   const items = (data ?? []).filter((i) => i.label.toLowerCase().includes(q.trim().toLowerCase()));
   // applied value first, like Desk's "has-selected" dropdown
   items.sort((a, b) => Number(isApplied(b.key)) - Number(isApplied(a.key)));

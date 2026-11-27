@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import type { DeskNavigation } from "@/lib/navigation";
+import { useNewLayout } from "@/lib/ui/newLayout";
 import {
   Moon,
   Sun,
@@ -458,7 +459,9 @@ export default function CremaShell({ children }: { children: React.ReactNode }) 
   const shellPath = usePathname();
   // full-screen tools (Print Format Builder): no breadcrumb row, no width cap — they bring their own header
   const fullScreen = shellPath.startsWith("/desk/print-format-builder/");
-  const wide = fullWidth || fullScreen;
+  const newLayout = useNewLayout();
+  // the New layout is fluid (§ 3.4: wide screens fill with panes and columns); classic keeps Desk's 1290 cap
+  const wide = fullWidth || fullScreen || newLayout;
   useCloseSidebarOnMobileNavigation(shellPath);
   useSeedThemeFromDeskUser();
   // Desk's container_fullwidth (localStorage) is read after mount so server and client markup match

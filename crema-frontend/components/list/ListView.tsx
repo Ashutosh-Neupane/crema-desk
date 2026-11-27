@@ -35,8 +35,13 @@ import { ActiveFilters, ListFilterBar } from "@/components/list/ListFilterBar";
 import { ListBody } from "@/components/list/ListBody";
 import type { RowContext } from "@/components/list/ListRows";
 import { ListLayoutDialogs, type LayoutDialogState } from "@/components/list/ListLayoutDialogs";
+import { ListFacetsPane } from "@/components/list/ListFacetsPane";
+import { usePane } from "@/lib/ui/pane";
+import { PanelLeftOpen } from "lucide-react";
 
-const Skeleton = () => <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />;
+const Skeleton = () => (
+  <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+);
 
 export default function ListView({ doctype }: { doctype: string }) {
   const { data: meta, isLoading, error } = useDoctype(doctype);
@@ -52,7 +57,18 @@ export default function ListView({ doctype }: { doctype: string }) {
 
   if (error) return <p className="p-6 text-sm text-red-600">{(error as Error).message}</p>;
   if (isLoading || !meta || meta.issingle) return <Skeleton />;
-  return <ListPage doctype={doctype} meta={meta} settings={settings} ctx={ctx} config={config} state={state} colSettings={colSettings} columns={columns} />;
+  return (
+    <ListPage
+      doctype={doctype}
+      meta={meta}
+      settings={settings}
+      ctx={ctx}
+      config={config}
+      state={state}
+      colSettings={colSettings}
+      columns={columns}
+    />
+  );
 }
 
 type DeskCtx = ReturnType<typeof useDeskContext>["data"];
@@ -98,7 +114,14 @@ function ListPage({
     disableAutoRefresh: config.disableAutoRefresh,
   });
   const { rows, refresh } = list;
-  const pageState = useListviewHooks({ doctype, meta, settings, ready: state.stateReady, loadedAt: list.isSuccess ? list.dataUpdatedAt : 0, host: { rows, selected, clearSelected, filters, setFilters, refresh } });
+  const pageState = useListviewHooks({
+    doctype,
+    meta,
+    settings,
+    ready: state.stateReady,
+    loadedAt: list.isSuccess ? list.dataUpdatedAt : 0,
+    host: { rows, selected, clearSelected, filters, setFilters, refresh },
+  });
 
   const [quickEntry, setQuickEntry] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -107,119 +130,206 @@ function ListPage({
   const [manageLayouts, setManageLayouts] = useState(false);
   const onAdd = useAddAction(doctype, meta, settings, () => setQuickEntry(true));
   // Desk list shortcut: Ctrl/⌘+B = New (list_view.js)
-  useShortcuts([{ keys: "mod+b", description: `New ${doctype}`, group: "List", allowInInput: true, action: () => router.push(newDocHref(doctype)) }], [doctype, router]);
+  useShortcuts(
+    [
+      {
+        keys: "mod+b",
+        description: `New ${doctype}`,
+        group: "List",
+        allowInInput: true,
+        action: () => router.push(newDocHref(doctype)),
+      },
+    ],
+    [doctype, router]
+  );
   const deskCtx = { user, roles: ctx?.roles ?? [], developerMode: !!ctx?.developer_mode };
-  const onLikeChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["list", doctype] }), [qc, doctype]);
+  const onLikeChanged = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["list", doctype] }),
+    [qc, doctype]
+  );
   const dateFormat = String(ctx?.sysdefaults?.date_format ?? "yyyy-mm-dd");
   const currency = (ctx?.defaults?.currency as string) || undefined;
   const { titleField, listFields, hasIndicator } = columns;
   const { disableCommentCount } = config;
   const { addFilter } = state;
   // stable across a selection change, so checking rows doesn't re-render every cell (largelist: 1000 rows)
+  const pane = usePane("list-filters", 1920);
   const rowCtx = useMemo<RowContext>(
-    () => ({ doctype, meta, settings, user, titleField, listFields, hasIndicator, disableCommentCount, dateFormat, currency, filters, setFilters, addFilter, onLikeChanged }),
-    [doctype, meta, settings, user, titleField, listFields, hasIndicator, disableCommentCount, dateFormat, currency, filters, setFilters, addFilter, onLikeChanged],
+    () => ({
+      doctype,
+      meta,
+      settings,
+      user,
+      titleField,
+      listFields,
+      hasIndicator,
+      disableCommentCount,
+      dateFormat,
+      currency,
+      filters,
+      setFilters,
+      addFilter,
+      onLikeChanged,
+    }),
+    [
+      doctype,
+      meta,
+      settings,
+      user,
+      titleField,
+      listFields,
+      hasIndicator,
+      disableCommentCount,
+      dateFormat,
+      currency,
+      filters,
+      setFilters,
+      addFilter,
+      onLikeChanged,
+    ]
   );
 
   return (
-    <div className="space-y-3">
-      <ListHeader
-        doctype={doctype}
-        meta={meta}
-        settings={settings}
-        pageState={pageState}
-        user={user}
-        systemManager={deskCtx.roles.includes("System Manager")}
-        layouts={state}
-        onCreateLayout={() => setLayoutDialog({ layout: null, duplicateFrom: null })}
-        onManageLayouts={() => setManageLayouts(true)}
-        refresh={refresh}
-        fetching={list.isFetching}
-        onListSettings={() => setListSettingsOpen(true)}
-        onExport={() => setExporting(true)}
-        selectedRows={rows.filter((r) => selected.has(r.name))}
-        listFields={columns.listFields}
-        onBulkDone={() => {
-          clearSelected();
-          refresh();
-        }}
-        onAdd={onAdd}
-      />
-      <ListFilterBar
-        doctype={doctype}
-        meta={meta}
-        user={user}
-        phone={phone}
-        standardFilters={standardFiltersOf(meta)}
-        showSidebar={config.showSidebar}
-        search={state.search}
-        setSearch={state.setSearch}
-        subjectLabel={columns.subjectLabel}
-        filters={filters}
-        allFilters={state.allFilters}
-        setFilters={setFilters}
-        addFilter={state.addFilter}
-        sort={state.sort}
-        setSort={state.setSort}
-      />
-      <ActiveFilters meta={meta} filters={filters} setFilters={setFilters} />
-      <ListBody
-        phone={phone}
-        list={list}
-        showCount={!config.disableCount}
-        colSettings={colSettings}
-        subjectLabel={columns.subjectLabel}
-        pageLength={pageLength}
-        setPageLength={setPageLength}
-        filtered={filters.length > 0 || !!state.debounced}
-        canCreate={!meta.istable}
-        addDisabled={settings === undefined}
-        onAdd={onAdd}
-        onClear={() => {
-          state.setSearch("");
-          setFilters([]);
-        }}
-        c={rowCtx}
-        sel={{ selected, setSelected, toggle }}
-      />
+    // wide screens (New layout, ≥ 1920): Desk's sidebar counts as a filters pane on the left (§ 3.8)
+    <div
+      className={pane.open ? "grid grid-cols-[15rem_minmax(0,1fr)] items-start gap-4" : undefined}
+    >
+      {pane.open && (
+        <ListFacetsPane
+          meta={meta}
+          filters={filters}
+          setFilters={setFilters}
+          user={user}
+          onClose={pane.toggle}
+        />
+      )}
+      <div className="min-w-0 space-y-3">
+        <ListHeader
+          doctype={doctype}
+          meta={meta}
+          settings={settings}
+          pageState={pageState}
+          user={user}
+          systemManager={deskCtx.roles.includes("System Manager")}
+          layouts={state}
+          onCreateLayout={() => setLayoutDialog({ layout: null, duplicateFrom: null })}
+          onManageLayouts={() => setManageLayouts(true)}
+          refresh={refresh}
+          fetching={list.isFetching}
+          onListSettings={() => setListSettingsOpen(true)}
+          onExport={() => setExporting(true)}
+          selectedRows={rows.filter((r) => selected.has(r.name))}
+          listFields={columns.listFields}
+          onBulkDone={() => {
+            clearSelected();
+            refresh();
+          }}
+          onAdd={onAdd}
+        />
+        <div className="flex items-start gap-2">
+          {pane.available && !pane.open && (
+            <button
+              type="button"
+              onClick={pane.toggle}
+              aria-label="Show filters pane"
+              title="Filters pane"
+              className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--outline-default)] text-[var(--ink-muted)] hover:bg-[var(--surface-hover)]"
+            >
+              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
+            <ListFilterBar
+              doctype={doctype}
+              meta={meta}
+              user={user}
+              phone={phone}
+              standardFilters={standardFiltersOf(meta)}
+              showSidebar={config.showSidebar}
+              search={state.search}
+              setSearch={state.setSearch}
+              subjectLabel={columns.subjectLabel}
+              filters={filters}
+              allFilters={state.allFilters}
+              setFilters={setFilters}
+              addFilter={state.addFilter}
+              sort={state.sort}
+              setSort={state.setSort}
+            />
+          </div>
+        </div>
+        <ActiveFilters meta={meta} filters={filters} setFilters={setFilters} />
+        <ListBody
+          phone={phone}
+          list={list}
+          showCount={!config.disableCount}
+          colSettings={colSettings}
+          subjectLabel={columns.subjectLabel}
+          pageLength={pageLength}
+          setPageLength={setPageLength}
+          filtered={filters.length > 0 || !!state.debounced}
+          canCreate={!meta.istable}
+          addDisabled={settings === undefined}
+          onAdd={onAdd}
+          onClear={() => {
+            state.setSearch("");
+            setFilters([]);
+          }}
+          c={rowCtx}
+          sel={{ selected, setSelected, toggle }}
+        />
 
-      {listSettingsOpen && (
-        <ListSettingsDialog
+        {listSettingsOpen && (
+          <ListSettingsDialog
+            meta={meta}
+            settings={config.lvs}
+            hasIndicator={columns.canIndicate}
+            onClose={() => setListSettingsOpen(false)}
+            onSaved={() => {
+              qc.invalidateQueries({ queryKey: lvsKey(doctype) });
+              qc.invalidateQueries({ queryKey: ["doctype", doctype] });
+              refresh();
+            }}
+          />
+        )}
+        <ListLayoutDialogs
           meta={meta}
-          settings={config.lvs}
-          hasIndicator={columns.canIndicate}
-          onClose={() => setListSettingsOpen(false)}
-          onSaved={() => {
-            qc.invalidateQueries({ queryKey: lvsKey(doctype) });
-            qc.invalidateQueries({ queryKey: ["doctype", doctype] });
-            refresh();
+          ctx={deskCtx}
+          layouts={state.layouts}
+          dialog={layoutDialog}
+          setDialog={setLayoutDialog}
+          manage={manageLayouts}
+          setManage={setManageLayouts}
+          current={{
+            filters,
+            sort_field: state.sort.field,
+            sort_order: state.sort.order,
+            columns: columns.currentColumns,
           }}
+          onSaved={(l) => void state.onLayoutSaved(l)}
+          onDeleted={state.onLayoutDeleted}
         />
-      )}
-      <ListLayoutDialogs
-        meta={meta}
-        ctx={deskCtx}
-        layouts={state.layouts}
-        dialog={layoutDialog}
-        setDialog={setLayoutDialog}
-        manage={manageLayouts}
-        setManage={setManageLayouts}
-        current={{ filters, sort_field: state.sort.field, sort_order: state.sort.order, columns: columns.currentColumns }}
-        onSaved={(l) => void state.onLayoutSaved(l)}
-        onDeleted={state.onLayoutDeleted}
-      />
-      {exporting && <ExportDialog doctype={doctype} filters={state.allFilters} onClose={() => setExporting(false)} />}
-      {quickEntry && (
-        <QuickEntry
-          meta={meta}
-          onClose={() => setQuickEntry(false)}
-          onCreated={(name) => {
-            setQuickEntry(false);
-            refresh();
-            toast.success(`${doctype} ${name} created`, { action: { label: "Open", onClick: () => router.push(docHref(doctype, name)) } });
-          }}
-        />
-      )}
+        {exporting && (
+          <ExportDialog
+            doctype={doctype}
+            filters={state.allFilters}
+            onClose={() => setExporting(false)}
+          />
+        )}
+        {quickEntry && (
+          <QuickEntry
+            meta={meta}
+            onClose={() => setQuickEntry(false)}
+            onCreated={(name) => {
+              setQuickEntry(false);
+              refresh();
+              toast.success(`${doctype} ${name} created`, {
+                action: { label: "Open", onClick: () => router.push(docHref(doctype, name)) },
+              });
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

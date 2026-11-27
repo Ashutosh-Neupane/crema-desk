@@ -17,7 +17,7 @@ import { getNewDoc } from "@/lib/crema-form/newDoc";
 import { saveDoc, type Doc } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { quickFields } from "@/components/form/quickEntryRules";
-import { useBackdropClose } from "@/components/form/useBackdropClose";
+import { useBackdropClose, useEscapeClose } from "@/components/form/useBackdropClose";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
@@ -39,7 +39,9 @@ export default function QuickEntry({
   const { data: ctx } = useDeskContext();
   const [busy, setBusy] = useState(false);
   const backdrop = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
   useBackdropClose(backdrop, onClose);
+  useEscapeClose(dialog, onClose);
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -87,7 +89,7 @@ export default function QuickEntry({
       ref={backdrop}
     >
       {/* non-modal <dialog open>: Link / Date popovers portalled to <body> must stay usable (a modal one makes them inert) */}
-      <dialog open aria-modal="true" aria-label={`New ${meta.name}`} className="static m-0 w-full max-w-xl rounded-xl border border-zinc-200 bg-zinc-50 p-0 text-inherit shadow-2xl dark:border-zinc-700 dark:bg-zinc-950">
+      <dialog ref={dialog} open aria-modal="true" aria-label={`New ${meta.name}`} className="static m-0 w-full max-w-xl rounded-xl border border-zinc-200 bg-zinc-50 p-0 text-inherit shadow-2xl dark:border-zinc-700 dark:bg-zinc-950">
         <div className="flex items-center gap-2 px-5 py-3">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">New {meta.name}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800">

@@ -797,3 +797,47 @@ a:focus-visible,
 
 /* DocField `bold`: label and value in semibold (Desk form/controls bold) */
 .crema-bold > label, .crema-bold :is(input, textarea, select, [data-value]) { font-weight: 600; }
+
+/* ── New layout: forms use wide screens (docs/PHASE2_DESIGN.md § 3.4) ─────────────────────────────────────────
+   Desk's columns stay; when the form is wide, the fields inside a column flow into more columns (a 1-column section
+   becomes 2–4; sections with Desk columns keep them) instead of stretching. Inputs stop at --field-max, prose at --measure.
+   Container queries: an open side panel or a dialog reduces the columns by itself. */
+:root[data-layout="new"] .crema-col > [data-fieldtype] { max-width: var(--field-max); }
+:root[data-layout="new"] .crema-col > :is([data-fieldtype="Table"], [data-fieldtype="Table MultiSelect"], [data-fieldtype="HTML"], [data-fieldtype="Section Break"]) { max-width: none; }
+:root[data-layout="new"] .crema-col > :is([data-fieldtype="Small Text"], [data-fieldtype="Text"], [data-fieldtype="Long Text"], [data-fieldtype="Text Editor"], [data-fieldtype="Markdown Editor"], [data-fieldtype="Code"], [data-fieldtype="JSON"]) { max-width: calc(var(--measure) + 2rem); }
+@container (min-width: 56rem) {
+  :root[data-layout="new"] .crema-section-grid[data-cols="1"] > .crema-col {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    column-gap: var(--spacing-column, 1.5rem);
+  }
+}
+/* tables, long text and HTML keep the whole row inside a reflowed column */
+:root[data-layout="new"] .crema-section-grid > .crema-col > :is([data-fieldtype="Table"], [data-fieldtype="Table MultiSelect"], [data-fieldtype="HTML"], [data-fieldtype="Small Text"], [data-fieldtype="Text"], [data-fieldtype="Long Text"], [data-fieldtype="Text Editor"], [data-fieldtype="Markdown Editor"], [data-fieldtype="Code"], [data-fieldtype="JSON"], [data-fieldtype="Signature"], [data-fieldtype="Geolocation"], [data-fieldtype="Heading"], [data-fieldtype="Button"]) { grid-column: 1 / -1; }
+
+/* ── Form page: body, activity, sidebar (components/form/DocForm.tsx) ─────────────────────────────────────── */
+@media (min-width: 1280px) {
+  .crema-form-layout { grid-template-columns: minmax(0, 1fr) clamp(13rem, 18vw, 16rem); align-items: start; }
+  .crema-form-layout > .crema-form-body { grid-column: 1; grid-row: 1; }
+  .crema-form-layout > .crema-form-activity { grid-column: 1; grid-row: 2; }
+  .crema-form-layout > .crema-form-side { grid-column: 2; grid-row: 1 / span 2; }
+}
+/* New layout, wide: Activity docked beside the form (§ 3.4 "form Activity docked at ≥ 1600") */
+@media (min-width: 1600px) {
+  :root[data-layout="new"] .crema-form-layout { grid-template-columns: minmax(0, 1fr) clamp(22rem, 24vw, 30rem); grid-template-rows: auto 1fr; }
+  :root[data-layout="new"] .crema-form-layout > .crema-form-body { grid-row: 1 / span 2; }
+  :root[data-layout="new"] .crema-form-layout > .crema-form-side { grid-column: 2; grid-row: 1; }
+  /* the sidebar's cards sit two by two above Activity instead of a tall sticky stack */
+  :root[data-layout="new"] .crema-form-side > aside { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+  :root[data-layout="new"] .crema-form-side > aside > * { margin: 0; }
+  :root[data-layout="new"] .crema-form-side > aside > :not(section, [data-sidebar-card]) { grid-column: 1 / -1; }
+  :root[data-layout="new"] .crema-form-layout > .crema-form-activity {
+    grid-column: 2;
+    grid-row: 2;
+    position: sticky;
+    top: 4rem;
+    max-height: calc(100dvh - 5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
