@@ -13,25 +13,59 @@ import { deskCall } from "@/lib/frappe/form";
 import { deleteRows, submitOrCancelRows, type Row } from "@/lib/list/api";
 import { getWorkflow } from "@/lib/form/workflow";
 import { toCsv } from "@/lib/report/columns";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
 import LinkInput from "@/components/list/LinkInput";
 import DatePicker from "@/components/form/DatePicker";
 import TimePicker from "@/components/form/TimePicker";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
 type Kind = "delete" | "submit" | "cancel" | "edit" | "assign" | "tags" | { workflow: string };
-const NO_EDIT = new Set(["Section Break", "Column Break", "Tab Break", "HTML", "Button", "Table", "Table MultiSelect", "Image", "Fold", "Heading", "Attach Image", "Signature", "Password", "Geolocation", "JSON", "Code"]);
-const inputCls = "h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
-const primaryBtn = "rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900";
-const ghostBtn = "rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200";
+const NO_EDIT = new Set([
+  "Section Break",
+  "Column Break",
+  "Tab Break",
+  "HTML",
+  "Button",
+  "Table",
+  "Table MultiSelect",
+  "Image",
+  "Fold",
+  "Heading",
+  "Attach Image",
+  "Signature",
+  "Password",
+  "Geolocation",
+  "JSON",
+  "Code",
+]);
+const inputCls =
+  "h-9 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+const primaryBtn =
+  "rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900";
+const ghostBtn =
+  "rounded-lg border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-600 dark:text-zinc-200";
 
 type ConfirmKind = "delete" | "submit" | "cancel" | { workflow: string };
 
 /** the open action that needs a Yes / No confirmation (delete, submit, cancel, a workflow action) */
 function confirmKindOf(open: Kind | null): ConfirmKind | null {
   if (open === null) return null;
-  if (typeof open === "object" || open === "delete" || open === "submit" || open === "cancel") return open;
+  if (typeof open === "object" || open === "delete" || open === "submit" || open === "cancel")
+    return open;
   return null;
 }
 
@@ -99,21 +133,42 @@ function BulkActionsMenu({
   );
 }
 
-function ConfirmDialog({ kind, count, doctype, onNo, onYes }: { kind: ConfirmKind | null; count: number; doctype: string; onNo: () => void; onYes: () => void }) {
+function ConfirmDialog({
+  kind,
+  count,
+  doctype,
+  onNo,
+  onYes,
+}: {
+  kind: ConfirmKind | null;
+  count: number;
+  doctype: string;
+  onNo: () => void;
+  onYes: () => void;
+}) {
   return (
     <Dialog open={!!kind} onOpenChange={(o) => !o && onNo()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {kind === null ? "" : confirmLabelOf(kind)} {count} {doctype} {count === 1 ? "record" : "records"}?
+            {kind === null ? "" : confirmLabelOf(kind)} {count} {doctype}{" "}
+            {count === 1 ? "record" : "records"}?
           </DialogTitle>
-          <DialogDescription>{kind === "delete" ? "This cannot be undone." : "This changes the documents permanently."}</DialogDescription>
+          <DialogDescription>
+            {kind === "delete"
+              ? "This cannot be undone."
+              : "This changes the documents permanently."}
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <button type="button" onClick={onNo} className={ghostBtn}>
             No
           </button>
-          <button type="button" onClick={onYes} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${kind === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}>
+          <button
+            type="button"
+            onClick={onYes}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${kind === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"}`}
+          >
             Yes
           </button>
         </DialogFooter>
@@ -122,8 +177,15 @@ function ConfirmDialog({ kind, count, doctype, onNo, onYes }: { kind: ConfirmKin
   );
 }
 
-function exportCsv(doctype: string, rows: Row[], columns: Array<{ fieldname: string; label: string; fieldtype: string }>) {
-  const cols = [{ fieldname: "name", label: "ID", fieldtype: "Data" }, ...columns.filter((c) => c.fieldname !== "name")];
+function exportCsv(
+  doctype: string,
+  rows: Row[],
+  columns: Array<{ fieldname: string; label: string; fieldtype: string }>
+) {
+  const cols = [
+    { fieldname: "name", label: "ID", fieldtype: "Data" },
+    ...columns.filter((c) => c.fieldname !== "name"),
+  ];
   const blob = new Blob([toCsv(rows, cols)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -134,9 +196,18 @@ function exportCsv(doctype: string, rows: Row[], columns: Array<{ fieldname: str
 }
 
 async function bulkUpdate(doctype: string, names: string[], field: DocField, value: unknown) {
-  const { env } = await deskCall("frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs", { doctype, docnames: JSON.stringify(names), action: "update", data: JSON.stringify({ [field.fieldname]: value }) });
+  const { env } = await deskCall(
+    "frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs",
+    {
+      doctype,
+      docnames: JSON.stringify(names),
+      action: "update",
+      data: JSON.stringify({ [field.fieldname]: value }),
+    }
+  );
   const failed = (env.message as { failed?: unknown[] } | undefined)?.failed ?? [];
-  if (Array.isArray(env.message) && env.message.length) throw new Error(`Could not update ${env.message.length} record(s)`);
+  if (Array.isArray(env.message) && env.message.length)
+    throw new Error(`Could not update ${env.message.length} record(s)`);
   if (failed.length) throw new Error(`Could not update ${failed.length} record(s)`);
 }
 
@@ -166,7 +237,14 @@ export default function BulkActions({
     enabled: !!workflow && rows.length > 0,
     queryFn: async () => {
       const docs = rows.map((r) => ({ ...r, doctype }));
-      return ((await deskCall("frappe.model.workflow.get_common_transition_actions", { docs: JSON.stringify(docs), doctype })).env.message as string[]) ?? [];
+      return (
+        ((
+          await deskCall("frappe.model.workflow.get_common_transition_actions", {
+            docs: JSON.stringify(docs),
+            doctype,
+          })
+        ).env.message as string[]) ?? []
+      );
     },
   });
 
@@ -184,30 +262,100 @@ export default function BulkActions({
   const confirmKind = confirmKindOf(open);
   const onConfirm = () => {
     if (!confirmKind) return;
-    if (typeof confirmKind === "object") void run(confirmKind.workflow, () => deskCall("frappe.model.workflow.bulk_workflow_approval", { docnames: JSON.stringify(names), doctype, action: confirmKind.workflow }));
+    if (typeof confirmKind === "object")
+      void run(confirmKind.workflow, () =>
+        deskCall("frappe.model.workflow.bulk_workflow_approval", {
+          docnames: JSON.stringify(names),
+          doctype,
+          action: confirmKind.workflow,
+        })
+      );
     else if (confirmKind === "delete") void run("Deleted", () => deleteRows(doctype, names));
-    else void run(confirmKind === "submit" ? "Submitted" : "Cancelled", () => submitOrCancelRows(doctype, names, confirmKind));
+    else
+      void run(confirmKind === "submit" ? "Submitted" : "Cancelled", () =>
+        submitOrCancelRows(doctype, names, confirmKind)
+      );
   };
 
   return (
     <>
-      <BulkActionsMenu count={rows.length} submittable={!!meta.is_submittable} extraActions={extraActions} wfActions={wfActions} onPick={setOpen} onExport={() => exportCsv(doctype, rows, columns)} />
-      <ConfirmDialog kind={confirmKind} count={rows.length} doctype={doctype} onNo={() => setOpen(null)} onYes={onConfirm} />
-      {open === "edit" && <BulkEdit meta={meta} count={rows.length} onClose={() => setOpen(null)} onApply={(field, value) => void run(`Updated ${field.label ?? field.fieldname}`, () => bulkUpdate(doctype, names, field, value))} />}
+      <BulkActionsMenu
+        count={rows.length}
+        submittable={!!meta.is_submittable}
+        extraActions={extraActions}
+        wfActions={wfActions}
+        onPick={setOpen}
+        onExport={() => exportCsv(doctype, rows, columns)}
+      />
+      <ConfirmDialog
+        kind={confirmKind}
+        count={rows.length}
+        doctype={doctype}
+        onNo={() => setOpen(null)}
+        onYes={onConfirm}
+      />
+      {open === "edit" && (
+        <BulkEdit
+          meta={meta}
+          count={rows.length}
+          onClose={() => setOpen(null)}
+          onApply={(field, value) =>
+            void run(`Updated ${field.label ?? field.fieldname}`, () =>
+              bulkUpdate(doctype, names, field, value)
+            )
+          }
+        />
+      )}
       {open === "assign" && (
         <AssignDialog
           count={rows.length}
           onClose={() => setOpen(null)}
-          onApply={(users, comment) => void run("Assigned", () => deskCall("frappe.desk.form.assign_to.add_multiple", { doctype, name: JSON.stringify(names), assign_to: JSON.stringify(users), description: comment, bulk_assign: true }))}
+          onApply={(users, comment) =>
+            void run("Assigned", () =>
+              deskCall("frappe.desk.form.assign_to.add_multiple", {
+                doctype,
+                name: JSON.stringify(names),
+                assign_to: JSON.stringify(users),
+                description: comment,
+                bulk_assign: true,
+              })
+            )
+          }
         />
       )}
-      {open === "tags" && <TagsDialog count={rows.length} onClose={() => setOpen(null)} onApply={(tags) => void run("Tagged", () => deskCall("frappe.desk.doctype.tag.tag.add_tags", { tags: JSON.stringify(tags), dt: doctype, docs: JSON.stringify(names) }))} />}
+      {open === "tags" && (
+        <TagsDialog
+          count={rows.length}
+          onClose={() => setOpen(null)}
+          onApply={(tags) =>
+            void run("Tagged", () =>
+              deskCall("frappe.desk.doctype.tag.tag.add_tags", {
+                tags: JSON.stringify(tags),
+                dt: doctype,
+                docs: JSON.stringify(names),
+              })
+            )
+          }
+        />
+      )}
     </>
   );
 }
 
-function BulkEdit({ meta, count, onClose, onApply }: { meta: DocTypeMeta; count: number; onClose: () => void; onApply: (field: DocField, value: unknown) => void }) {
-  const fields = (meta.fields ?? []).filter((f) => !NO_EDIT.has(f.fieldtype) && !f.read_only && !f.hidden && f.fieldname);
+function BulkEdit({
+  meta,
+  count,
+  onClose,
+  onApply,
+}: {
+  meta: DocTypeMeta;
+  count: number;
+  onClose: () => void;
+  onApply: (field: DocField, value: unknown) => void;
+}) {
+  const fields = (meta.fields ?? []).filter(
+    (f) => !NO_EDIT.has(f.fieldtype) && !f.read_only && !f.hidden && f.fieldname
+  );
   const [fieldname, setFieldname] = useState(fields[0]?.fieldname ?? "");
   const [value, setValue] = useState<unknown>("");
   const df = fields.find((f) => f.fieldname === fieldname);
@@ -215,29 +363,71 @@ function BulkEdit({ meta, count, onClose, onApply }: { meta: DocTypeMeta; count:
     if (!df) return null;
     switch (df.fieldtype) {
       case "Link":
-        return <LinkInput doctype={String(df.options)} value={String(value ?? "")} onChange={setValue} placeholder="Value" className="[&_input]:h-9 [&_input]:w-full" />;
+        return (
+          <LinkInput
+            doctype={String(df.options)}
+            value={String(value ?? "")}
+            onChange={setValue}
+            placeholder="Value"
+            className="[&_input]:h-9 [&_input]:w-full"
+          />
+        );
       case "Select":
         return (
-          <select aria-label="Value" value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className={inputCls}>
-            {String(df.options ?? "").split("\n").map((o) => (
-              <option key={o} value={o}>
-                {o || "(empty)"}
-              </option>
-            ))}
+          <select
+            aria-label="Value"
+            value={String(value ?? "")}
+            onChange={(e) => setValue(e.target.value)}
+            className={inputCls}
+          >
+            {String(df.options ?? "")
+              .split("\n")
+              .map((o) => (
+                <option key={o} value={o}>
+                  {o || "(empty)"}
+                </option>
+              ))}
           </select>
         );
       case "Check":
         return (
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!value} onChange={(e) => setValue(e.target.checked ? 1 : 0)} /> {df.label}
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => setValue(e.target.checked ? 1 : 0)}
+            />{" "}
+            {df.label}
           </label>
         );
       case "Date":
-        return <DatePicker value={String(value ?? "")} onChange={(v) => setValue(v ?? "")} ariaLabel="Value" />;
+        return (
+          <DatePicker
+            value={String(value ?? "")}
+            onChange={(v) => setValue(v ?? "")}
+            ariaLabel="Value"
+          />
+        );
       case "Time":
-        return <TimePicker value={String(value ?? "")} onChange={(v) => setValue(v ?? "")} ariaLabel="Value" />;
+        return (
+          <TimePicker
+            value={String(value ?? "")}
+            onChange={(v) => setValue(v ?? "")}
+            ariaLabel="Value"
+          />
+        );
       default:
-        return <input aria-label="Value" type={["Int", "Float", "Currency", "Percent"].includes(df.fieldtype) ? "number" : "text"} value={String(value ?? "")} onChange={(e) => setValue(e.target.value)} className={inputCls} />;
+        return (
+          <input
+            aria-label="Value"
+            type={
+              ["Int", "Float", "Currency", "Percent"].includes(df.fieldtype) ? "number" : "text"
+            }
+            value={String(value ?? "")}
+            onChange={(e) => setValue(e.target.value)}
+            className={inputCls}
+          />
+        );
     }
   };
   return (
@@ -274,7 +464,12 @@ function BulkEdit({ meta, count, onClose, onApply }: { meta: DocTypeMeta; count:
           <button type="button" onClick={onClose} className={ghostBtn}>
             Cancel
           </button>
-          <button type="button" disabled={!df} onClick={() => df && onApply(df, df.fieldtype === "Check" ? (value ? 1 : 0) : value)} className={primaryBtn}>
+          <button
+            type="button"
+            disabled={!df}
+            onClick={() => df && onApply(df, df.fieldtype === "Check" ? (value ? 1 : 0) : value)}
+            className={primaryBtn}
+          >
             Update {count} {count === 1 ? "record" : "records"}
           </button>
         </DialogFooter>
@@ -283,7 +478,15 @@ function BulkEdit({ meta, count, onClose, onApply }: { meta: DocTypeMeta; count:
   );
 }
 
-function AssignDialog({ count, onClose, onApply }: { count: number; onClose: () => void; onApply: (users: string[], comment: string) => void }) {
+function AssignDialog({
+  count,
+  onClose,
+  onApply,
+}: {
+  count: number;
+  onClose: () => void;
+  onApply: (users: string[], comment: string) => void;
+}) {
   const [users, setUsers] = useState<string[]>([]);
   const [pick, setPick] = useState(0);
   const [comment, setComment] = useState("");
@@ -293,32 +496,57 @@ function AssignDialog({ count, onClose, onApply }: { count: number; onClose: () 
         <DialogHeader>
           <DialogTitle>Assign To</DialogTitle>
           <DialogDescription>
-            Creates an assignment (ToDo) on {count} {count === 1 ? "record" : "records"} for each user.
+            Creates an assignment (ToDo) on {count} {count === 1 ? "record" : "records"} for each
+            user.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap gap-1">
           {users.map((u) => (
-            <span key={u} className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+            <span
+              key={u}
+              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
+            >
               {u}
-              <button type="button" aria-label={`Remove ${u}`} onClick={() => setUsers(users.filter((x) => x !== u))}>
+              <button
+                type="button"
+                aria-label={`Remove ${u}`}
+                onClick={() => setUsers(users.filter((x) => x !== u))}
+              >
                 <X className="h-3 w-3" aria-hidden />
               </button>
             </span>
           ))}
         </div>
-        <LinkInput key={pick} doctype="User" value="" placeholder="Add a user" onChange={(v) => {
-          if (v && !users.includes(v)) setUsers([...users, v]);
-          setPick((n) => n + 1);
-        }} className="[&_input]:h-9 [&_input]:w-full" />
+        <LinkInput
+          key={pick}
+          doctype="User"
+          value=""
+          placeholder="Add a user"
+          onChange={(v) => {
+            if (v && !users.includes(v)) setUsers([...users, v]);
+            setPick((n) => n + 1);
+          }}
+          className="[&_input]:h-9 [&_input]:w-full"
+        />
         <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Comment
-          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900" />
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+          />
         </label>
         <DialogFooter>
           <button type="button" onClick={onClose} className={ghostBtn}>
             Cancel
           </button>
-          <button type="button" disabled={!users.length} onClick={() => onApply(users, comment)} className={primaryBtn}>
+          <button
+            type="button"
+            disabled={!users.length}
+            onClick={() => onApply(users, comment)}
+            className={primaryBtn}
+          >
             Assign
           </button>
         </DialogFooter>
@@ -327,24 +555,48 @@ function AssignDialog({ count, onClose, onApply }: { count: number; onClose: () 
   );
 }
 
-function TagsDialog({ count, onClose, onApply }: { count: number; onClose: () => void; onApply: (tags: string[]) => void }) {
+function TagsDialog({
+  count,
+  onClose,
+  onApply,
+}: {
+  count: number;
+  onClose: () => void;
+  onApply: (tags: string[]) => void;
+}) {
   const [text, setText] = useState("");
-  const tags = text.split(",").map((t) => t.trim()).filter(Boolean);
+  const tags = text
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Tags</DialogTitle>
           <DialogDescription>
-            Comma-separated; new tags are created. Applies to {count} {count === 1 ? "record" : "records"}.
+            Comma-separated; new tags are created. Applies to {count}{" "}
+            {count === 1 ? "record" : "records"}.
           </DialogDescription>
         </DialogHeader>
-        <input aria-label="Tags" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tags.length && onApply(tags)} placeholder="urgent, follow-up" className={inputCls} />
+        <input
+          aria-label="Tags"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && tags.length && onApply(tags)}
+          placeholder="urgent, follow-up"
+          className={inputCls}
+        />
         <DialogFooter>
           <button type="button" onClick={onClose} className={ghostBtn}>
             Cancel
           </button>
-          <button type="button" disabled={!tags.length} onClick={() => onApply(tags)} className={primaryBtn}>
+          <button
+            type="button"
+            disabled={!tags.length}
+            onClick={() => onApply(tags)}
+            className={primaryBtn}
+          >
             Add
           </button>
         </DialogFooter>

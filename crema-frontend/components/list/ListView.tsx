@@ -25,7 +25,7 @@ import type { DocTypeMeta } from "@/lib/frappe/types";
 import QuickEntry from "@/components/form/QuickEntry";
 import ExportDialog from "@/components/list/ExportDialog";
 import ListSettingsDialog from "@/components/list/ListSettingsDialog";
-import { docHref, newDocHref, standardFiltersOf } from "@/components/list/listModel";
+import { docHref, newDocHref, rowHref, standardFiltersOf } from "@/components/list/listModel";
 import { useListLayouts } from "@/components/list/useListLayouts";
 import { useListColumns, useListViewConfig } from "@/components/list/useListColumns";
 import { useListRows, useListviewHooks, useSelection } from "@/components/list/useListRows";
@@ -36,8 +36,10 @@ import { ListBody } from "@/components/list/ListBody";
 import type { RowContext } from "@/components/list/ListRows";
 import { ListLayoutDialogs, type LayoutDialogState } from "@/components/list/ListLayoutDialogs";
 import { ListFacetsPane } from "@/components/list/ListFacetsPane";
+import { ListPreviewPane } from "@/components/list/ListPreviewPane";
+import { useListPreview } from "@/components/list/useListPreview";
 import { usePane } from "@/lib/ui/pane";
-import { PanelLeftOpen } from "lucide-react";
+import { ListPanes, PreviewModeButton, ShowFiltersButton } from "@/components/list/ListPaneButtons";
 
 const Skeleton = () => (
   <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
@@ -154,6 +156,10 @@ function ListPage({
   const { addFilter } = state;
   // stable across a selection change, so checking rows doesn't re-render every cell (largelist: 1000 rows)
   const pane = usePane("list-filters", 1920);
+  // wide screens: a row click previews the record on the right (§ 3.8)
+  const preview = useListPreview(rows);
+  const previewing = preview.current;
+  const onPreview = preview.onPreview;
   const rowCtx = useMemo<RowContext>(
     () => ({
       doctype,
@@ -170,6 +176,8 @@ function ListPage({
       setFilters,
       addFilter,
       onLikeChanged,
+      previewing,
+      onPreview,
     }),
     [
       doctype,
@@ -186,15 +194,15 @@ function ListPage({
       setFilters,
       addFilter,
       onLikeChanged,
+      previewing,
+      onPreview,
     ]
   );
 
   return (
-    // wide screens (New layout, ≥ 1920): Desk's sidebar counts as a filters pane on the left (§ 3.8)
-    <div
-      className={pane.open ? "grid grid-cols-[15rem_minmax(0,1fr)] items-start gap-4" : undefined}
-    >
-      {pane.open && (
+    <ListPanes
+      left={pane.open}
+      leftPane={
         <ListFacetsPane
           meta={meta}
           filters={filters}
@@ -202,7 +210,21 @@ function ListPage({
           user={user}
           onClose={pane.toggle}
         />
+      }
+      right={preview.row}
+      rightPane={(row) => (
+        <ListPreviewPane
+          meta={meta}
+          name={row.name}
+          href={rowHref(settings, doctype, row)}
+          settings={settings}
+          titleField={titleField}
+          onClose={preview.close}
+          onPrev={preview.prev}
+          onNext={preview.next}
+        />
       )}
+    >
       <div className="min-w-0 space-y-3">
         <ListHeader
           doctype={doctype}
@@ -227,17 +249,8 @@ function ListPage({
           onAdd={onAdd}
         />
         <div className="flex items-start gap-2">
-          {pane.available && !pane.open && (
-            <button
-              type="button"
-              onClick={pane.toggle}
-              aria-label="Show filters pane"
-              title="Filters pane"
-              className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--outline-default)] text-[var(--ink-muted)] hover:bg-[var(--surface-hover)]"
-            >
-              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
+          <ShowFiltersButton pane={pane} />
+          <PreviewModeButton preview={preview} />
           <div className="min-w-0 flex-1">
             <ListFilterBar
               doctype={doctype}
@@ -330,6 +343,6 @@ function ListPage({
           />
         )}
       </div>
-    </div>
+    </ListPanes>
   );
 }

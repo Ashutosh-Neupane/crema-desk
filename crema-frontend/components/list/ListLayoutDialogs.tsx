@@ -7,7 +7,10 @@ import type { ListColumnSetting } from "@/lib/list/useListViewSettings";
 import type { ListLayout } from "@/lib/list/layouts";
 import { LayoutDialog, ManageLayoutsDialog } from "@/components/list/Layouts";
 
-export type LayoutDialogState = { layout: ListLayout | null; duplicateFrom: ListLayout | null } | null;
+export type LayoutDialogState = {
+  layout: ListLayout | null;
+  duplicateFrom: ListLayout | null;
+} | null;
 type Ctx = { user: string; roles: string[]; developerMode: boolean };
 
 export function ListLayoutDialogs({
@@ -29,7 +32,12 @@ export function ListLayoutDialogs({
   setDialog: (d: LayoutDialogState) => void;
   manage: boolean;
   setManage: (v: boolean) => void;
-  current: { filters: Filter[]; sort_field: string; sort_order: string; columns: ListColumnSetting[] };
+  current: {
+    filters: Filter[];
+    sort_field: string;
+    sort_order: string;
+    columns: ListColumnSetting[];
+  };
   onSaved: (l: ListLayout) => void;
   onDeleted: (l: ListLayout) => void;
 }) {

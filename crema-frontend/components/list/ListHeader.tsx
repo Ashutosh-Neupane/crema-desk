@@ -12,14 +12,21 @@ import type { Row } from "@/lib/list/api";
 import type { PageItem, PageState } from "@/lib/list/listviewShim";
 import { DEFAULT_LAYOUT, type ListLayout } from "@/lib/list/layouts";
 import { INDICATOR_PILL } from "@/lib/list/indicator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
 import BulkActions from "@/components/list/BulkActions";
 import { LayoutMenu } from "@/components/list/Layouts";
 import { ToolbarButtons } from "@/components/list/ListHooksUI";
 import { listViews, runItem, type ListSettings } from "@/components/list/listModel";
 
 const enc = encodeURIComponent;
-const iconBtn = "rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
+const iconBtn =
+  "rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
 
 function ViewSwitcher({ views }: { views: Array<{ id: string; label: string; href: string }> }) {
   if (views.length <= 1) return null;
@@ -43,9 +50,18 @@ function ViewSwitcher({ views }: { views: Array<{ id: string; label: string; hre
 function PageTitle({ doctype, pageState }: { doctype: string; pageState: PageState }) {
   return (
     <>
-      <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{pageState.title || doctype}</h1>
+      <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+        {pageState.title || doctype}
+      </h1>
       {/* page.set_indicator from an app's onload / refresh */}
-      {pageState.indicator && <span data-page-indicator className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[pageState.indicator.color] ?? INDICATOR_PILL.gray}`}>{pageState.indicator.label}</span>}
+      {pageState.indicator && (
+        <span
+          data-page-indicator
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${INDICATOR_PILL[pageState.indicator.color] ?? INDICATOR_PILL.gray}`}
+        >
+          {pageState.indicator.label}
+        </span>
+      )}
     </>
   );
 }
@@ -58,7 +74,21 @@ function RefreshButton({ onClick, spinning }: { onClick: () => void; spinning: b
   );
 }
 
-function ListSettingsMenu({ doctype, meta, systemManager, appItems, onListSettings, onExport }: { doctype: string; meta: DocTypeMeta; systemManager: boolean; appItems: PageItem[]; onListSettings: () => void; onExport: () => void }) {
+function ListSettingsMenu({
+  doctype,
+  meta,
+  systemManager,
+  appItems,
+  onListSettings,
+  onExport,
+}: {
+  doctype: string;
+  meta: DocTypeMeta;
+  systemManager: boolean;
+  appItems: PageItem[];
+  onListSettings: () => void;
+  onExport: () => void;
+}) {
   const router = useRouter();
   return (
     <DropdownMenu>
@@ -66,14 +96,38 @@ function ListSettingsMenu({ doctype, meta, systemManager, appItems, onListSettin
         <Settings2 className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem onClick={() => router.push(`/desk/customize Form/Customize Form?doc_type=${enc(doctype)}`)}>Customize</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}`)}>Edit DocType</DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() =>
+            router.push(`/desk/customize Form/Customize Form?doc_type=${enc(doctype)}`)
+          }
+        >
+          Customize
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push(`/desk/doctype/${enc(doctype)}`)}>
+          Edit DocType
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onListSettings}>List settings</DropdownMenuItem>
-        {!!meta.allow_import && <DropdownMenuItem onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}>Import</DropdownMenuItem>}
+        {!!meta.allow_import && (
+          <DropdownMenuItem
+            onClick={() => router.push(`/desk/data-import?doctype=${enc(doctype)}`)}
+          >
+            Import
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={onExport}>Export</DropdownMenuItem>
         {/* Desk list_view.js: System Manager only */}
-        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/user-permission?allow=${enc(doctype)}`)}>User Permissions</DropdownMenuItem>}
-        {systemManager && <DropdownMenuItem onClick={() => router.push(`/desk/permission-manager/${enc(doctype)}`)}>Role Permissions Manager</DropdownMenuItem>}
+        {systemManager && (
+          <DropdownMenuItem
+            onClick={() => router.push(`/desk/user-permission?allow=${enc(doctype)}`)}
+          >
+            User Permissions
+          </DropdownMenuItem>
+        )}
+        {systemManager && (
+          <DropdownMenuItem onClick={() => router.push(`/desk/permission-manager/${enc(doctype)}`)}>
+            Role Permissions Manager
+          </DropdownMenuItem>
+        )}
         {/* page.add_menu_item from the app's listview_settings */}
         {appItems.length > 0 && <DropdownMenuSeparator />}
         {appItems.map((m) => (
@@ -86,7 +140,15 @@ function ListSettingsMenu({ doctype, meta, systemManager, appItems, onListSettin
   );
 }
 
-function AddButton({ doctype, onAdd, disabled }: { doctype: string; onAdd: () => void; disabled: boolean }) {
+function AddButton({
+  doctype,
+  onAdd,
+  disabled,
+}: {
+  doctype: string;
+  onAdd: () => void;
+  disabled: boolean;
+}) {
   return (
     <button
       type="button"
@@ -124,7 +186,12 @@ export function ListHeader({
   pageState: PageState;
   user: string;
   systemManager: boolean;
-  layouts: { layouts: ListLayout[]; layoutsLoaded: boolean; activeLayout: string | null; selectLayout: (name: string) => void };
+  layouts: {
+    layouts: ListLayout[];
+    layoutsLoaded: boolean;
+    activeLayout: string | null;
+    selectLayout: (name: string) => void;
+  };
   onCreateLayout: () => void;
   onManageLayouts: () => void;
   refresh: () => void;
@@ -139,17 +206,45 @@ export function ListHeader({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <PageTitle doctype={doctype} pageState={pageState} />
-      {layouts.layoutsLoaded && <LayoutMenu layouts={layouts.layouts} active={layouts.activeLayout ?? DEFAULT_LAYOUT} user={user} onSelect={layouts.selectLayout} onCreate={onCreateLayout} onManage={onManageLayouts} />}
+      {layouts.layoutsLoaded && (
+        <LayoutMenu
+          layouts={layouts.layouts}
+          active={layouts.activeLayout ?? DEFAULT_LAYOUT}
+          user={user}
+          onSelect={layouts.selectLayout}
+          onCreate={onCreateLayout}
+          onManage={onManageLayouts}
+        />
+      )}
       <ViewSwitcher views={listViews(meta, doctype)} />
       <div className="ml-auto flex items-center gap-2">
         <ToolbarButtons items={pageState.inner} />
         <RefreshButton onClick={refresh} spinning={fetching} />
-        <ListSettingsMenu doctype={doctype} meta={meta} systemManager={systemManager} appItems={pageState.menu} onListSettings={onListSettings} onExport={onExport} />
+        <ListSettingsMenu
+          doctype={doctype}
+          meta={meta}
+          systemManager={systemManager}
+          appItems={pageState.menu}
+          onListSettings={onListSettings}
+          onExport={onExport}
+        />
         {selectedRows.length > 0 ? (
-          <BulkActions meta={meta} extraActions={pageState.actions} rows={selectedRows} columns={listFields.map((f) => ({ fieldname: f.fieldname, label: f.label ?? f.fieldname, fieldtype: f.fieldtype }))} onDone={onBulkDone} />
+          <BulkActions
+            meta={meta}
+            extraActions={pageState.actions}
+            rows={selectedRows}
+            columns={listFields.map((f) => ({
+              fieldname: f.fieldname,
+              label: f.label ?? f.fieldname,
+              fieldtype: f.fieldtype,
+            }))}
+            onDone={onBulkDone}
+          />
         ) : (
           // the app's listview_settings (primary_action) must be in before Add means the same as in Desk
-          !meta.istable && <AddButton doctype={doctype} onAdd={onAdd} disabled={settings === undefined} />
+          !meta.istable && (
+            <AddButton doctype={doctype} onAdd={onAdd} disabled={settings === undefined} />
+          )
         )}
       </div>
     </div>

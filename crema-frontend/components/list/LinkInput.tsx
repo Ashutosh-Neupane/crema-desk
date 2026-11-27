@@ -21,11 +21,14 @@ export default function LinkInput({
   className?: string;
   autoFocus?: boolean;
   id?: string;
-  getQuery?: () => { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
+  getQuery?: () =>
+    { filters?: unknown; query?: string; params?: Record<string, unknown> } | undefined;
 }) {
   const [text, setText] = useState(value);
   const [open, setOpen] = useState(false);
-  const [results, setResults] = useState<Array<{ value: string; description?: string; label?: string }>>([]);
+  const [results, setResults] = useState<
+    Array<{ value: string; description?: string; label?: string }>
+  >([]);
   const [active, setActive] = useState(0);
   const listId = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,9 +38,12 @@ export default function LinkInput({
     setText(value);
   }
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
 
   const search = (q: string) => {
     if (timer.current) clearTimeout(timer.current);
@@ -105,7 +111,11 @@ export default function LinkInput({
         className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
       />
       {open && results.length > 0 && (
-        <ul id={listId} role="listbox" className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+        >
           {results.map((r, i) => (
             <li
               key={r.value}
@@ -118,8 +128,12 @@ export default function LinkInput({
               }}
               className={`block w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/60 ${i === active ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
             >
-              <span className="block truncate text-zinc-900 dark:text-zinc-100">{r.label || r.value}</span>
-              {r.description && <span className="block truncate text-xs text-zinc-500">{r.description}</span>}
+              <span className="block truncate text-zinc-900 dark:text-zinc-100">
+                {r.label || r.value}
+              </span>
+              {r.description && (
+                <span className="block truncate text-xs text-zinc-500">{r.description}</span>
+              )}
             </li>
           ))}
         </ul>
