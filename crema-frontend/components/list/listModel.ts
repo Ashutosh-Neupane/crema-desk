@@ -213,29 +213,30 @@ export function sortableFields(meta: DocTypeMeta) {
 }
 
 /** only the views that make sense for the DocType */
+/**
+ * The views Desk's view switcher offers (frappe/list/list_view_select.js get_views): List, Report when the user may
+ * report on the DocType, Calendar / Gantt with calendar settings, Image with an image field, Tree for tree DocTypes.
+ * Kanban is listed by board in ViewMenu (Desk's Kanban submenu: the boards that exist, then "New Kanban Board").
+ */
 export function listViews(
   meta: DocTypeMeta | undefined,
-  doctype: string
+  doctype: string,
+  opts: { canReport?: boolean } = {}
 ): Array<{ id: string; label: string; href: string }> {
   if (!meta) return [];
   const base = `${doctypeUrl(doctype)}`;
-  const v = [
-    { id: "list", label: "List", href: `${base}${meta.is_tree ? "?view=list" : ""}` },
-    { id: "report", label: "Report", href: `${base}/view/report` },
-  ];
+  const v = [{ id: "list", label: doctype === "File" ? "File" : "List", href: `${base}${meta.is_tree ? "?view=list" : ""}` }];
+  if (opts.canReport !== false) v.push({ id: "report", label: "Report", href: `${base}/view/report` });
   // Desk: File has a folder view (/app/file/view/home)
   if (doctype === "File") v.push({ id: "home", label: "Home", href: "/desk/files" });
-  // Desk offers Calendar when the DocType ships calendar settings (frappe.views.calendar)
+  // Calendar and Gantt when the DocType ships calendar settings (frappe.views.calendar) or is_calendar_and_gantt
   const calJs = String((meta as { __calendar_js?: string }).__calendar_js ?? "");
-  if (calJs) v.push({ id: "calendar", label: "Calendar", href: `${base}/view/calendar` });
-  // Gantt when the calendar settings enable it (gantt: true / { ... })
-  if (/\bgantt\s*:\s*(true|\{)/.test(calJs))
+  const calendar = !!calJs || !!(meta as { is_calendar_and_gantt?: number }).is_calendar_and_gantt;
+  if (calendar) v.push({ id: "calendar", label: "Calendar", href: `${base}/view/calendar` });
+  if (calendar && (/\bgantt\s*:\s*(true|\{)/.test(calJs) || (meta as { is_calendar_and_gantt?: number }).is_calendar_and_gantt))
     v.push({ id: "gantt", label: "Gantt", href: `${base}/view/gantt` });
-  // Desk offers Kanban for any DocType with a Select field to build columns from
-  if (meta.fields?.some((f) => f.fieldtype === "Select" && !f.hidden))
-    v.push({ id: "kanban", label: "Kanban", href: `${base}/view/kanban` });
-  if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `${base}/view/tree` });
   if (meta.image_field) v.push({ id: "image", label: "Image", href: `${base}/view/image` });
+  if (meta.is_tree) v.push({ id: "tree", label: "Tree", href: `${base}/view/tree` });
   return v;
 }
 

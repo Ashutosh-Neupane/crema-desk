@@ -19,8 +19,9 @@ const kids = await page.locator("ul[aria-label='Account tree'] ul ul > li").coun
 check(kids > 0, `children loaded (${kids})`);
 await shot("tree_expanded", false);
 
-step("List tab still reachable");
-await page.getByRole("link", { name: "List", exact: true }).click();
+step("List still reachable from the view menu");
+await page.getByRole("button", { name: /^View: / }).click();
+await page.getByRole("menuitem", { name: "List", exact: true }).click();
 await page.waitForURL(/view=list/, { timeout: 30000 });
 await page.locator("tbody tr").first().waitFor({ timeout: 60000 });
 check((await page.locator("tbody tr").count()) > 0, "Account list shows rows");

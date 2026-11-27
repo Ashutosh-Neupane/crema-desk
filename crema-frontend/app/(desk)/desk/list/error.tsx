@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import { Button } from "@/components/shadcn/button";
 import { AlertCircle } from "lucide-react";
+import { useReloadOnStaleBuild } from "@/lib/ui/staleBuild";
 
 export default function ListError({ error, reset }: { error: Error; reset: () => void }) {
+  useReloadOnStaleBuild(error);
   useEffect(() => {
     console.error("List error:", error);
   }, [error]);

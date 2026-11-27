@@ -15,7 +15,8 @@ await post("frappe.client.set_value", { doctype: "Item", name: ITEM.name, fieldn
 
 step("Item list → Image view");
 await page.goto(`${BASE}/desk/item`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Image" }).click({ timeout: 90000 });
+await page.getByRole("button", { name: /^View: / }).click({ timeout: 90000 });
+await page.getByRole("menuitem", { name: "Image" }).click();
 await page.waitForURL(/\/view\/image/, { timeout: 60000 });
 const grid = page.getByRole("list", { name: "Item images" });
 await grid.getByRole("listitem").first().waitFor({ timeout: 60000 });

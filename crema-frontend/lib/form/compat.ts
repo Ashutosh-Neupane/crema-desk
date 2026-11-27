@@ -3,8 +3,8 @@
  * scripts load instead of throwing on their first line:
  *  - frappe.ui.form.Controller and the ERPNext controller bases
  *    (TransactionController, SellingController, BuyingController, StockController)
- *    — bases: Crema provides most behaviour natively (see lib/erpnext); TransactionController carries
- *    transaction.js's payment helpers (make_payment_entry → get_payment_entry → a pre-filled Payment Entry)
+ *    — TransactionController ports what transaction.js does on refresh (hide_company, set_dynamic_labels: currency
+ *    labels and which totals show) and its payment helpers (make_payment_entry → a pre-filled Payment Entry)
  *  - extend_cscript(cscript, controller) — copies controller methods onto frm.cscript
  *  - frappe.model.open_mapped_doc — "Create → Delivery Note" style mapping via
  *    the app's whitelisted make_* method, opened as a new unsaved form
@@ -14,6 +14,7 @@ import { deskCall } from "@/lib/frappe/form";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import { MultiSelectDialog, type MultiSelectOptions } from "@/lib/desk-runtime/multiSelect";
 import { installShims } from "./shims";
+import { setDependsOnGlobals } from "@/lib/crema-form/dependsOn";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 /** A fresh copy of a filters / query object per call, like JSON.parse(JSON.stringify(x)) did: undefined and functions
@@ -63,7 +64,120 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   provide("erpnext.stock");
   provide("erpnext.accounts");
   provide("erpnext.taxes");
+  /** the frm calls transaction.js makes for labels and visibility */
+  type TxFrm = {
+    doc: Record<string, unknown> & { doctype?: string; company?: string; currency?: string; price_list_currency?: string; party_account_currency?: string; docstatus?: number; discount_amount?: unknown; taxes?: Array<{ included_in_print_rate?: number }> };
+    fields_dict: Record<string, { grid?: { doctype?: string } } | undefined>;
+    toggle_display: (f: string | string[], show: boolean) => void;
+    toggle_reqd: (f: string | string[], reqd: boolean) => void;
+    set_df_property: (f: string, prop: string, value: unknown) => void;
+    set_currency_labels: (fields: string[], currency: string, parentfield?: string) => void;
+    set_value: (f: string, v: unknown) => unknown;
+  };
+  const companies = () => ((g.locals as Record<string, Record<string, { default_currency?: string }>> | undefined)?.[":Company"] ?? {});
+  const sysCurrency = () => String(((rt.frappe.boot as { sysdefaults?: { currency?: string } } | undefined)?.sysdefaults?.currency) ?? "");
+  /** erpnext/public/js/utils.js get_currency */
+  const companyCurrency = (company?: string) => (company ? companies()[company]?.default_currency || sysCurrency() : sysCurrency());
+  const docfields = (dt: string) => ((rt.frappe.meta as unknown as { get_docfields: (d: string) => Array<{ fieldname: string; fieldtype: string; options?: string }> }).get_docfields(dt) ?? []);
+
   class TransactionController extends Controller {
+    private _last_currency?: unknown;
+    private _last_price_list_currency?: unknown;
+    private _last_party_account_currency?: unknown;
+    private _last_company_currency?: unknown;
+    private get tx() {
+      return this.frm as unknown as TxFrm;
+    }
+
+    /** transaction.js refresh: Company hidden on a one-company site, then the currency labels and totals shown */
+    refresh() {
+      this.hide_company();
+      this.set_dynamic_labels();
+    }
+
+    /** utils.js hide_company: with one Company, fill it and hide the field */
+    hide_company() {
+      const frm = this.tx;
+      if (!frm?.fields_dict?.company) return;
+      const names = Object.keys(companies());
+      if (names.length === 1) {
+        if (!frm.doc.company) void frm.set_value("company", names[0]);
+        frm.toggle_display("company", false);
+      }
+    }
+
+    get_company_currency() {
+      return companyCurrency(this.tx.doc.company);
+    }
+
+    /** transaction.js set_dynamic_labels: relabel and toggle when a currency changed (also on the first refresh) */
+    set_dynamic_labels() {
+      const frm = this.tx;
+      if (!frm?.doc) return;
+      frm.toggle_reqd("plc_conversion_rate", !!(frm.doc.price_list_name && frm.doc.price_list_currency));
+      const company_currency = this.get_company_currency();
+      if (
+        this._last_currency === frm.doc.currency &&
+        this._last_price_list_currency === frm.doc.price_list_currency &&
+        this._last_party_account_currency === frm.doc.party_account_currency &&
+        this._last_company_currency === company_currency
+      )
+        return;
+      this._last_currency = frm.doc.currency;
+      this._last_price_list_currency = frm.doc.price_list_currency;
+      this._last_party_account_currency = frm.doc.party_account_currency;
+      this._last_company_currency = company_currency;
+      this.change_form_labels(company_currency);
+      this.change_grid_labels(company_currency);
+    }
+
+    get_currency_label_options(company_currency: string): Record<string, unknown> {
+      const d = this.tx.doc;
+      return { currency: d.currency, "Company:company:default_currency": company_currency, party_account_currency: d.party_account_currency };
+    }
+
+    set_currency_labels_from_options(options: Record<string, unknown>, parentfield?: string) {
+      const frm = this.tx;
+      // the child DocType from the table field's options (grid.doctype in Desk)
+      const doctype = parentfield ? String(docfields(String(frm.doc.doctype)).find((df) => df.fieldname === parentfield)?.options ?? "") : String(frm.doc.doctype);
+      const fields = docfields(doctype);
+      for (const [opt, currency] of Object.entries(options)) {
+        if (!currency) continue;
+        frm.set_currency_labels(fields.filter((df) => df.fieldtype === "Currency" && df.options === opt).map((df) => df.fieldname), String(currency), parentfield);
+      }
+    }
+
+    /** transaction.js change_form_labels: "(NPR)" on amounts; company-currency, tax and net-total fields only when they say something */
+    change_form_labels(company_currency: string) {
+      const frm = this.tx;
+      const d = frm.doc;
+      this.set_currency_labels_from_options(this.get_currency_label_options(company_currency));
+      frm.set_currency_labels(["totals_section"], String(d.currency ?? ""));
+      frm.set_currency_labels(["base_totals_section"], company_currency);
+      frm.set_df_property("conversion_rate", "description", `1 ${d.currency} = [?] ${company_currency}`);
+      if (d.price_list_currency && d.price_list_currency !== company_currency)
+        frm.set_df_property("plc_conversion_rate", "description", `1 ${d.price_list_currency} = [?] ${company_currency}`);
+      const has = (fn: string) => docfields(String(d.doctype)).some((df) => df.fieldname === fn);
+      const show = (fields: string[], on: boolean) => frm.toggle_display(fields.filter(has), on);
+      show(
+        ["conversion_rate", "base_total", "base_net_total", "base_tax_withholding_net_total", "base_total_taxes_and_charges", "base_taxes_and_charges_added", "base_taxes_and_charges_deducted", "base_grand_total", "base_rounded_total", "base_in_words", "base_discount_amount", "base_paid_amount", "base_write_off_amount", "base_operating_cost", "base_raw_material_cost", "base_total_cost", "base_secondary_items_cost", "base_rounding_adjustment"],
+        d.currency !== company_currency
+      );
+      show(["plc_conversion_rate", "price_list_currency"], d.price_list_currency !== company_currency);
+      for (const f of ["total_taxes_and_charges", "taxes_and_charges_deducted", "taxes_and_charges_added", "base_taxes_and_charges_added", "base_taxes_and_charges_deducted", "base_total_taxes_and_charges"])
+        show([f], d[f] !== 0 || d.docstatus !== 1);
+      const netTotal = !!(Number(d.discount_amount) || (d.taxes ?? []).some((t) => t.included_in_print_rate === 1));
+      show(["net_total"], netTotal);
+      show(["base_net_total"], netTotal && d.currency !== company_currency);
+    }
+
+    /** transaction.js change_grid_labels: the same "(NPR)" on child table columns */
+    change_grid_labels(company_currency: string) {
+      const options = this.get_currency_label_options(company_currency);
+      for (const table of ["items", "operations", "secondary_items", "taxes", "advances", "payment_schedule", "sales_team"])
+        if (this.tx.fields_dict[table]) this.set_currency_labels_from_options(options, table);
+    }
+
     /** erpnext/public/js/controllers/transaction.js onload_post_render: item rows get "Add Multiple" (item, qty) */
     onload_post_render() {
       const frm = this.frm as { doc?: { doctype?: string }; get_field?: (f: string) => { grid?: { set_multiple_add?: (l: string, q: string) => void } } } | undefined;
@@ -125,11 +239,28 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
       return "erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry";
     }
   }
+  // utils.js get_currency: the Company's currency (sections like "Currency and Price List" open only when it differs)
+  erpnext.get_currency = (company?: string) => companyCurrency(company ?? String(((g.cur_frm as { doc?: { company?: string } } | undefined)?.doc?.company) ?? ""));
   erpnext.TransactionController = TransactionController;
   erpnext.taxes_and_totals = TransactionController;
   erpnext.payments = TransactionController;
-  (erpnext.selling as Record<string, unknown>).SellingController = class extends TransactionController {};
-  (erpnext.buying as Record<string, unknown>).BuyingController = class extends TransactionController {};
+  /** a party name that only repeats the party's ID is hidden (utils/sales_common.js, controllers/buying.js refresh) */
+  const hidePartyName = (frm: TxFrm, party: string) => {
+    const name = frm?.doc?.[`${party}_name`];
+    if (frm?.fields_dict?.[`${party}_name`]) frm.toggle_display(`${party}_name`, !!name && name !== frm.doc[party]);
+  };
+  (erpnext.selling as Record<string, unknown>).SellingController = class extends TransactionController {
+    refresh() {
+      super.refresh();
+      hidePartyName(this.frm as unknown as TxFrm, "customer");
+    }
+  };
+  (erpnext.buying as Record<string, unknown>).BuyingController = class extends TransactionController {
+    refresh() {
+      super.refresh();
+      hidePartyName(this.frm as unknown as TxFrm, "supplier");
+    }
+  };
   (erpnext.stock as Record<string, unknown>).StockController = class extends Controller {};
   (erpnext.utils as Record<string, unknown>).get_fiscal_year = () => undefined;
 
@@ -138,6 +269,9 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
   g.erpnext = lenient(erpnext);
 
   // copy own + prototype methods (except constructor) onto cscript
+  // depends_on / collapsible_depends_on expressions see the same globals as in Desk
+  setDependsOnGlobals({ frappe: rt.frappe, erpnext: g.erpnext, flt: g.flt, cint: g.cint, cstr: g.cstr, in_list: g.in_list, __: g.__ });
+
   g.extend_cscript = (cscript: Record<string, unknown>, obj: Record<string, unknown>) => {
     let proto: object | null = obj;
     const seen = new Set<string>();
@@ -154,6 +288,8 @@ export function installFormCompat(rt: Runtime, opts: { frm: Record<string, unkno
     return cscript;
   };
   g.cur_frm = opts.frm;
+  // Desk keeps the open form at window.cur_frm too (people inspect it from the browser console)
+  if (typeof window !== "undefined") (window as unknown as { cur_frm?: unknown }).cur_frm = opts.frm;
 
   frappe.model.open_mapped_doc = async (o: { method: string; frm?: { doc: Record<string, unknown> }; source_name?: string; args?: Record<string, unknown> }) => {
     const source = o.source_name ?? (o.frm ?? opts.frm as { doc: Record<string, unknown> }).doc?.name;

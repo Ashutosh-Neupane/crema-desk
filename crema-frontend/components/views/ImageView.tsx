@@ -14,6 +14,7 @@ import { fetchCount, fetchRows, type Filter } from "@/lib/list/api";
 import { fieldLabel } from "@/components/list/filters";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 const enc = encodeURIComponent;
 const PAGE = 40;
@@ -59,14 +60,7 @@ export default function ImageView({ doctype }: { doctype: string }) {
           </div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{doctype}</h1>
         </div>
-        <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-          <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-            List
-          </Link>
-          <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-            Image
-          </span>
-        </nav>
+        <ViewMenu meta={meta} doctype={doctype} current="image" />
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" aria-hidden />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${fieldLabel(meta, titleField)}`} aria-label="Search" className="h-8 w-52 rounded-md border border-zinc-200 bg-white pl-7 pr-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />

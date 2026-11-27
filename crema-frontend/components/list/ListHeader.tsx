@@ -4,7 +4,6 @@
  * The list's title row (list_view.js + ui/page.js): title and page indicator, saved layouts, the view switcher,
  * an app's toolbar buttons, refresh, the settings menu, and Add / bulk Actions.
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Settings2 } from "lucide-react";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
@@ -22,30 +21,13 @@ import {
 import BulkActions from "@/components/list/BulkActions";
 import { LayoutMenu } from "@/components/list/Layouts";
 import { ToolbarButtons } from "@/components/list/ListHooksUI";
-import { listViews, runItem, type ListSettings } from "@/components/list/listModel";
+import { runItem, type ListSettings } from "@/components/list/listModel";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 const enc = encodeURIComponent;
 const iconBtn =
   "rounded-lg border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
 
-function ViewSwitcher({ views }: { views: Array<{ id: string; label: string; href: string }> }) {
-  if (views.length <= 1) return null;
-  return (
-    <nav aria-label="Views" className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
-      {views.map((v) => (
-        <Link
-          key={v.id}
-          href={v.href}
-          prefetch={false}
-          aria-current={v.id === "list" ? "page" : undefined}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium ${v.id === "list" ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}
-        >
-          {v.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
 
 function PageTitle({ doctype, pageState }: { doctype: string; pageState: PageState }) {
   return (
@@ -219,7 +201,7 @@ export function ListHeader({
           onManage={onManageLayouts}
         />
       )}
-      <ViewSwitcher views={listViews(meta, doctype)} />
+      <ViewMenu meta={meta} doctype={doctype} current="list" />
       <div className="ml-auto flex items-center gap-2">
         <ToolbarButtons items={pageState.inner} />
         {sortControl}

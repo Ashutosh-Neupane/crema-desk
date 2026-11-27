@@ -18,6 +18,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { PREFILL_KEY } from "@/lib/form/prefill";
 import LinkInput from "@/components/list/LinkInput";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 interface TreeNode {
   value: string;
@@ -192,10 +193,7 @@ export default function TreeView({ doctype }: { doctype: string }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{String(settings?.title ?? doctype)}</h1>
-        <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
-          <Link href={`${doctypeUrl(doctype)}?view=list`} className="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">List</Link>
-          <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100">Tree</span>
-        </div>
+        <ViewMenu meta={meta} doctype={doctype} current="tree" />
         <button type="button" onClick={() => addChild(root?.value ?? "")} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
           <Plus className="h-4 w-4" /> Add {doctype}
         </button>

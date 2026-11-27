@@ -117,6 +117,9 @@ export function resolveDeskPath(path: string, reg: DeskRouteRegistry, search = "
     const mine = reg.workspaces.find((w) => PRIVATE_WS.test(w) && deskSlug(w.replace(PRIVATE_WS, "$1")) === rest[0]);
     if (mine) return `/desk/workspace/${enc(mine)}${q}`;
   }
+  // Desk's builder (/desk/print-format-builder-beta/<name>, what Print Format → Edit Format opens) is Crema's builder;
+  // framing Desk's page here would load Crema again inside the frame (Desk's router moves the frame to /desk/…)
+  if (first === "print-format-builder-beta" && rest[0]) return `/desk/print-format-builder/${enc(rest[0])}${q}`;
   // Desk's dashboard page (/desk/dashboard-view/<name>) is Crema's dashboard screen
   if (first === "dashboard-view" && rest[0]) return `/desk/dashboard/${enc(rest[0])}${q}`;
   const ws = workspaces.get(first);

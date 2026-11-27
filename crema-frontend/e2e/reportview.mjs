@@ -11,7 +11,8 @@ await post("frappe.desk.reportview.delete_report", { name: REPORT }).catch(() =>
 
 step("open Report view from the list");
 await page.goto(`${BASE}/desk/sales-order`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Report", exact: true }).click();
+await page.getByRole("button", { name: /^View: / }).click({ timeout: 90000 });
+await page.getByRole("menuitem", { name: "Report", exact: true }).click();
 await page.waitForURL(/\/view\/report/, { timeout: 30000 });
 const grid = page.getByRole("table", { name: "Sales Order report" });
 await grid.locator("tbody tr").first().waitFor({ timeout: 60000 });

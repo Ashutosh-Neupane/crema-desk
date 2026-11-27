@@ -18,6 +18,7 @@ import { fieldLabel } from "@/components/list/filters";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { monthDay, monthShortYear } from "./parts/dateLabels";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 type Scale = "Day" | "Week" | "Month";
 const PX: Record<Scale, number> = { Day: 36, Week: 14, Month: 4 };
@@ -162,17 +163,7 @@ export default function GanttView({ doctype }: { doctype: string }) {
           </div>
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{doctype} Gantt</h1>
         </div>
-        <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-          <Link href={`${doctypeUrl(doctype)}`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-            List
-          </Link>
-          <Link href={`${doctypeUrl(doctype)}/view/calendar`} prefetch={false} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-            Calendar
-          </Link>
-          <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-            Gantt
-          </span>
-        </nav>
+        <ViewMenu meta={meta} doctype={doctype} current="gantt" />
         <div className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700" role="group" aria-label="Gantt scale">
           {(["Day", "Week", "Month"] as const).map((s) => (
             <button key={s} type="button" aria-pressed={scale === s} onClick={() => setScale(s)} className={`rounded px-2.5 py-1 ${scale === s ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-300"}`}>

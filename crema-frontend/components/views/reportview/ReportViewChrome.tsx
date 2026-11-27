@@ -15,6 +15,7 @@ import type { GroupBy } from "@/lib/report/groupBy";
 import GroupByEditor from "./GroupByEditor";
 import { btn, primaryBtn } from "./shared";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 export function ReportViewHeader({
   doctype,
@@ -55,14 +56,7 @@ export function ReportViewHeader({
         </div>
         <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{reportName ?? `${doctype} Report`}</h1>
       </div>
-      <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-        <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-          List
-        </Link>
-        <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-          Report
-        </span>
-      </nav>
+      <ViewMenu meta={meta} doctype={doctype} current="report" />
       <button type="button" className={btn} onClick={onRefresh} aria-label="Refresh">
         <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} aria-hidden />
       </button>

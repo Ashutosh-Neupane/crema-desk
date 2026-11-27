@@ -46,6 +46,10 @@ type Handler = (...args: unknown[]) => unknown;
 function bootDocs(docs: RuntimeContext["docs"]): Array<Record<string, unknown>> {
   return Object.entries(docs ?? {}).flatMap(([dt, byName]) => Object.values(byName).map((d) => ({ ...d, doctype: `:${dt}` })));
 }
+/** the boot docs as Desk's locals hold them: { ":Company": { "<name>": {…} }, … } */
+function bootLocals(docs: RuntimeContext["docs"]): Record<string, Record<string, Record<string, unknown>>> {
+  return Object.fromEntries(Object.entries(docs ?? {}).map(([dt, byName]) => [`:${dt}`, Object.fromEntries(Object.entries(byName).map(([n, d]) => [n, { ...d, doctype: `:${dt}` }]))]));
+}
 export type FormHandlers = Map<string, Map<string, Handler[]>>;
 
 // ── numbers / strings (frappe/public/js/frappe/utils/number_format.js) ──────
@@ -367,6 +371,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       get_field_precision: (df?: DocField, doc?: Record<string, unknown>) => fmt.getFieldPrecision(df ?? {}, doc),
       get_field_currency: (df?: DocField, doc?: Record<string, unknown>) => fmt.getFieldCurrency(df ?? {}, doc),
       get_label: (dt: string, fn: string) => getField(dt, fn)?.label ?? fn,
+      // meta.js get_docfields: the DocType's fields (ERPNext's set_currency_labels_from_options filters them)
+      get_docfields: (dt: string) => metas[dt]?.fields ?? [],
+      get_meta: (dt: string) => metas[dt],
     },
     model: {
       round_floats_in: () => {},
@@ -498,7 +505,9 @@ export function createRuntime(ctx: RuntimeContext): Runtime {
       const other = new Set(b ?? []);
       return (a ?? []).some((x) => other.has(x));
     },
-    locals: {} as Record<string, unknown>,
+    // Desk boot syncs frappe.boot.docs into locals (frappe.model.sync): locals[":Company"], locals[":Currency"], …
+    // ERPNext reads them (hide_company hides Company on a one-company site, is_perpetual_inventory_enabled)
+    locals: bootLocals(ctx.docs) as Record<string, unknown>,
     cur_frm: undefined,
     // Desk globals some scripts still call
     refresh_field: () => {},
