@@ -99,7 +99,7 @@ export default function GridRowEditor({ ctl, df, meta, row, rowCount, readOnly, 
             overrides={overrides}
             overridePrefix={`${table}.`}
             errors={rowErrors}
-            onChange={(f, v) => void ctl.set_child_value(row.doctype, row.name, f, v)}
+            onChange={(f, v) => void ctl.editChild(row.doctype, row.name, f, v)}
             getQuery={(f) => () => ctl.getQuery(f, table)?.(ctl.getDoc(), row.doctype, row.name)}
             // Button fields in the row form fire the child doctype's event (Desk script_manager.trigger(fieldname, cdt, cdn))
             onButton={(f) => void ctl.clickButton(f, row.doctype, row.name)}

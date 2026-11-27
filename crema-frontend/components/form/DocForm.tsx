@@ -522,7 +522,7 @@ function DocFormBody({
       <TableMultiSelectField
         field={df}
         value={doc[df.fieldname]}
-        onChange={(v) => void ctl.set_value(df.fieldname, v)}
+        onChange={(v) => void ctl.edit(df.fieldname, v)}
         onAddRow={(values) => ctl.add_child(df.fieldname, values)}
         onRemoveRow={(row) => ctl.remove_rows(df.fieldname, [String(row.name)])}
         disabled={readOnly && !df.allow_on_submit}
@@ -551,7 +551,7 @@ function DocFormBody({
       fieldPerm={ctl.fieldStatus}
       overrides={snap.overrides}
       errors={snap.errors}
-      onChange={(f, v) => void ctl.set_value(f, v)}
+      onChange={(f, v) => void ctl.edit(f, v)}
       onButton={(f) => void ctl.clickButton(f)}
       getQuery={(f) => () => ctl.getQuery(f)?.(ctl.getDoc())}
       renderTable={(df) => renderTable(df as DocField)}
