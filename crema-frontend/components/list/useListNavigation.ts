@@ -20,7 +20,19 @@ const guidedStart = (doctype: string, newLayout: boolean) => newLayout && doctyp
  *  - ?new=1 (e.g. /desk/doctype/new redirect) goes to the new form unless the app has a primary action, which the
  *    list opens once its JS is loaded
  */
-export function useListRedirects({ doctype, meta, settings, view, wantNew }: { doctype: string; meta: DocTypeMeta | undefined; settings: ListSettings; view: string | null; wantNew: boolean }) {
+export function useListRedirects({
+  doctype,
+  meta,
+  settings,
+  view,
+  wantNew,
+}: {
+  doctype: string;
+  meta: DocTypeMeta | undefined;
+  settings: ListSettings;
+  view: string | null;
+  wantNew: boolean;
+}) {
   const opened = useRef(false);
   const guided = guidedStart(doctype, useNewLayout());
   useEffect(() => {
@@ -30,12 +42,19 @@ export function useListRedirects({ doctype, meta, settings, view, wantNew }: { d
   }, [wantNew, settings, guided]);
 
   if (meta?.issingle) redirect(docHref(doctype, doctype), RedirectType.replace);
-  if (meta?.is_tree && view !== "list") redirect(`${doctypeUrl(doctype)}/view/tree`, RedirectType.replace);
-  if (wantNew && meta && settings !== undefined && (guided || !hasPrimaryAction(settings))) redirect(newDocHref(doctype), RedirectType.push);
+  if (meta?.is_tree && view !== "list")
+    redirect(`${doctypeUrl(doctype)}/view/tree`, RedirectType.replace);
+  if (wantNew && meta && settings !== undefined && (guided || !hasPrimaryAction(settings)))
+    redirect(newDocHref(doctype), RedirectType.push);
 }
 
 /** Desk: the app's listview_settings.primary_action replaces New (e.g. DocType's "Create New DocType" dialog) */
-export function useAddAction(doctype: string, meta: DocTypeMeta | undefined, settings: ListSettings, openQuickEntry: () => void) {
+export function useAddAction(
+  doctype: string,
+  meta: DocTypeMeta | undefined,
+  settings: ListSettings,
+  openQuickEntry: () => void
+) {
   const router = useRouter();
   const guided = guidedStart(doctype, useNewLayout());
   return () => {

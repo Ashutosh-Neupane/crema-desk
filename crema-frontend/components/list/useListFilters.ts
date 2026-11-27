@@ -11,7 +11,10 @@ export function useListFilters(doctype: string, titleField: string) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const filters = useMemo(() => filtersFromParams(doctype, new URLSearchParams(params.toString())), [doctype, params]);
+  const filters = useMemo(
+    () => filtersFromParams(doctype, new URLSearchParams(params.toString())),
+    [doctype, params]
+  );
 
   const urlQ = params.get("q") ?? "";
   const [search, setSearch] = useState(urlQ);
@@ -30,12 +33,28 @@ export function useListFilters(doctype: string, titleField: string) {
   const view = params.get("view");
   const setFilters = useCallback(
     (next: Filter[]) => router.replace(listUrl(pathname, next, search, view), { scroll: false }),
-    [pathname, router, search, view],
+    [pathname, router, search, view]
   );
-  const addFilter = useCallback((f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]), [filters, setFilters]);
+  const addFilter = useCallback(
+    (f: Filter) => setFilters([...filters.filter((x) => !(x[1] === f[1] && x[2] === f[2])), f]),
+    [filters, setFilters]
+  );
 
-  const searchFilter = useMemo<Filter[]>(() => (debounced ? [[doctype, titleField || "name", "like", `%${debounced}%`]] : []), [debounced, doctype, titleField]);
+  const searchFilter = useMemo<Filter[]>(
+    () => (debounced ? [[doctype, titleField || "name", "like", `%${debounced}%`]] : []),
+    [debounced, doctype, titleField]
+  );
   const allFilters = useMemo(() => [...filters, ...searchFilter], [filters, searchFilter]);
 
-  return { filters, setFilters, addFilter, allFilters, search, setSearch, debounced, view, wantNew: params.get("new") === "1" };
+  return {
+    filters,
+    setFilters,
+    addFilter,
+    allFilters,
+    search,
+    setSearch,
+    debounced,
+    view,
+    wantNew: params.get("new") === "1",
+  };
 }

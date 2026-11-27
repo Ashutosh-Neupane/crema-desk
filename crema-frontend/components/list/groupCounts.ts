@@ -22,10 +22,15 @@ export const STANDARD = [
   { fieldname: "tags", label: "Tags" },
 ];
 export const FIELD_TYPES = ["Select", "Link", "Data", "Int", "Check"];
-export const filterField = (f: string) => (f === "assigned_to" ? "_assign" : f === "tags" ? "_user_tags" : f);
+export const filterField = (f: string) =>
+  f === "assigned_to" ? "_assign" : f === "tags" ? "_user_tags" : f;
 
 async function loadGroupByFields(doctype: string): Promise<string[]> {
-  const { env } = await deskCall("frappe.model.utils.user_settings.get", { doctype }, { get: true });
+  const { env } = await deskCall(
+    "frappe.model.utils.user_settings.get",
+    { doctype },
+    { get: true }
+  );
   try {
     const s = typeof env.message === "string" ? JSON.parse(env.message) : (env.message ?? {});
     return Array.isArray(s?.group_by_fields) ? (s.group_by_fields as string[]) : [];
@@ -37,7 +42,11 @@ async function loadGroupByFields(doctype: string): Promise<string[]> {
 /** Assigned To / Created By / Tags plus the user's saved group-by fields */
 export function useGroupByFields(meta: DocTypeMeta) {
   const doctype = meta.name;
-  const { data: saved = [] } = useQuery({ queryKey: ["list-group-by-fields", doctype], queryFn: () => loadGroupByFields(doctype), staleTime: 60_000 });
+  const { data: saved = [] } = useQuery({
+    queryKey: ["list-group-by-fields", doctype],
+    queryFn: () => loadGroupByFields(doctype),
+    staleTime: 60_000,
+  });
   const fields = useMemo(() => {
     const out = [...STANDARD];
     const byName = new Map((meta.fields ?? []).map((f) => [f.fieldname, f]));
@@ -56,7 +65,13 @@ export function useGroupByFields(meta: DocTypeMeta) {
 }
 
 /** Desk apply_filter: remove the field's filter, then add the value unless it was the one applied */
-export function toggleGroupFilter(doctype: string, filters: Filter[], fieldname: string, value: string | null, selected: boolean): Filter[] {
+export function toggleGroupFilter(
+  doctype: string,
+  filters: Filter[],
+  fieldname: string,
+  value: string | null,
+  selected: boolean
+): Filter[] {
   const ff = filterField(fieldname);
   const rest = filters.filter((f) => f[1] !== ff);
   if (selected) return rest;
@@ -81,25 +96,59 @@ function labelOf(r: Count, user: string, fieldtype?: string): string {
   return fieldtype === "Link" && r.title ? r.title : String(r.name);
 }
 
-async function loadCounts(doctype: string, fieldname: string, fieldtype: string | undefined, countFilters: Filter[], user: string): Promise<GroupItem[]> {
+async function loadCounts(
+  doctype: string,
+  fieldname: string,
+  fieldtype: string | undefined,
+  countFilters: Filter[],
+  user: string
+): Promise<GroupItem[]> {
   if (fieldname === "tags") {
-    const { env } = await deskCall("frappe.desk.reportview.get_sidebar_stats", { stats: ["_user_tags"], doctype, filters: countFilters }, { get: true });
-    const stats = ((env.message as { stats?: Record<string, Array<[string, number]>> })?.stats?._user_tags ?? []) as Array<[string, number]>;
+    const { env } = await deskCall(
+      "frappe.desk.reportview.get_sidebar_stats",
+      { stats: ["_user_tags"], doctype, filters: countFilters },
+      { get: true }
+    );
+    const stats = ((env.message as { stats?: Record<string, Array<[string, number]>> })?.stats
+      ?._user_tags ?? []) as Array<[string, number]>;
     return stats.map(([name, count]) => ({ key: name, label: name, count }));
   }
-  let rows: Count[] = (await fetchGroupByCount(doctype, countFilters, fieldname)).filter((r) => r.count !== 0);
+  let rows: Count[] = (await fetchGroupByCount(doctype, countFilters, fieldname)).filter(
+    (r) => r.count !== 0
+  );
   const me = rows.find((r) => r.name === user);
   rows = rows.filter((r) => !["Guest", "Administrator", user].includes(String(r.name)));
   if (me) rows.unshift(me);
-  return rows.map((r) => ({ key: r.name == null ? "" : String(r.name), count: r.count, label: labelOf(r, user, fieldtype) }));
+  return rows.map((r) => ({
+    key: r.name == null ? "" : String(r.name),
+    count: r.count,
+    label: labelOf(r, user, fieldtype),
+  }));
 }
 
 /** counts per value of one field, and which value is applied */
-export function useGroupCounts({ doctype, fieldname, fieldtype, filters, user, enabled }: { doctype: string; fieldname: string; fieldtype?: string; filters: Filter[]; user: string; enabled: boolean }) {
+export function useGroupCounts({
+  doctype,
+  fieldname,
+  fieldtype,
+  filters,
+  user,
+  enabled,
+}: {
+  doctype: string;
+  fieldname: string;
+  fieldtype?: string;
+  filters: Filter[];
+  user: string;
+  enabled: boolean;
+}) {
   const ff = filterField(fieldname);
   const applied = filters.find((f) => f[1] === ff);
   // Desk removes the field's own filter so every value keeps its count; tags keep all filters
-  const countFilters = useMemo(() => (fieldname === "tags" ? filters : filters.filter((f) => f[1] !== ff)), [filters, fieldname, ff]);
+  const countFilters = useMemo(
+    () => (fieldname === "tags" ? filters : filters.filter((f) => f[1] !== ff)),
+    [filters, fieldname, ff]
+  );
   const { data, isLoading } = useQuery<GroupItem[]>({
     queryKey: ["list-sidebar", doctype, fieldname, countFilters],
     enabled,

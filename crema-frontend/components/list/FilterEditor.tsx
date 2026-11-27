@@ -7,7 +7,8 @@ import LinkInput from "@/components/list/LinkInput";
 import { OPERATORS, filterableFields } from "@/components/list/filterModel";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 
-const selectCls = "h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+const selectCls =
+  "h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
 const NUMERIC = new Set(["Int", "Float", "Currency", "Percent"]);
 
 /** the typed value as the filter tuple stores it (like → %v%, is → set / not set, Check → 1 / 0) */
@@ -23,19 +24,42 @@ function inputType(fieldtype: string | undefined) {
   return NUMERIC.has(fieldtype ?? "") ? "number" : "text";
 }
 
-function FilterValueInput({ op, df, value, setValue, onEnter }: { op: string; df: DocField | undefined; value: string; setValue: (v: string) => void; onEnter: () => void }) {
+function FilterValueInput({
+  op,
+  df,
+  value,
+  setValue,
+  onEnter,
+}: {
+  op: string;
+  df: DocField | undefined;
+  value: string;
+  setValue: (v: string) => void;
+  onEnter: () => void;
+}) {
   if (op === "is") {
     return (
-      <select aria-label="Filter value" value={value || "set"} onChange={(e) => setValue(e.target.value)} className={selectCls}>
+      <select
+        aria-label="Filter value"
+        value={value || "set"}
+        onChange={(e) => setValue(e.target.value)}
+        className={selectCls}
+      >
         <option value="set">set</option>
         <option value="not set">not set</option>
       </select>
     );
   }
-  if (df?.fieldtype === "Link") return <LinkInput doctype={String(df.options)} value={value} onChange={setValue} autoFocus />;
+  if (df?.fieldtype === "Link")
+    return <LinkInput doctype={String(df.options)} value={value} onChange={setValue} autoFocus />;
   if (df?.fieldtype === "Select") {
     return (
-      <select aria-label="Filter value" value={value} onChange={(e) => setValue(e.target.value)} className={selectCls}>
+      <select
+        aria-label="Filter value"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className={selectCls}
+      >
         {String(df.options ?? "")
           .split("\n")
           .map((o) => (
@@ -48,7 +72,12 @@ function FilterValueInput({ op, df, value, setValue, onEnter }: { op: string; df
   }
   if (df?.fieldtype === "Check") {
     return (
-      <select aria-label="Filter value" value={value || "1"} onChange={(e) => setValue(e.target.value)} className={selectCls}>
+      <select
+        aria-label="Filter value"
+        value={value || "1"}
+        onChange={(e) => setValue(e.target.value)}
+        className={selectCls}
+      >
         <option value="1">Yes</option>
         <option value="0">No</option>
       </select>
@@ -66,8 +95,22 @@ function FilterValueInput({ op, df, value, setValue, onEnter }: { op: string; df
   );
 }
 
-export default function FilterEditor({ meta, onAdd }: { meta: DocTypeMeta; onAdd: (f: Filter) => void }) {
-  const fields = useMemo(() => [{ fieldname: "name", label: "ID", fieldtype: "Data" } as DocField, ...filterableFields(meta), { fieldname: "owner", label: "Created By", fieldtype: "Link", options: "User" } as DocField, { fieldname: "modified", label: "Last Updated On", fieldtype: "Datetime" } as DocField], [meta]);
+export default function FilterEditor({
+  meta,
+  onAdd,
+}: {
+  meta: DocTypeMeta;
+  onAdd: (f: Filter) => void;
+}) {
+  const fields = useMemo(
+    () => [
+      { fieldname: "name", label: "ID", fieldtype: "Data" } as DocField,
+      ...filterableFields(meta),
+      { fieldname: "owner", label: "Created By", fieldtype: "Link", options: "User" } as DocField,
+      { fieldname: "modified", label: "Last Updated On", fieldtype: "Datetime" } as DocField,
+    ],
+    [meta]
+  );
   const [fieldname, setFieldname] = useState(() => fields[1]?.fieldname ?? "name");
   const [op, setOp] = useState("=");
   const [value, setValue] = useState("");
@@ -96,7 +139,12 @@ export default function FilterEditor({ meta, onAdd }: { meta: DocTypeMeta; onAdd
             </option>
           ))}
         </select>
-        <select aria-label="Filter operator" value={op} onChange={(e) => setOp(e.target.value)} className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+        <select
+          aria-label="Filter operator"
+          value={op}
+          onChange={(e) => setOp(e.target.value)}
+          className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        >
           {OPERATORS.map((o) => (
             <option key={o.op} value={o.op}>
               {o.label}
@@ -105,7 +153,11 @@ export default function FilterEditor({ meta, onAdd }: { meta: DocTypeMeta; onAdd
         </select>
       </div>
       <FilterValueInput op={op} df={df} value={value} setValue={setValue} onEnter={add} />
-      <button type="button" onClick={add} className="w-full rounded-md bg-zinc-900 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
+      <button
+        type="button"
+        onClick={add}
+        className="w-full rounded-md bg-zinc-900 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+      >
         Add filter
       </button>
     </div>

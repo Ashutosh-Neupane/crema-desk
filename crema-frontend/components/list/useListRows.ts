@@ -7,7 +7,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCount, fetchRows, type Filter, type Row } from "@/lib/list/api";
-import { createListview, EMPTY_PAGE_STATE, runHook, type ListviewHandle } from "@/lib/list/listviewShim";
+import {
+  createListview,
+  EMPTY_PAGE_STATE,
+  runHook,
+  type ListviewHandle,
+} from "@/lib/list/listviewShim";
 import { useListRealtime } from "@/lib/services/realtime";
 import type { DocTypeMeta } from "@/lib/frappe/types";
 import { toggled, type ListSettings, type Sort } from "@/components/list/listModel";
@@ -21,7 +26,11 @@ export function useSelection(filters: Filter[]) {
   const selected = sel.key === key ? sel.names : NONE;
   const setSelected = useCallback((names: Set<string>) => setSel({ key, names }), [key]);
   const clearSelected = useCallback(() => setSel({ key, names: NONE }), [key]);
-  const toggle = useCallback((name: string) => setSel((prev) => ({ key, names: toggled(prev.key === key ? prev.names : NONE, name) })), [key]);
+  const toggle = useCallback(
+    (name: string) =>
+      setSel((prev) => ({ key, names: toggled(prev.key === key ? prev.names : NONE, name) })),
+    [key]
+  );
   return { selected, setSelected, clearSelected, toggle };
 }
 
@@ -58,10 +67,23 @@ export function useListRows({
   const rowsQuery = useQuery<Row[]>({
     queryKey: ["list", doctype, fields, filters, sort, pageLength, disableCommentCount],
     enabled: live && settings !== undefined,
-    queryFn: () => fetchRows({ doctype, fields, filters, orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`, start: 0, pageLength, withCommentCount: !disableCommentCount }),
+    queryFn: () =>
+      fetchRows({
+        doctype,
+        fields,
+        filters,
+        orderBy: `\`tab${doctype}\`.\`${sort.field}\` ${sort.order}`,
+        start: 0,
+        pageLength,
+        withCommentCount: !disableCommentCount,
+      }),
     placeholderData: keepPreviousData,
   });
-  const countQuery = useQuery({ queryKey: ["list-count", doctype, filters], enabled: live && !disableCount, queryFn: () => fetchCount(doctype, filters) });
+  const countQuery = useQuery({
+    queryKey: ["list-count", doctype, filters],
+    enabled: live && !disableCount,
+    queryFn: () => fetchCount(doctype, filters),
+  });
   const rows = useMemo(() => rowsQuery.data ?? [], [rowsQuery.data]);
   const total = countQuery.data ?? rows.length;
 
@@ -80,10 +102,18 @@ export function useListRows({
     () => () => {
       if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
     },
-    [],
+    []
   );
 
-  return { rows, total, isLoading: rowsQuery.isLoading, isFetching: rowsQuery.isFetching, isSuccess: rowsQuery.isSuccess, dataUpdatedAt: rowsQuery.dataUpdatedAt, refresh };
+  return {
+    rows,
+    total,
+    isLoading: rowsQuery.isLoading,
+    isFetching: rowsQuery.isFetching,
+    isSuccess: rowsQuery.isSuccess,
+    dataUpdatedAt: rowsQuery.dataUpdatedAt,
+    refresh,
+  };
 }
 
 /**
@@ -103,9 +133,19 @@ export function useListviewHooks({
   settings: ListSettings;
   ready: boolean;
   loadedAt: number;
-  host: { rows: Row[]; selected: Set<string>; clearSelected: () => void; filters: Filter[]; setFilters: (f: Filter[]) => void; refresh: () => void };
+  host: {
+    rows: Row[];
+    selected: Set<string>;
+    clearSelected: () => void;
+    filters: Filter[];
+    setFilters: (f: Filter[]) => void;
+    refresh: () => void;
+  };
 }) {
-  const lvHandle = useMemo(() => (meta && settings ? createListview(doctype, meta, settings) : null), [meta, settings, doctype]);
+  const lvHandle = useMemo(
+    () => (meta && settings ? createListview(doctype, meta, settings) : null),
+    [meta, settings, doctype]
+  );
   useEffect(() => {
     lvHandle?.setHost({
       rows: () => host.rows,
@@ -116,7 +156,11 @@ export function useListviewHooks({
       refresh: host.refresh,
     });
   });
-  const pageState = useSyncExternalStore(lvHandle?.subscribe ?? noSubscribe, lvHandle?.getState ?? emptyPageState, emptyPageState);
+  const pageState = useSyncExternalStore(
+    lvHandle?.subscribe ?? noSubscribe,
+    lvHandle?.getState ?? emptyPageState,
+    emptyPageState
+  );
   // list_view.js setup_view: settings.onload(listview), once per list
   const onloadFor = useRef<ListviewHandle | null>(null);
   useEffect(() => {
