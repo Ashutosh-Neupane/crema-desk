@@ -147,6 +147,11 @@ function SortControl({
   );
 }
 
+/** an "=" filter on a field shown as an inline standard filter */
+function isInline(f: Filter, standard: Pick<DocField, "fieldname">[]) {
+  return f[2] === "=" && standard.some((d) => d.fieldname === f[1]);
+}
+
 export function ListFilterBar({
   doctype,
   meta,
@@ -232,8 +237,8 @@ export function ListFilterBar({
             </span>
           )}
         </PopoverTrigger>
-        <PopoverContent className="w-80">
-          <FilterEditor meta={meta} onAdd={addFilter} />
+        <PopoverContent align="start" className="w-96 max-w-[calc(100vw-1.5rem)]">
+          <FilterEditor meta={meta} onAdd={addFilter} filters={filters} setFilters={setFilters} />
         </PopoverContent>
       </Popover>
 
@@ -252,6 +257,13 @@ export function ListFilterBar({
         <ListSidebar meta={meta} filters={filters} setFilters={setFilters} user={user} />
       )}
 
+      {/* every filter sits in an inline field (no chip row below): Clear all lives here instead */}
+      {filters.length > 0 && !phone && filters.every((f) => isInline(f, standardFilters)) && (
+        <button type="button" onClick={() => setFilters([])} className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
+          Clear all
+        </button>
+      )}
+
       <SortControl meta={meta} sort={sort} setSort={setSort} />
     </div>
   );
@@ -261,15 +273,19 @@ export function ActiveFilters({
   meta,
   filters,
   setFilters,
+  inline = [],
 }: {
   meta: DocTypeMeta;
   filters: Filter[];
   setFilters: (f: Filter[]) => void;
+  /** fields shown as inline standard filters: their "=" filter is already visible there, so no chip */
+  inline?: string[];
 }) {
-  if (!filters.length) return null;
+  const shown = filters.map((f, i) => ({ f, i })).filter(({ f }) => !isInline(f, inline.map((fieldname) => ({ fieldname }))));
+  if (!shown.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {filters.map((f, i) => (
+      {shown.map(({ f, i }) => (
         <span
           key={`${f[1]}|${f[2]}|${JSON.stringify(f[3])}`}
           className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"

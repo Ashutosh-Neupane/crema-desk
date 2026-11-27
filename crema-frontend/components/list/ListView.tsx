@@ -278,7 +278,7 @@ function ListPage({
             />
           </div>
         </div>
-        <ActiveFilters meta={meta} filters={filters} setFilters={setFilters} />
+        <ActiveFilters meta={meta} filters={filters} setFilters={setFilters} inline={phone ? [] : standardFiltersOf(meta).map((f) => f.fieldname)} />
         <ListBody
           phone={phone}
           list={list}

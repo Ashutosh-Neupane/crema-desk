@@ -114,16 +114,18 @@ await page.waitForFunction(() => decodeURIComponent(location.search).includes("p
 check(true, `URL gained the saved filter (${decodeURIComponent(new URL(page.url()).search)})`);
 check((await page.getByLabel("Sort by").inputValue()) === "creation", "sort field restored (creation)");
 check(await page.getByRole("button", { name: "Ascending" }).isVisible(), "sort order restored (ascending)");
-check(await page.getByRole("button", { name: "Remove Priority filter" }).isVisible(), "Priority filter chip shown");
+// Priority is a standard filter: it shows in its inline field, not again as a chip
+check((await page.getByLabel("Priority", { exact: true }).first().inputValue()) === "High", "Priority filter shown in its inline field");
 await shot("ls_restored");
 
 step("explicit ?field=value URL wins over the saved filter");
 await page.goto(`${BASE}/desk/todo?status=Cancelled`, { waitUntil: "domcontentloaded", timeout: 120000 });
-await page.getByRole("button", { name: "Remove Status filter" }).waitFor({ timeout: 60000 });
+await page.waitForFunction(() => (document.querySelector('[aria-label="Status"]'))?.value === "Cancelled", null, { timeout: 60000 }).catch(() => {});
 await page.waitForTimeout(1500);
 const u = decodeURIComponent(new URL(page.url()).search);
 check(u.includes("status=Cancelled") && !u.includes("priority"), `URL filter kept, saved one not merged (${u})`);
-check((await page.getByRole("button", { name: "Remove Priority filter" }).count()) === 0, "no Priority chip");
+check((await page.getByLabel("Status", { exact: true }).first().inputValue()) === "Cancelled", "Status filter shown in its inline field");
+check((await page.getByLabel("Priority", { exact: true }).first().inputValue()) === "", "no Priority filter");
 for (let i = 0; i < 30; i++) {
   us = (await getUS()).List;
   if (JSON.stringify(us?.filters ?? []).includes("Cancelled")) break;

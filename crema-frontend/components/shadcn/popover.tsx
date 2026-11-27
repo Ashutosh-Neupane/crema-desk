@@ -75,7 +75,7 @@ export function PopoverContent({ children, className = "", align = "start" }: { 
   const alignClass = align === "end" ? "right-0" : align === "center" ? "left-1/2 -translate-x-1/2" : "left-0";
 
   return (
-    <div className={`absolute z-50 mt-1 w-80 rounded-lg border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-800 ${alignClass} ${className}`}>
+    <div className={`absolute z-50 mt-1 ${/(^|\s)w-/.test(className) ? "" : "w-80"} rounded-lg border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-800 ${alignClass} ${className}`}>
       {children}
     </div>
   );
