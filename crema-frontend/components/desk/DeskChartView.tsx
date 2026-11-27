@@ -55,7 +55,7 @@ function ChartTooltip({
       {label != null && <div className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">{label}</div>}
       {payload.map((p) => (
         // one entry per series: its dataKey (s0, s1 … or "value" for a pie slice) is unique within the tooltip
-        <div key={`${String(p.dataKey)}-${p.name}`} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+        <div key={`${String(p.dataKey)}-${p.name}`} className="flex items-center gap-2 text-muted-foreground">
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
           <span>{p.name}</span>
           <span className="ml-auto pl-4 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
@@ -112,7 +112,7 @@ export default function DeskChartView({
           </div>
           <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-3">
             {slices.map((s, i) => (
-              <li key={s.name} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+              <li key={s.name} className="flex items-center gap-2 text-muted-foreground">
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: SERIES[i % 8] }} />
                 <span className="truncate">{s.name}</span>
                 <span className="ml-auto tabular-nums text-zinc-900 dark:text-zinc-100">{Math.round((s.value / total) * 100)}%</span>
@@ -136,7 +136,7 @@ export default function DeskChartView({
         </ResponsiveContainer>
         <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
           {slices.slice(0, 8).map((s, i) => (
-            <li key={s.name} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+            <li key={s.name} className="flex items-center gap-2 text-muted-foreground">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: SERIES[i % 8] }} />
               <span className="truncate">{s.name}</span>
               <span className="ml-auto pl-2 tabular-nums text-zinc-900 dark:text-zinc-100">{formatCompact(s.value)}</span>

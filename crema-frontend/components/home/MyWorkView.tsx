@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Phase 2 Home — "My work" (docs/GAPS.md § 3.4): what a clerk / storekeeper / accountant / approver comes back for,
+ * "My work" (docs/GAPS.md § 3.4): what a clerk / storekeeper / accountant / approver comes back for,
  * instead of a module grid. Each row has one action: open the document.
  */
 import { useSyncExternalStore } from "react";

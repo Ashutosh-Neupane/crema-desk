@@ -33,6 +33,9 @@ const themeOf = async () => (await t.api("api/method/frappe.client.get_value", {
 const originalTheme = await themeOf();
 await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { theme: "Light" } });
 
+// the user's own layout choice, put back at the end
+const savedUi = (await t.api("api/method/frappe.model.utils.user_settings.get", { data: { doctype: "Crema UI" } })).message || JSON.stringify({ newLayout: false, density: "comfortable" });
+
 // clean prefs for a deterministic start (server copy + local cache)
 await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
@@ -183,11 +186,9 @@ await sheet.waitFor({ state: "detached" });
 check(true, "backdrop closes the sheet");
 await page.setViewportSize({ width: 1440, height: 1000 });
 
-// restore defaults so other suites see the classic layout
-await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("crema:ui-prefs:")).forEach((k) => localStorage.removeItem(k)));
 await t.shot("p2-foundation-1440");
-// leave the user on the classic layout for the suites that follow
-await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: JSON.stringify({ newLayout: false, density: "comfortable" }) } });
+// put the user's own layout choice back (its cookie is rewritten on their next page load)
+await t.api("api/method/frappe.model.utils.user_settings.save", { data: { doctype: "Crema UI", user_settings: savedUi } });
 if (originalTheme !== "Light") await t.api("api/method/frappe.core.doctype.user.user.switch_theme", { data: { theme: originalTheme } });
 await t.finish();

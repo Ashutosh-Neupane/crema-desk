@@ -677,7 +677,7 @@ Never stack more than one dialog; a dialog that needs another dialog becomes a p
 ### 3.4 Screens
 - **Home**: "My work" instead of a module grid — documents waiting on me (workflow, assignments, ToDo), drafts I
   started, recent records, shortcuts the user pinned. Workspaces stay for implementers.
-  - ✅ `/desk/my-work` (`components/phase2/home`, `e2e/p2.mywork.mjs`): open Workflow Actions + open ToDos, drafts
+  - ✅ `/desk/my-work` (`components/home`, `e2e/p2.mywork.mjs`): open Workflow Actions + open ToDos, drafts
     and recently edited records in the doctypes the user works in, recently opened records, workspace shortcuts.
     Not yet linked from the navbar / home redirect.
 - **Lists**: saved views as tabs (My open orders, To deliver, Overdue); filters as chips; row preview in a side panel;

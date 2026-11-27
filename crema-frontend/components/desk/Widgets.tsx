@@ -93,7 +93,7 @@ function NumberCardChange({ change, interval }: { change: number; interval: stri
     <span className={`inline-flex items-center text-xs font-medium ${up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
       {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
       {Math.abs(change).toFixed(1)}%
-      <span className="ml-1 font-normal text-zinc-400">vs last {interval.toLowerCase().replace(/ly$/, "")}</span>
+      <span className="ml-1 font-normal text-muted-foreground">vs last {interval.toLowerCase().replace(/ly$/, "")}</span>
     </span>
   );
 }

@@ -29,7 +29,7 @@ export function Tooltip({ label, shortcut, side = "bottom", children }: { label:
           side={side}
           sideOffset={6}
           collisionPadding={8}
-          className="z-(--z-popover) flex max-w-xs items-center gap-2 rounded-[var(--round-control)] bg-[var(--gray-900)] px-2 py-1 text-[var(--type-caption)] text-white shadow-[var(--elevation-2)]"
+          className="crema-fade z-(--z-popover) flex max-w-xs items-center gap-2 rounded-[var(--round-control)] bg-[var(--gray-900)] px-2 py-1 text-[var(--type-caption)] text-white shadow-[var(--elevation-2)]"
         >
           {label}
           {shortcut && <Kbd keys={shortcut} className="border-white/20 bg-white/10 text-white" />}

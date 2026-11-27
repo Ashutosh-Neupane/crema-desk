@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Desk home. Frappe v16 opens an "Apps" grid; Crema keeps that (every module,
+ * Desk home. Classic: Frappe v16 opens an "Apps" grid; Crema keeps that (every module,
  * grouped by app) and adds what you usually come back for: search, your open
  * assignments and recently opened documents — no placeholder KPIs.
  */
@@ -11,12 +11,12 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock, Search } from "lucide-react";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
-import { SidebarIcon } from "@/components/DeskSidebar";
+import { ModuleGrid } from "@/components/desk/ModuleGrid";
+import DynamicHome from "@/components/home/DynamicHome";
+import { useNewLayout } from "@/lib/ui/newLayout";
 import { getRecentDocs, type RecentDoc } from "@/lib/utils/recentDocs";
-import type { NavSection } from "@/lib/navigation";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
-const APP_TITLES: Record<string, string> = { frappe: "Framework", erpnext: "ERPNext" };
 const enc = encodeURIComponent;
 
 const noopSubscribe = () => () => {};
@@ -24,10 +24,6 @@ const noopSubscribe = () => () => {};
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
-
-function countLinks(s: NavSection): number {
-  return s.items.reduce((n, i) => n + (i.type === "link" ? 1 : countLinks(i)), 0);
 }
 
 function timeAgo(ts: number): string {
@@ -47,7 +43,12 @@ function readRecent(): RecentDoc[] {
   return recentCache.list;
 }
 
+/** New layout: the dynamic, role-based home (docs/PHASE2_DESIGN.md § 4.1); classic: the apps grid below */
 export default function DeskHomePage() {
+  return useNewLayout() ? <DynamicHome /> : <ClassicHome />;
+}
+
+function ClassicHome() {
   const { data: nav } = useNavigation();
   const { data: ctx } = useDeskContext();
   const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
@@ -74,14 +75,6 @@ export default function DeskHomePage() {
       return res.ok ? ((await res.json()) as { data: [] }).data : [];
     },
   });
-
-  const modules = (nav?.sections ?? []).filter((s) => s.id.startsWith("module:"));
-  const byApp = new Map<string, NavSection[]>();
-  for (const m of modules) {
-    const app = m.app ?? "";
-    if (!byApp.has(app)) byApp.set(app, []);
-    byApp.get(app)!.push(m);
-  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
@@ -154,31 +147,7 @@ export default function DeskHomePage() {
         </section>
       </div>
 
-      {[...byApp.entries()].map(([app, mods]) => (
-        <section key={app || "modules"}>
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-400">{APP_TITLES[app] ?? (app || "Modules")}</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {mods.map((m) => {
-              const firstLink = m.href ?? m.items.find((i) => i.type === "link")?.href ?? "/desk";
-              return (
-                <Link
-                  key={m.id}
-                  href={firstLink}
-                  className="group flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3.5 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 transition-colors group-hover:bg-zinc-900 group-hover:text-white dark:bg-zinc-800 dark:text-zinc-200 dark:group-hover:bg-zinc-100 dark:group-hover:text-zinc-900">
-                    <SidebarIcon name={m.icon} className="h-[18px] w-[18px]" />
-                  </span>
-                  <span>
-                    <span className="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{m.label}</span>
-                    <span className="block text-xs text-zinc-400">{countLinks(m)} items</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <ModuleGrid sections={nav?.sections ?? []} />
     </div>
   );
 }
