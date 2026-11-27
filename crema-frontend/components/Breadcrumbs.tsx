@@ -48,8 +48,8 @@ export default function Breadcrumbs() {
 
   return (
     <nav className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
-      <Link href="/desk" className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100">
-        <Home className="h-4 w-4" />
+      <Link href="/desk" aria-label="Home" className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100">
+        <Home className="h-4 w-4" aria-hidden="true" />
       </Link>
       {items.map((item) => (
         <span key={item.href} className="flex items-center gap-1">

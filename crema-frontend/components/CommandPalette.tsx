@@ -13,7 +13,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Command } from "cmdk";
-import { Search, FileText, Plus, List, BarChart3, LayoutGrid, Settings2, Moon, Sun, Monitor, Calculator } from "lucide-react";
+import { Search, FileText, Plus, List, BarChart3, LayoutGrid, Settings2, Moon, Sun, Monitor, Calculator, Sparkles, Inbox, UserCog } from "lucide-react";
 import { useGlobalSearch } from "@/lib/hooks/useSearch";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
@@ -44,6 +44,17 @@ function rank(entries: Entry[], q: string): Entry[] {
 }
 
 const enc = encodeURIComponent;
+
+/** Crema's own pages; Connect Claude needs the crema Frappe app (boot.versions.crema) */
+function pageEntries(cremaApp: boolean): Entry[] {
+  const pages: Entry[] = [
+    { id: "page:my-work", label: "My work", hint: "Waiting on me, my drafts, recent", href: "/desk/my-work", icon: Inbox, key: "My work inbox tasks" },
+    { id: "page:settings", label: "My settings", hint: "Language, time zone", href: "/desk/settings", icon: UserCog, key: "My settings preferences" },
+  ];
+  if (cremaApp)
+    pages.unshift({ id: "page:connect-claude", label: "Connect Claude", hint: "Claude on the web, Claude Code, Desktop", href: "/desk/connect-claude", icon: Sparkles, key: "Connect Claude AI MCP connector" });
+  return pages;
+}
 
 const GROUP_CLASS =
   "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-400";
@@ -273,11 +284,14 @@ function PaletteResults({ search, onGo, onClose }: { search: string; onGo: (href
   const index = useAwesomebarIndex();
   const { docs, searching } = useDocumentSearch(search);
   const groups = useMemo(() => buildGroups(index, canCreate, q, search), [index, q, search, canCreate]);
-  const nothing = q && !calc && groupsEmpty(groups) && !docs.length;
+  const cremaApp = "crema" in ((ctx?.boot?.versions ?? {}) as Record<string, unknown>);
+  const pages = useMemo(() => (q ? rank(pageEntries(cremaApp), q) : []), [q, cremaApp]);
+  const nothing = q && !calc && groupsEmpty(groups) && !docs.length && !pages.length;
 
   return (
     <Command.List className="max-h-[60vh] overflow-y-auto p-2">
       {calc && <CalcGroup calc={calc} onDone={onClose} />}
+      <EntryGroup heading="Pages" entries={pages} onGo={onGo} />
       <EntryGroup heading="Lists" entries={groups.lists} onGo={onGo} />
       <EntryGroup heading="Create" entries={groups.creates} onGo={onGo} />
       <EntryGroup heading="Find in list" entries={groups.finds} onGo={onGo} />

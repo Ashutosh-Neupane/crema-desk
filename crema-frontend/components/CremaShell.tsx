@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/frappe/auth";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
 import { useNavigation } from "@/lib/hooks/useNavigation";
+import AskClaude from "@/components/ai/AskClaude";
 import CommandPalette from "@/components/CommandPalette";
 import DeskSidebar from "@/components/DeskSidebar";
 import DialogHost from "@/components/desk/DialogHost";
@@ -312,6 +313,7 @@ function useGlobalShortcuts(openShortcuts: () => void) {
     [
       { keys: "mod+k", description: "Open awesomebar", group: "Global", allowInInput: true, action: () => document.dispatchEvent(new CustomEvent("crema:command-palette")) },
       { keys: "mod+g", description: "Open global search", group: "Global", allowInInput: true, action: () => document.dispatchEvent(new CustomEvent("crema:command-palette")) },
+      { keys: "mod+i", description: "Ask in Claude", group: "Global", action: () => document.dispatchEvent(new CustomEvent("crema:ask-claude")) },
       { keys: "mod+/", description: "Toggle sidebar", group: "Global", allowInInput: true, action: () => toggleSidebar() },
       { keys: "shift+mod+g", description: "Switch theme", group: "Global", action: () => setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark") },
       { keys: "shift+?", description: "Show keyboard shortcuts", group: "Global", action: () => openShortcuts() },
@@ -441,6 +443,7 @@ function ShellHeader({ apps, onShortcuts }: { apps: NonNullable<DeskNavigation["
 
         <div className="flex min-w-0 items-center justify-end gap-0.5">
           <CommandPalette />
+          <AskClaude />
           <ThemeMenu />
           <NotificationsPanel />
           {/* User menu (Desk v16 sidebar_header.js + Navbar Settings rows) */}
