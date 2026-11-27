@@ -39,7 +39,7 @@ function CreateButtons({ own, other }: { own: string[]; other: string[] }) {
         </Link>
       ))}
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90">
+        <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-fg)] hover:opacity-90">
           <Plus className="h-3.5 w-3.5" aria-hidden="true" /> New <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="max-h-[60vh] w-56 overflow-y-auto">
