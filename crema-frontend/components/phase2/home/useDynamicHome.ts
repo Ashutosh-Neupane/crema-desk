@@ -125,13 +125,8 @@ export function useDynamicHome() {
     enabled: !!statusDoctypes,
     staleTime: 60_000,
     queryFn: async () => {
-      const out: Array<{ doctype: string; counts: StatusCount[] }> = [];
-      for (const doctype of statusDoctypes ?? []) {
-        const counts = await fetchStatusCounts(doctype).catch(() => null);
-        if (counts?.length) out.push({ doctype, counts });
-        if (out.length >= MAX_STATUS) break;
-      }
-      return out;
+      const all = await Promise.all((statusDoctypes ?? []).map(async (doctype) => ({ doctype, counts: await fetchStatusCounts(doctype).catch(() => null) })));
+      return all.filter((s): s is { doctype: string; counts: StatusCount[] } => !!s.counts?.length).slice(0, MAX_STATUS);
     },
   });
   const events = useQuery({ queryKey: ["home", "events", user], enabled: !!user && canRead.has("Event"), staleTime: 60_000, queryFn: () => fetchEvents() });
@@ -150,8 +145,7 @@ export function useDynamicHome() {
     for (const c of (charts.data ?? []).slice(0, MAX_CHARTS)) out.push({ id: `chart:${c.name}`, type: "chart", title: c.label, size: 6, score: dtScore(c.doctype) - 0.05, card: c });
     const ev = events.data ?? [];
     if (ev.length) {
-      const today = new Date().toLocaleDateString("en-CA");
-      out.push({ id: "today", type: "today", title: "Today and this week", size: 4, score: ev.some((e) => e.start.startsWith(today)) ? 0.88 : 0.4, events: ev });
+      out.push({ id: "today", type: "today", title: "Today and this week", size: 4, score: ev.some((e) => e.isToday) ? 0.88 : 0.4, events: ev });
     }
     const rec = recent.slice(0, 8);
     if (rec.length) out.push({ id: "recent", type: "recent", title: "Recent", size: 4, score: 0.5, items: rec });

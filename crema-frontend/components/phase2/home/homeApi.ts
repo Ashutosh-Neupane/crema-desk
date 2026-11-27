@@ -85,12 +85,27 @@ export interface EventItem {
   subject: string;
   start: string;
   allDay: boolean;
+  /** "Today 10:00", "Fri 28" (formatted when fetched, in the browser's locale) */
+  when: string;
+  isToday: boolean;
+}
+
+function eventWhen(start: string, allDay: boolean, today: string): string {
+  const d = new Date(start.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return start;
+  const day = start.slice(0, 10) === today ? "Today" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+  return allDay ? day : `${day} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 export async function fetchEvents(days = 7): Promise<EventItem[]> {
-  const rows = await frappeMethod<Row[]>("frappe.desk.doctype.event.event.get_events", { start: localDay(0), end: localDay(days) });
+  const today = localDay(0);
+  const rows = await frappeMethod<Row[]>("frappe.desk.doctype.event.event.get_events", { start: today, end: localDay(days) });
   return (Array.isArray(rows) ? rows : [])
-    .map((r) => ({ name: String(r.name), subject: String(r.subject || r.name), start: String(r.starts_on ?? ""), allDay: !!Number(r.all_day) }))
+    .map((r) => {
+      const start = String(r.starts_on ?? "");
+      const allDay = !!Number(r.all_day);
+      return { name: String(r.name), subject: String(r.subject || r.name), start, allDay, when: eventWhen(start, allDay, today), isToday: start.startsWith(today) };
+    })
     .filter((e) => e.start)
     .sort((a, b) => a.start.localeCompare(b.start))
     .slice(0, 8);
