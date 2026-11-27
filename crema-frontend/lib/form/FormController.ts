@@ -732,6 +732,7 @@ export class FormController {
         // grid API for tables; Desk grid methods Crema doesn't model (toggle_checkboxes, …) are no-ops
         grid: TABLE_TYPES.has(f.fieldtype)
           ? lenient({
+              doctype: String(f.options ?? ""),
               get_field: (child: string) => ({
                 set get_query(fn: QueryFn) {
                   self.queries[`${f.fieldname}.${child}`] = fn;
@@ -917,7 +918,17 @@ export class FormController {
         self.permReadOnly = true;
         self.setDf("__form", "read_only", 1);
       },
-      set_currency_labels: () => {},
+      // form.js set_currency_labels: "Grand Total" → "Grand Total (NPR)"; on a child table's columns with parentfield
+      set_currency_labels: (fields: string[], currency: string, parentfield?: string) => {
+        if (!currency) return;
+        const dt = parentfield ? String(self.field(parentfield)?.options ?? "") : self.meta.name;
+        for (const fn of fields ?? []) {
+          const df = parentfield ? self.field(fn, dt) : self.field(fn);
+          if (!df) continue;
+          const label = `${String(df.label ?? "").replace(/\([^)]*\)/g, "").trim()} (${currency})`;
+          self.setDf(parentfield ? `${parentfield}.${fn}` : fn, "label", label);
+        }
+      },
       get_field: (f: string) => fieldsDict[f],
       get_docfield: (table: string, f?: string) => (f ? self.field(f, String(self.field(table)?.options)) : self.field(table)),
       has_perm: (ptype: string) => hasPerm(self.getPerm(), 0, ptype),
@@ -1055,6 +1066,28 @@ export class FormController {
     this.runtime.evalScript(String(meta.__custom_js ?? ""), `${meta.name} client scripts`);
   }
 
+  /**
+   * Desk form.js cleanup_refresh (run by refresh_fields, before the refresh handlers): Amended From and Trash Reason
+   * only when set, and once saved the fields the name came from are hidden (naming_series, or the autoname field).
+   */
+  private cleanupRefresh() {
+    const has = (fn: string) => this.meta.fields?.some((f) => f.fieldname === fn);
+    const show = (fn: string, on: boolean) => has(fn) && this.setDf(fn, "hidden", on ? 0 : 1);
+    const d = this.doc;
+    if (has("amended_from")) {
+      show("amended_from", !!d.amended_from);
+      show("amendment_date", !!d.amended_from);
+    }
+    if (has("trash_reason")) show("trash_reason", !!d.trash_reason && d.docstatus === 2);
+    const autoname = String(this.meta.autoname ?? "");
+    if (d.__islocal) return;
+    if (autoname.startsWith("field:")) {
+      const fn = autoname.slice(6);
+      if (d[fn]) show(fn, false);
+    }
+    if (autoname === "naming_series:") show("naming_series", false);
+  }
+
   /** Desk's load sequence: setup → onload → refresh → onload_post_render */
   async runLoadEvents(first: boolean) {
     this.buttons = [];
@@ -1066,6 +1099,7 @@ export class FormController {
       await this.trigger("setup");
       await this.trigger("onload");
     }
+    this.cleanupRefresh();
     await this.trigger("refresh");
     if (first) await this.trigger("onload_post_render");
     this.emit();

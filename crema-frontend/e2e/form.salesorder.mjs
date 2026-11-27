@@ -71,7 +71,8 @@ await itemCell.fill(ITEM);
 await page.waitForTimeout(800);
 await page.getByRole("option", { name: new RegExp(esc(ITEM)) }).first().click();
 await page.waitForTimeout(3000);
-const rateText = await page.getByLabel("Rate", { exact: true }).first().inputValue().catch(() => "");
+// "Rate (NPR)": ERPNext labels currency columns with the document currency (transaction.js change_grid_labels)
+const rateText = await page.getByLabel(/^Rate( \([A-Z]{3}\))?$/).first().inputValue().catch(() => "");
 check(rateText.includes(money(RATE)), `rate ${money(RATE)} fetched from the price list (${rateText})`);
 
 step("qty 3 → amount and totals recalc live");

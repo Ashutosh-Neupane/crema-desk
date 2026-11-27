@@ -13,6 +13,14 @@
  * least-surprising behavior when a script expression is malformed.
  */
 
+/** Desk evaluates these with its page globals in scope (frappe, erpnext, flt, …): ERPNext's
+ * `collapsible_depends_on: "eval:doc.currency != erpnext.get_currency(doc.company)"` needs them. The open form's
+ * runtime registers them here (lib/form/compat.ts); without it only `doc` / `parent` / `locals` are in scope. */
+let globalScope: Record<string, unknown> = {};
+export function setDependsOnGlobals(scope: Record<string, unknown>) {
+  globalScope = Object.fromEntries(Object.entries(scope).filter(([k, v]) => v !== undefined && /^[A-Za-z_$][\w$]*$/.test(k) && !["doc", "parent", "locals"].includes(k)));
+}
+
 /** True when the condition expression is satisfied by the current values. */
 export function evalDependsOn(
   expression: string | null | undefined,
@@ -40,9 +48,10 @@ export function evalDependsOn(
     // Desk evaluates depends_on JS from the DocType definition the same way (only
     // `doc` / `parent` / `locals` in scope); the expressions are site config, not user input.
     // `let out = …; return out` like Desk's frappe.utils.eval, so a trailing `;` (`eval:doc.x === "Report";`) is valid
+    const names = Object.keys(globalScope);
     // eslint-disable-next-line no-new-func
-    const fn = new Function("doc", "parent", "locals", `"use strict"; let out = ${expr}; return out;`); // react-doctor-disable-line no-eval
-    return !!fn(values, parent ?? {}, values);
+    const fn = new Function("doc", "parent", "locals", ...names, `"use strict"; let out = ${expr}; return out;`); // react-doctor-disable-line no-eval
+    return !!fn(values, parent ?? {}, values, ...names.map((k) => globalScope[k]));
   } catch {
     return true;
   }
