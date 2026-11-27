@@ -5,10 +5,10 @@
  * pick print format and letterhead, preview the server-rendered HTML, print or download PDF.
  *   www.printview.get_html_and_style · utils.print_format.download_pdf
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Download, Loader2, Printer } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Download, Loader2, PenLine, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { deskCall } from "@/lib/frappe/form";
 import { frappeErrorMessage, parseServerMessages } from "@/lib/frappe/errors";
@@ -16,14 +16,77 @@ import { useDoctype } from "@/lib/hooks/useDoctype";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 const enc = encodeURIComponent;
+/** Desk's print page is one page kept between documents, so the format picked last stays picked; Crema keeps it per DocType */
+const pickKey = (doctype: string) => `crema:print-format:${doctype}`;
+const noSubscribe = () => () => {};
+function readPick(doctype: string): string | null {
+  try {
+    return localStorage.getItem(pickKey(doctype));
+  } catch {
+    return null;
+  }
+}
+function savePick(doctype: string, format: string) {
+  try {
+    localStorage.setItem(pickKey(doctype), format);
+  } catch {
+    /* private mode: the pick lasts for this page only */
+  }
+}
 const sel = "h-8 rounded-md border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+
+/**
+ * The builder autosaves to the format's draft (print_format.py save_draft) and prints use what was applied, so a
+ * format edited without "Save & Apply" still prints its old layout. Say so here, with Apply and the builder a click away.
+ */
+function DraftNotice({ format }: { format: string }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const { data: pf } = useQuery({
+    queryKey: ["print-format-draft", format],
+    enabled: format !== "Standard",
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: async () => ((await deskCall("frappe.client.get_value", { doctype: "Print Format", filters: format, fieldname: JSON.stringify(["draft_data", "modified"]) })).env.message ?? null) as { draft_data?: string | null; modified?: string } | null,
+  });
+  if (format === "Standard" || !pf?.draft_data) return null;
+  const apply = async () => {
+    setBusy(true);
+    try {
+      await deskCall("frappe.printing.doctype.print_format.print_format.apply_draft", { name: format, modified: pf.modified });
+      toast.success(`Applied: ${format} prints with the builder's changes now`);
+      await qc.invalidateQueries({ queryKey: ["print-format-draft", format] });
+      await qc.invalidateQueries({ queryKey: ["print-html"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't apply the changes", { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+      <PenLine className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <strong className="font-medium">{format}</strong>{" "}has changes in the builder that aren&apos;t applied yet. This preview and prints use the last applied version.
+      </span>
+      <Link href={`/desk/print-format-builder/${enc(format)}`} className="rounded-md px-2.5 py-1 underline underline-offset-2 hover:bg-amber-100 dark:hover:bg-amber-900/40">
+        Open builder
+      </Link>
+      <button type="button" disabled={busy} onClick={() => void apply()} className="inline-flex items-center gap-1.5 rounded-md bg-amber-900 px-3 py-1 font-medium text-white disabled:opacity-50 dark:bg-amber-200 dark:text-amber-950">
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />} Apply changes
+      </button>
+    </div>
+  );
+}
 
 export default function PrintView({ doctype, name }: { doctype: string; name: string }) {
   const { data: meta } = useDoctype(doctype);
   const frame = useRef<HTMLIFrameElement>(null);
 
-  const { data: formats = [] } = useQuery({
+  const { data: formats = [], isFetched: formatsReady } = useQuery({
     queryKey: ["print-formats", doctype],
+    // a format made or enabled in the builder shows up the next time print opens
+    staleTime: 0,
     queryFn: async () => ((await deskCall("frappe.client.get_list", { doctype: "Print Format", filters: { doc_type: doctype, disabled: 0 }, fields: ["name"], limit_page_length: 100 })).env.message as Array<{ name: string }>) ?? [],
   });
   const { data: letterheads = [] } = useQuery({
@@ -34,12 +97,25 @@ export default function PrintView({ doctype, name }: { doctype: string; name: st
   // Desk default: the DocType's default_print_format, else Standard; default letterhead
   const [format, setFormat] = useState<string | null>(null);
   const [letterhead, setLetterhead] = useState<string | null>(null);
-  const fmt = format ?? (String((meta as { default_print_format?: string } | undefined)?.default_print_format || "") || "Standard");
+  const remembered = useSyncExternalStore(noSubscribe, () => readPick(doctype), () => null);
+  // print.js set_default_print_format: keep the picked format while it is one of the DocType's formats,
+  // else the DocType's default_print_format, else Standard
+  const usable = (f: string | null | undefined) => !!f && (f === "Standard" || formats.some((x) => x.name === f));
+  const fallback = String((meta as { default_print_format?: string } | undefined)?.default_print_format || "") || "Standard";
+  const fmt = format ?? (usable(remembered) ? remembered! : fallback);
+  const pick = (f: string) => {
+    setFormat(f);
+    savePick(doctype, f);
+  };
   const lh = letterhead ?? letterheads.find((l) => l.is_default)?.name ?? "";
 
   const { data, isFetching, error } = useQuery({
     queryKey: ["print-html", doctype, name, fmt, lh],
-    enabled: !!meta,
+    // wait for the format list so a remembered format is checked before the first render
+    enabled: !!meta && formatsReady,
+    // rendered fresh each time print opens: the format may have been edited in the builder since
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { env } = await deskCall("frappe.www.printview.get_html_and_style", { doc: doctype, name, print_format: fmt, no_letterhead: lh ? 0 : 1, letterhead: lh || undefined });
       return env.message as { html: string; style?: string };
@@ -102,7 +178,7 @@ export default function PrintView({ doctype, name }: { doctype: string; name: st
           Print {doctype} {name}
         </h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <select aria-label="Print format" value={fmt} onChange={(e) => setFormat(e.target.value)} className={sel}>
+          <select aria-label="Print format" value={fmt} onChange={(e) => pick(e.target.value)} className={sel}>
             <option>Standard</option>
             {formats.filter((f) => f.name !== "Standard").map((f) => (
               <option key={f.name}>{f.name}</option>
@@ -122,6 +198,7 @@ export default function PrintView({ doctype, name }: { doctype: string; name: st
           </button>
         </div>
       </div>
+      <DraftNotice format={fmt} />
       <div className="relative flex-1 overflow-auto bg-zinc-100 p-6 dark:bg-zinc-900">
         {isFetching && (
           <div className="absolute right-6 top-6 flex items-center gap-2 text-xs text-zinc-500" role="status">
