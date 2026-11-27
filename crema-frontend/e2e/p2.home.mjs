@@ -10,6 +10,15 @@ const { page, browser, check, step, shot, api } = t;
 const post = (method, data, p = page) => p.request.post(`${BASE}/api/frappe/api/method/${method}`, { data });
 const stamp = Date.now().toString(36);
 const STOCK_USER = `crema-home-${stamp}@example.com`;
+
+// a site whose apps supply their own home (frappe.boot.home_api) shows that instead: e2e/p2.providerhome.mjs
+await page.goto(`${BASE}/desk`, { waitUntil: "domcontentloaded" });
+if (await page.evaluate(async () => !!(await (await fetch("/api/desk/context")).json()).boot?.home_api).catch(() => false)) {
+  step("built-in home");
+  check(true, "this site's apps supply the home (p2.providerhome covers it)");
+  await t.finish();
+  process.exit(0);
+}
 const STOCK_PASS = `Crema-${stamp}-Home!9`;
 
 const setLayout = async (on, p = page, user = "Administrator") => {
