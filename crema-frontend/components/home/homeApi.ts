@@ -11,7 +11,7 @@
  *   repeats expanded) for today and the next 7 days.
  */
 import { frappeMethod } from "@/lib/frappe/client";
-import { fetchDoctypeMetaClient } from "@/lib/frappe/doctype";
+import { fetchDoctypeBrief } from "@/lib/frappe/doctypeBrief";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 import { localDay } from "./data";
 
@@ -64,9 +64,8 @@ export interface StatusCount {
 
 /** Open documents per status, when the DocType has a `status` Select field; null when it has none */
 export async function fetchStatusCounts(doctype: string): Promise<StatusCount[] | null> {
-  const meta = await fetchDoctypeMetaClient(doctype);
-  const field = meta.fields?.find((f) => f.fieldname === "status" && f.fieldtype === "Select");
-  if (!field) return null;
+  const meta = await fetchDoctypeBrief(doctype);
+  if (!meta.has_status) return null;
   // cancelled documents aren't work; Desk's sidebar counts everything, the home counts what is still live
   const filters = meta.is_submittable ? [[doctype, "docstatus", "<", 2]] : [];
   const rows = await frappeMethod<Array<{ name: string; count: number }>>("frappe.desk.listview.get_group_by_count", {

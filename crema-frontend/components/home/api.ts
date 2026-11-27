@@ -13,7 +13,7 @@
  * Every call is guarded by boot `can_read`, so a list the user can't read is never requested.
  */
 import { frappeMethod } from "@/lib/frappe/client";
-import { fetchDoctypeMetaClient } from "@/lib/frappe/doctype";
+import { fetchDoctypeBrief } from "@/lib/frappe/doctypeBrief";
 import { sidebarItemHref } from "@/lib/navigation";
 import type { WorkspaceSidebarItem } from "@/lib/frappe/types";
 import { docHref, localDay, parseFrappeDate, stripHtml, type Shortcut, type WorkItem } from "./data";
@@ -86,10 +86,8 @@ export async function fetchAssignments(user: string, canRead: ReadonlySet<string
 /** title field the list query can ask for (a real column, not the name) */
 async function titleField(doctype: string): Promise<{ title?: string; submittable: boolean }> {
   try {
-    const meta = await fetchDoctypeMetaClient(doctype);
-    const tf = typeof meta.title_field === "string" ? meta.title_field : "";
-    const field = tf && tf !== "name" ? meta.fields?.find((f) => f.fieldname === tf && !f.is_virtual) : undefined;
-    return { title: field ? tf : undefined, submittable: !!meta.is_submittable };
+    const b = await fetchDoctypeBrief(doctype);
+    return { title: b.title_field ?? undefined, submittable: b.is_submittable };
   } catch {
     return { submittable: false };
   }
