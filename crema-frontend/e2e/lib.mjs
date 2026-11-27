@@ -5,6 +5,9 @@ import { createRequire } from "node:module";
 
 export const BASE = process.env.BASE ?? "http://localhost:3001";
 /** Desk's URL slug for a doctype or workspace (router.slug): "Sales Invoice" → "sales-invoice", URL-encoded */
+// a calendar date (YYYY-MM-DD) in this machine's timezone, n days from today. Not toISOString(): that is the UTC date,
+// which differs from the site's date for part of the day (e.g. 00:00–05:45 in Kathmandu).
+export const localDate = (n = 0) => new Date(Date.now() + n * 86400000).toLocaleDateString("en-CA");
 export const slug = (name) => encodeURIComponent(String(name).toLowerCase().replace(/ /g, "-"));
 export const OUT = process.env.OUT ?? "./smoke-shots";
 /**

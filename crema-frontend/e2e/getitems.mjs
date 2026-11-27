@@ -1,7 +1,7 @@
 // ERPNext "Get Items From → Sales Order" on a new Sales Invoice: MultiSelectDialog + map_docs, saved and verified.
 // Makes its own submitted Sales Order (customer and items from the site) and removes everything afterwards.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/getitems.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot } = t;
@@ -10,7 +10,7 @@ const COMPANY = await defaultCompany(page);
 const CUSTOMER = (await post("frappe.client.get_list", { doctype: "Customer", filters: { disabled: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 const ITEMS = ((await post("frappe.client.get_list", { doctype: "Item", filters: { is_sales_item: 1, disabled: 0, has_variants: 0 }, fields: ["name"], limit_page_length: 2 })) ?? []).map((i) => i.name);
 check(!!CUSTOMER && ITEMS.length > 0, `site data: ${CUSTOMER}, items ${ITEMS.join(", ")}`);
-const day = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+const day = localDate(5);
 
 const so = await post("frappe.client.insert", { doc: { doctype: "Sales Order", company: COMPANY, customer: CUSTOMER, delivery_date: day, items: ITEMS.map((item_code, i) => ({ item_code, qty: i + 2, rate: 100 + i * 10, delivery_date: day })) } });
 await post("frappe.client.submit", { doc: { ...so, docstatus: 0 } });

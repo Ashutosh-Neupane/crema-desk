@@ -8,7 +8,7 @@
 //            longer lists the paid invoice
 // Customer, supplier, item and warehouse come from the site; everything created is cancelled and deleted at the end.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/dayofwork.mjs
-import { start, BASE, defaultCompany, slug } from "./lib.mjs";
+import { start, BASE, defaultCompany, slug, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -16,8 +16,8 @@ const enc = encodeURIComponent;
 const post = async (method, data) => (await (await page.request.post(`${BASE}/api/frappe/api/method/${method}`, { data })).json()).message;
 const get = async (dt, name) => (await api(`api/resource/${enc(dt)}/${enc(name)}`)).data;
 const pick = async (doctype, filters, fields = ["name"]) => (await post("frappe.client.get_list", { doctype, filters, fields, limit_page_length: 1 }))?.[0];
-const today = new Date().toISOString().slice(0, 10);
-const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const today = localDate();
+const inDays = localDate;
 
 const COMPANY = await defaultCompany(page);
 const ABBR = (await post("frappe.client.get_value", { doctype: "Company", fieldname: "abbr", filters: COMPANY }))?.abbr;
@@ -69,7 +69,7 @@ const saveSubmit = async (dt) => {
     await ref.fill(`E2E-${Date.now().toString(36)}`);
     const refDate = page.getByRole("textbox", { name: /^Cheque\/Reference Date/ }).first();
     if (await refDate.isVisible().catch(() => false)) {
-      await refDate.fill(new Date().toISOString().slice(0, 10));
+      await refDate.fill(localDate());
       await page.keyboard.press("Escape");
     }
     await page.waitForTimeout(500);
@@ -137,7 +137,7 @@ try {
   await itemCell.click();
   await itemCell.fill(ITEM);
   await page.waitForTimeout(800);
-  await page.getByRole("button", { name: new RegExp(ITEM) }).first().click();
+  await page.getByRole("option", { name: new RegExp(ITEM) }).first().click();
   await page.waitForTimeout(2500);
   const qty = page.getByLabel("Qty", { exact: true }).first();
   await qty.click();

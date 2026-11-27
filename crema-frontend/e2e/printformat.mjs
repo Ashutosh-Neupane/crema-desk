@@ -2,7 +2,7 @@
 // __newname), a custom Jinja format saves, shows up in the print view's format picker and renders the template on
 // the server; a read-only Text Editor value (address) shows as rendered HTML on the form, not as tags.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/printformat.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -15,7 +15,7 @@ await post("frappe.client.delete", { doctype: "Print Format", name: PF }).catch(
 const company = await defaultCompany(page);
 const customer = (await post("frappe.client.get_list", { doctype: "Customer", fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 const item = (await post("frappe.client.get_list", { doctype: "Item", filters: { is_sales_item: 1, disabled: 0, has_variants: 0 }, fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
-const day = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+const day = localDate(5);
 const so = (await api("api/resource/Sales Order", { data: { company, customer, delivery_date: day, items: [{ item_code: item, qty: 2, delivery_date: day }] } })).data?.name;
 check(!!so, `draft Sales Order ${so}`);
 

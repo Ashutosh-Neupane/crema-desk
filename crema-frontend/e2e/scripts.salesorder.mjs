@@ -3,7 +3,7 @@
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/scripts.salesorder.mjs
 // Server Script steps run only when the site has `server_script_enabled`; otherwise they are skipped (a Server
 // Script left on Sales Order there would block every save). Customer and item come from the site.
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -104,7 +104,7 @@ await backToDetails();
 step("child qty handler caps at 100");
 const dd = page.getByRole("textbox", { name: /^Delivery Date/ }).first();
 await dd.click();
-await dd.fill(new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10));
+await dd.fill(localDate(4));
 await dd.press("Enter");
 const row = page.locator("[aria-label^='Select row']").first().locator("xpath=ancestor::div[contains(@class,'grid')][1]");
 const item = row.locator("input").nth(1);
@@ -155,7 +155,7 @@ await page.waitForURL(/sales-order\/SAL-ORD-/, { timeout: 30000 });
 const name = decodeURIComponent(page.url().split("/").pop());
 saved = name;
 const so = (await api(`api/resource/Sales Order/${encodeURIComponent(name)}`)).data;
-const today = new Date().toISOString().slice(0, 10);
+const today = localDate();
 check(so?.po_no === PO_AUTO, `saved po_no ${so?.po_no}`);
 if (SERVER) check(!!so?.po_date, `po_date set by server script (${so?.po_date}, today ${today})`);
 check(so?.items?.[0]?.qty === 100, `server kept clamped qty ${so?.items?.[0]?.qty}`);
