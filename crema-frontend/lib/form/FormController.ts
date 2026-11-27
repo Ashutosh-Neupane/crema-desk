@@ -24,6 +24,7 @@ import { evalDependsOn } from "@/lib/crema-form/dependsOn";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { installFormCompat } from "./compat";
 import { asksForName } from "./newName";
+import { UndoManager, type Change } from "./undoManager";
 import { fieldPermStatus, getPerm, hasPerm, readOnlyPerm, type FieldStatus, type Perm, type PermContext, type PermDocInfo } from "./perm";
 
 export type Row = Record<string, unknown> & { name: string; doctype: string; idx: number; parentfield?: string };
@@ -79,6 +80,8 @@ export class FormController {
   private ctx: RuntimeContext;
   private doc: Doc;
   private dirty = false;
+  /** the user's edits, for Ctrl+Z / Ctrl+Y (Desk frm.undo_manager); cleared on every load like Desk refresh() */
+  readonly undoManager = new UndoManager();
   private overrides: Record<string, Record<string, unknown>> = {};
   private buttons: CustomButton[] = [];
   /** frm.dashboard (lib/form/dashboard.ts) */
@@ -170,7 +173,36 @@ export class FormController {
     this.permReadOnly = false; // Desk refresh() re-fetches the permissions
     this.dirty = false;
     this.errors = {};
+    this.undoManager.erase();
     this.emit();
+  }
+
+  /** a value the user entered (Desk base_control validate_and_set_in_model): recorded for undo, then set */
+  edit(fieldname: string, value: unknown): Promise<void> {
+    if (!TABLE_TYPES.has(this.field(fieldname)?.fieldtype ?? "")) this.undoManager.record({ fieldname, old_value: this.doc[fieldname] ?? null, new_value: value ?? null });
+    return this.set_value(fieldname, value);
+  }
+
+  /** a child-row value the user entered */
+  editChild(cdt: string, cdn: string, fieldname: string, value: unknown): Promise<void> {
+    const hit = this.findRow(cdn);
+    if (hit) this.undoManager.record({ fieldname, old_value: hit.row[fieldname] ?? null, new_value: value ?? null, cdt, cdn });
+    return this.set_child_value(cdt, cdn, fieldname, value);
+  }
+
+  /** Ctrl+Z / Ctrl+Y: apply the step and bring its field into view; false when there is nothing to undo / redo */
+  async undo(): Promise<boolean> {
+    return this.applyStep(this.undoManager.undo());
+  }
+  async redo(): Promise<boolean> {
+    return this.applyStep(this.undoManager.redo());
+  }
+  private async applyStep(c: Change | null): Promise<boolean> {
+    if (!c) return false;
+    if (c.cdn && c.cdt) await this.set_child_value(c.cdt, c.cdn, c.fieldname, c.old_value);
+    else await this.set_value(c.fieldname, c.old_value);
+    if (!c.cdn && typeof document !== "undefined") document.querySelector(`[data-fieldname="${CSS.escape(c.fieldname)}"]`)?.scrollIntoView({ block: "nearest" });
+    return true;
   }
 
   /** frappe.model.docinfo for this doc (the server's per-document permissions and shares) */

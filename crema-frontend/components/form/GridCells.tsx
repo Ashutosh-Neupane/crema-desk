@@ -22,7 +22,7 @@ interface CellProps {
 
 export default function Cell({ df, row, ctl, readOnly, table, error }: CellProps) {
   const value = row[df.fieldname];
-  const set = (v: unknown) => void ctl.set_child_value(row.doctype, row.name, df.fieldname, v);
+  const set = (v: unknown) => void ctl.editChild(row.doctype, row.name, df.fieldname, v);
   if (df.fieldtype === "Check") return <CheckCell df={df} value={value} readOnly={readOnly} onChange={set} />;
   const parent = ctl.getDoc();
   const display = formatCell(value, df, { ...row, currency: parent.currency }, { currency: currencyFor(df, { ...parent, ...row }) });
