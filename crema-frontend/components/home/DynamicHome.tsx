@@ -5,7 +5,7 @@
  * user's permissions and usage (useDynamicHome). Cards pack into a 12-column grid (dense flow); how many show before
  * "Show more" depends on the width. Edit lets the user pin and hide cards (user_settings "Crema Home").
  */
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import { ChartCard, NumberCard } from "@/components/desk/Widgets";
-import { useDashboardChart } from "@/lib/hooks/useDashboardChart";
 import { ModuleGrid } from "@/components/desk/ModuleGrid";
 import { Kbd, StatusPill, Tooltip } from "@/components/crema-ui";
 import { newDocUrl } from "@/lib/navigation/deskUrl";
@@ -38,6 +37,9 @@ import { focusRing, type WorkItem } from "./data";
 import { useDynamicHome, useHomeLayout, type CardSize, type HomeCard } from "./useDynamicHome";
 
 const noSubscribe = () => () => {};
+
+/** a card id as a view-transition-name (letters, digits, - and _ only) */
+const transitionName = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 /** column span per card size: one column on phones, 2 / 3 per row on tablets, the 12-col grid from 1024 */
 const SPAN: Record<CardSize, string> = {
@@ -133,10 +135,11 @@ export default function DynamicHome() {
         <HomeSkeleton />
       ) : (
         <ul className="grid grid-flow-row-dense grid-cols-12 gap-4" aria-label="Home cards">
-          {shown.map((card) => (
+          {shown.map((card, i) => (
             <li
               key={card.id}
-              className={`${SPAN[card.size]} ${rowSpan(card)} relative min-w-0 has-[>[data-empty]]:hidden`}
+              className={`${SPAN[card.size]} ${rowSpan(card)} crema-rise relative min-w-0`}
+              style={{ "--i": Math.min(i, 8), viewTransitionName: `home-${transitionName(card.id)}` } as CSSProperties}
               data-card={card.id}
             >
               {editing && card.type !== "needs-you" && (
@@ -179,21 +182,23 @@ export default function DynamicHome() {
 
       <HiddenCards cards={hiddenCards} onRestore={restore} />
 
-      <details className="group mt-8" open={!!q || undefined}>
-        <summary
-          className={`flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-semibold text-[var(--ink-default)] ${focusRing}`}
-        >
-          <LayoutGrid className="h-4 w-4 text-[var(--ink-muted)]" aria-hidden="true" />
-          All workspaces
-          <ChevronDown
-            className="h-4 w-4 text-[var(--ink-muted)] transition-transform group-open:rotate-180"
-            aria-hidden="true"
-          />
-        </summary>
-        <div className="mt-4 space-y-6">
-          <ModuleGrid sections={nav?.sections ?? []} filter={query} />
-        </div>
-      </details>
+      {!loading && (
+        <details className="group mt-8" open={!!q || undefined}>
+          <summary
+            className={`flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-semibold text-[var(--ink-default)] ${focusRing}`}
+          >
+            <LayoutGrid className="h-4 w-4 text-[var(--ink-muted)]" aria-hidden="true" />
+            All workspaces
+            <ChevronDown
+              className="h-4 w-4 text-[var(--ink-muted)] transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="mt-4 space-y-6">
+            <ModuleGrid sections={nav?.sections ?? []} filter={query} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -328,7 +333,7 @@ function CardControls({
 }) {
   const btn = `inline-flex h-8 w-8 items-center justify-center rounded-md bg-[var(--surface-raised)] text-[var(--ink-muted)] shadow-[var(--elevation-1)] hover:text-[var(--ink-default)] ${focusRing}`;
   return (
-    <div className="absolute top-2 right-2 z-10 flex gap-1">
+    <div className="crema-fade absolute top-2 right-2 z-10 flex gap-1">
       <Tooltip label={pinned ? "Unpin" : "Pin"}>
         <button
           type="button"
@@ -381,7 +386,7 @@ function CardBody({
               message="All clear. Nothing is waiting on you."
             />
           }
-          className="h-full"
+          className="crema-card-hover h-full"
         >
           {items.length ? <WorkList items={items.slice(0, 6)} label="Needs you" /> : undefined}
         </WorkSection>
@@ -395,14 +400,14 @@ function CardBody({
           icon={<Plus className="h-4 w-4" />}
           loading={false}
           empty={null}
-          className="h-full"
+          className="crema-card-hover h-full"
         >
           <ul className="grid grid-cols-2 gap-2" aria-label="Quick create">
             {card.doctypes.map((dt) => (
               <li key={dt}>
                 <Link
                   href={newDocUrl(dt)}
-                  className={`flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--outline-default)] px-2.5 text-sm font-medium text-[var(--ink-default)] hover:bg-[var(--surface-hover)] ${focusRing}`}
+                  className={`flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--outline-default)] px-2.5 text-sm font-medium text-[var(--ink-default)] hover:bg-[var(--surface-hover)] crema-lift ${focusRing}`}
                 >
                   <Plus
                     className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]"
@@ -426,7 +431,7 @@ function CardBody({
           loading={loadingDrafts}
           onRetry={retry}
           empty={null}
-          className="h-full"
+          className="crema-card-hover h-full"
         >
           {items.length ? <WorkList items={items} label="Continue" /> : undefined}
         </WorkSection>
@@ -441,7 +446,7 @@ function CardBody({
           icon={<Clock className="h-4 w-4" />}
           loading={false}
           empty={null}
-          className="h-full"
+          className="crema-card-hover h-full"
         >
           {items.length ? <WorkList items={items} label="Recent" /> : undefined}
         </WorkSection>
@@ -456,7 +461,7 @@ function CardBody({
           viewAll={{ href: "/desk/event/view/calendar", label: "Calendar" }}
           loading={false}
           empty={null}
-          className="h-full"
+          className="crema-card-hover h-full"
         >
           <ul className="flex flex-col gap-1" aria-label="Events">
             {card.events.map((e) => (
@@ -509,20 +514,8 @@ function CardBody({
     case "kpi":
       return <NumberCard name={card.card.name} label={card.title} />;
     case "chart":
-      return <HomeChart name={card.card.name} title={card.title} />;
+      return <ChartCard name={card.card.name} label={card.title} height={200} />;
   }
-}
-
-/** a chart whose period has no data is left out (§ 4.1.5: no empty tiles); same query as ChartCard, so one request */
-function HomeChart({ name, title }: { name: string; title: string }) {
-  const { data } = useDashboardChart(name);
-  const empty =
-    !!data &&
-    (!data.labels.length ||
-      !data.datasets.length ||
-      data.datasets.every((d) => d.values.every((v) => !v)));
-  if (empty) return <div data-empty hidden />;
-  return <ChartCard name={name} label={title} height={200} />;
 }
 
 function HomeSkeleton() {

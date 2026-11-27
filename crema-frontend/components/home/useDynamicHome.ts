@@ -8,6 +8,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { frappeMethod } from "@/lib/frappe/client";
+import { chartIsEmpty, dashboardChartQuery, numberCardQuery } from "@/lib/hooks/useDashboardChart";
 import { rankDoctypes, type Ranked, type UsageEvent } from "@/lib/home/rank";
 import { fetchCharts, fetchEvents, fetchNumberCards, fetchStatusCounts, type CardRef, type EventItem, type StatusCount } from "./homeApi";
 import { useMyWork } from "./useMyWork";
@@ -78,7 +79,16 @@ export function useHomeLayout(user: string) {
   const layout = data ?? EMPTY_LAYOUT;
   const save = useCallback(
     (next: HomeLayout) => {
-      qc.setQueryData(key, next);
+      // cards glide to their new places where the browser has View Transitions (and the user allows motion)
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (document.startViewTransition && !calm) {
+        // the "after" snapshot is taken when the callback's promise settles. Frames are paused during the update,
+        // so wait on a timer: React's scheduler (a message channel) commits the new order before it fires
+        document.startViewTransition(() => {
+          qc.setQueryData(key, next);
+          return new Promise<void>((done) => setTimeout(done, 20));
+        });
+      } else qc.setQueryData(key, next);
       void frappeMethod("frappe.model.utils.user_settings.save", { doctype: LAYOUT_KEY, user_settings: JSON.stringify(next) }).catch(() => undefined);
     },
     [qc, key],
@@ -112,8 +122,29 @@ export function useDynamicHome() {
   const top = useMemo(() => (ranked ?? []).slice(0, 8).map((r) => r.doctype), [ranked]);
   const scoreOf = useMemo(() => new Map((ranked ?? []).map((r) => [r.doctype, r.score])), [ranked]);
 
-  const kpis = useQuery({ queryKey: ["home", "kpis", user, top], enabled: !!ranked, staleTime: 60_000, queryFn: () => fetchNumberCards(user, top) });
-  const charts = useQuery({ queryKey: ["home", "charts", user, top], enabled: !!ranked, staleTime: 60_000, queryFn: () => fetchCharts(user, top) });
+  const qcl = useQueryClient();
+  // KPI values and chart data are fetched before the grid paints (into the cache NumberCard / ChartCard read), so
+  // cards don't arrive one by one and push each other around, and charts with nothing to draw are left out
+  const kpis = useQuery({
+    queryKey: ["home", "kpis", user, top],
+    enabled: !!ranked,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const cards = (await fetchNumberCards(user, top)).slice(0, MAX_KPIS);
+      await Promise.all(cards.map((c) => qcl.prefetchQuery(numberCardQuery(c.name))));
+      return cards;
+    },
+  });
+  const charts = useQuery({
+    queryKey: ["home", "charts", user, top],
+    enabled: !!ranked,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const candidates = (await fetchCharts(user, top)).slice(0, MAX_CHARTS * 2);
+      const withData = await Promise.all(candidates.map((c) => qcl.fetchQuery(dashboardChartQuery(c.name)).then((d) => (chartIsEmpty(d) ? null : c), () => null)));
+      return withData.filter((c): c is CardRef => !!c).slice(0, MAX_CHARTS);
+    },
+  });
   // status counts for the top DocTypes that have no Number Card of their own
   const statusDoctypes = useMemo(() => {
     if (!kpis.data) return null;
@@ -155,6 +186,8 @@ export function useDynamicHome() {
     return out;
   }, [ranked, canCreate, canSubmit, shortcuts.data, drafts, recent, now, kpis.data, status.data, charts.data, events.data, scoreOf, waiting.data]);
 
-  const loading = !ranked;
+  // one paint for the first screen: wait for every card source (each settles even on error)
+  const pending = (q: { isPending: boolean; fetchStatus: string }) => q.isPending && q.fetchStatus !== "idle";
+  const loading = !ranked || pending(kpis) || pending(charts) || pending(status) || pending(events) || !statusDoctypes;
   return { work, cards, ranked, loading };
 }

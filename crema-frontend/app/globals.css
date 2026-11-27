@@ -747,3 +747,50 @@ a:focus-visible,
 :root[data-layout="new"]:not([data-theme="dark"]):not([data-contrast="more"]) {
   --text-muted: #6b6b6b;
 }
+
+/* Small motion for the New layout (docs/PHASE2_DESIGN.md § 2.3). Every duration and delay is a token, and the tokens
+ * are 0 under prefers-reduced-motion, so nothing moves for people who asked for less motion. */
+:root {
+  --stagger: 35ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --stagger: 0ms;
+  }
+}
+@keyframes crema-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* enters once on mount; --i staggers a list (capped by the caller) */
+.crema-rise {
+  animation: crema-rise var(--duration-base) var(--ease-enter) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+.crema-fade {
+  animation: crema-fade-in var(--duration-fast) var(--ease-standard) both;
+}
+/* cards: the shadow deepens on hover; buttons and tiles lift by a pixel */
+.crema-card-hover {
+  transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.crema-card-hover:hover {
+  box-shadow: var(--elevation-2);
+}
+.crema-lift {
+  transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.crema-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--elevation-1);
+}
+.crema-lift:active {
+  transform: translateY(0);
+}
+/* pin / hide / restore: cards glide to their new place (View Transitions, where the browser has them) */
+::view-transition-group(*) {
+  animation-duration: var(--duration-base);
+  animation-timing-function: var(--ease-standard);
+}
