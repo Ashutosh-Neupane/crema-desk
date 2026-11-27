@@ -24,7 +24,7 @@ import { deskRegistry } from "@/lib/navigation/deskRegistry";
  * Except Crema's own pages, which Desk doesn't name …
  */
 const CREMA_PAGES = new Set([
-  "files", "forms", "inbox", "list", "modules", "my-work", "onboarding", "print", "print-format-builder", "profile",
+  "connect-claude", "files", "forms", "inbox", "list", "modules", "my-work", "onboarding", "print", "print-format-builder", "profile",
   "query-report", "reports", "settings", "translations", "ui-kit", "update-password", "workflow-builder",
 ]);
 /** … and Crema's versions of a Desk screen, at its bare URL only (`/desk/data-import`; `/desk/data-import/X` is Desk's) */

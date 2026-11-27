@@ -16,7 +16,8 @@ const CLAUDE_CONNECTORS = "https://claude.ai/settings/connectors";
 function useDeskRoles() {
   return useQuery({
     queryKey: ["crema-desk-roles"],
-    queryFn: async () => (await frappeGet<{ data: { name: string }[] }>("Role", { filters: JSON.stringify([["disabled", "=", 0], ["desk_access", "=", 1]]), fields: JSON.stringify(["name"]), limit_page_length: 0, order_by: "name asc" })).data.map((r) => r.name),
+    // frappeGet unwraps Frappe's { data } envelope
+    queryFn: async () => (await frappeGet<{ name: string }[]>("Role", { filters: JSON.stringify([["disabled", "=", 0], ["desk_access", "=", 1]]), fields: JSON.stringify(["name"]), limit_page_length: 0, order_by: "name asc" })).map((r) => r.name),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -53,7 +54,7 @@ function ConnectorValues({ client }: { client: NewClient }) {
       <CopyField label="Connector URL" value={client.mcp_url} />
       <CopyField label="OAuth client ID" value={client.client_id} />
       <CopyField label="OAuth client secret (keep it private)" value={client.client_secret} />
-      <a href={CLAUDE_CONNECTORS} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-link)] hover:underline">
+      <a href={CLAUDE_CONNECTORS} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-default)] underline underline-offset-2 hover:no-underline">
         Open Claude&apos;s connector settings <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
       </a>
       <p className="text-xs text-[var(--ink-muted)]">Then each person opens the connector in Claude, selects Connect and signs in to this site.</p>

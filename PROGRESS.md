@@ -2,6 +2,23 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-27 — Phase 2 C1: Connect Claude
+- The crema Frappe app (private repo `Ashutosh-Neupane/crema`) adds what the server has to do. Claude uses Frappe
+  v16's own MCP endpoint (`/api/v2/mcp`) with OAuth.
+  - Site checks, each with a fix.
+  - One "Claude" OAuth client (dynamic registration off), limited to chosen roles.
+  - Connections with revoke, and a personal API key for Claude Code / Desktop.
+  - Drafts only through Claude: submit, cancel and delete are refused with a link to the document in Crema.
+  - A "Created / Updated via Claude" note on the timeline, and one Crema AI Log row per tool call.
+  - Python tests: `crema/ai/test_ai.py` (14).
+- Crema: `/desk/connect-claude` ("Claude on the web" / "On this computer"), Connect Claude in ⌘K, Connected apps on
+  My settings. The page needs the app; without it, it says how to install it.
+- e2e: `p2.ai.mcp` (a Claude token makes a draft, which is noted and logged, and is refused a delete) and
+  `p2.connectclaude` (⌘K, checks, client values, personal key, settings), both green.
+- Same day, PR #70: list, form and DocType builder space fixes (filter chips, filter popover, sort in the title row,
+  double-click to open in preview mode, compact form summary, select chevrons, builder panes that scroll).
+- Next: C2 (Crema's own MCP tools), then 2c, 3c.
+
 ## 2026-11-27 — Phase 1 closed (M7)
 - Why phase 1 testing had stalled since 11-26: the last step, a full `run-all.mjs` run green twice, kept failing
   (59/78, 52/78), and work moved on to phase 2. Most failures were not bugs in Crema:

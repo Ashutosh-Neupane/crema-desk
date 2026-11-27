@@ -29,11 +29,12 @@ function desktopConfig(url: string): string {
 }
 
 function download(text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  a.href = url;
   a.download = HEADERS_FILE;
   a.click();
-  URL.revokeObjectURL(a.href);
+  URL.revokeObjectURL(url);
 }
 
 function KeyCard({ info }: { info: MyKey }) {
@@ -64,7 +65,7 @@ function KeyCard({ info }: { info: MyKey }) {
         <div className="space-y-2 rounded-lg border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-3">
           <p className="text-xs text-[var(--ink-default)]">Shown once. Save it in the headers file now; it isn&apos;t shown again.</p>
           <CopyField label="Header" value={fresh.header} />
-          <button type="button" onClick={() => download(`${fresh.header}\n`)} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-link)] hover:underline">
+          <button type="button" onClick={() => download(`${fresh.header}\n`)} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-default)] underline underline-offset-2 hover:no-underline">
             <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download {HEADERS_FILE}
           </button>
         </div>

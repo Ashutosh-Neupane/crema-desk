@@ -10,11 +10,16 @@ import { Button } from "@/components/shadcn/button";
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { toast } from "sonner";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
+import { ConnectedApps } from "@/components/ai/ConnectedApps";
+import { useCremaApp } from "@/components/ai/useConnectClaude";
 
 export function SettingsClient() {
   const { data: bootInfo, isLoading } = useBootInfo();
   const qc = useQueryClient();
   const user = bootInfo?.user;
+  const crema = useCremaApp();
 
   const [language, setLanguage] = useState(bootInfo?.lang ?? "");
   const [timezone, setTimezone] = useState("");
@@ -129,6 +134,14 @@ export function SettingsClient() {
               </div>
             </div>
           </Card>
+          {crema.installed && (
+            <>
+              <ConnectedApps />
+              <Link href="/desk/connect-claude" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-link)] hover:underline">
+                <Sparkles className="h-4 w-4" aria-hidden="true" /> Connect Claude
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </div>
