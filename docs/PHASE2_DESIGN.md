@@ -422,7 +422,7 @@ A white-label Frappe app on the local bench replaces `/desk` with its own home (
 | Created / submitted a document | `Version` rows by the user written on insert (`version.py` `for_insert`, data has `creation`) or with docstatus 0→1 | 3 | Strongest sign of "my work" |
 | Edited a document | `Version` (`owner = user`, `ref_doctype`) | 2 | |
 | Acted on a workflow | `Version` with `workflow_state` change by the user, `Workflow Action` completed by user | 3 | |
-| Opened a form / list / report | `Route History` (`route`, `user`), `View Log` (`viewed_by`), `Access Log` (report exports) | 1 | Route strings are parsed as in `components/phase2/home/data.ts` `parseDeskRoute` |
+| Opened a form / list / report | `Route History` (`route`, `user`), `View Log` (`viewed_by`), `Access Log` (report exports) | 1 | Route strings are parsed as in `components/home/data.ts` `parseDeskRoute` |
 | Logged activity | `Activity Log` (`user`, `reference_doctype`) | 1 | |
 | Desk's own top 5 | boot `frequently_visited_links` (`route_history.py`) | used for cold start only | Available to every user without extra permission |
 
@@ -525,7 +525,7 @@ Browser ── GET /api/desk/home ──► Crema server (RSC + route)  ──�
 - **Cache invalidation.** `doc_events` `on_update` / `on_submit` / `on_cancel` and workflow actions delete the
   user's 60 s key (`crema:home:<user>`); role changes (`User` `on_update`) delete the usage and prior keys.
 - **Without the app** (a site that hasn't installed it): Crema computes a reduced home on its server from standard
-  endpoints (today's My work: `components/phase2/home/api.ts`, boot `frequently_visited_links`, Number Cards,
+  endpoints (today's My work: `components/home/api.ts`, boot `frequently_visited_links`, Number Cards,
   workspace shortcuts) with the same card types, no usage learning, and a System Manager hint "Install the Crema app
   for a home that learns". This keeps § 1 G3 / G7 testable on any site.
 - **Server**: candidates, permissions, scores, counts, first-screen data. **Client**: grid packing by width, user

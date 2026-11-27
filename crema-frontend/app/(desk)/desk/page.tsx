@@ -12,7 +12,7 @@ import { CheckCircle2, Clock, Search } from "lucide-react";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { ModuleGrid } from "@/components/desk/ModuleGrid";
-import DynamicHome from "@/components/phase2/home/DynamicHome";
+import DynamicHome from "@/components/home/DynamicHome";
 import { useNewLayout } from "@/lib/ui/newLayout";
 import { getRecentDocs, type RecentDoc } from "@/lib/utils/recentDocs";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";

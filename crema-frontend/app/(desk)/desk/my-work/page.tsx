@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import MyWorkView from "@/components/phase2/home/MyWorkView";
+import MyWorkView from "@/components/home/MyWorkView";
 
 export const metadata: Metadata = { title: "My work | Crema" };
 
