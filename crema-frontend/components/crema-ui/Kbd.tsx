@@ -24,7 +24,6 @@ export function Kbd({ keys, className = "" }: { keys: string; className?: string
   const spoken = parts.map((p) => SPOKEN[p] ?? p).join(" ");
   return (
     <kbd
-      aria-label={spoken}
       className={`inline-flex items-center gap-0.5 rounded border border-[var(--outline-default)] bg-[var(--surface-sunken)] px-1.5 font-sans text-[var(--type-caption)] leading-5 text-[var(--ink-muted)] ${className}`}
     >
       {parts.map((p, i) => (
@@ -32,6 +31,7 @@ export function Kbd({ keys, className = "" }: { keys: string; className?: string
           {p}
         </span>
       ))}
+      <span className="sr-only">{spoken}</span>
     </kbd>
   );
 }
