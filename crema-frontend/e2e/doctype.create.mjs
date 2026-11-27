@@ -4,7 +4,8 @@
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/doctype.create.mjs
 import { start, BASE, slug } from "./lib.mjs";
 
-const t = await start();
+// Desk's dialog flow is the classic layout's; the New layout's guided start is e2e/p2.doctypebuilder.mjs
+const t = await start({ newLayout: false });
 const { page, check, step, shot, api } = t;
 const NAME = `Crema Test ${Date.now().toString(36)}`;
 

@@ -1,9 +1,10 @@
 // Saved desk theme seeds a new browser (User.desk_theme → data-theme) and the user menu's
 // Toggle Full Width widens the content container and persists in localStorage.container_fullwidth.
+// Toggle Full Width is the classic layout's (the New layout is always fluid), so the suite runs in classic.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/fullwidth.mjs
 import { start, BASE } from "./lib.mjs";
 
-const t = await start();
+const t = await start({ newLayout: false });
 const { page, check, step, shot } = t;
 // wide viewport so the content cap (1290px) is below the available width
 await page.setViewportSize({ width: 1920, height: 1000 });
@@ -25,15 +26,18 @@ const fullFlag = () => page.evaluate(() => localStorage.getItem("container_fullw
 try {
   step("saved desk theme applies to a browser with no stored choice");
   await post(SWITCH_THEME, { theme: "Dark" });
-  await page.goto(`${BASE}/desk`, { waitUntil: "domcontentloaded", timeout: 180000 });
-  await page.evaluate(() => localStorage.removeItem("crema-ui"));
-  await page.goto(`${BASE}/desk`, { waitUntil: "domcontentloaded", timeout: 180000 });
-  await page.getByLabel("User menu").waitFor({ timeout: 60000 });
-  const dark = await page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "dark", null, { timeout: 30000 }).then(() => true, () => false);
+  // a new device: same sign-in, empty storage (clearing storage under an open Crema page doesn't do it: the page's
+  // store writes its state back)
+  const fresh = await page.context().browser().newContext({ viewport: { width: 1920, height: 1000 }, storageState: { cookies: await page.context().cookies(), origins: [] } });
+  const device = await fresh.newPage();
+  await device.goto(`${BASE}/desk`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await device.getByLabel("User menu").waitFor({ timeout: 60000 });
+  const dark = await device.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "dark", null, { timeout: 30000 }).then(() => true, () => false);
   check(dark, 'data-theme="dark" on <html> from User.desk_theme = Dark');
-  await page.waitForTimeout(500);
-  check(await page.evaluate(() => document.documentElement.getAttribute("data-theme") === "dark"), "theme still dark after the seed settles");
-  await shot("fullwidth_dark", false);
+  await device.waitForTimeout(500);
+  check(await device.evaluate(() => document.documentElement.getAttribute("data-theme") === "dark"), "theme still dark after the seed settles");
+  await device.screenshot({ path: `${process.env.OUT ?? "/tmp/shots"}/fullwidth_dark.png` });
+  await fresh.close();
 
   step("Toggle Full Width (user menu)");
   await page.evaluate(() => localStorage.removeItem("container_fullwidth"));
