@@ -7,8 +7,11 @@ import type { DocTypeMeta } from "@/lib/frappe/types";
 import { canQuickEntry } from "@/components/form/QuickEntry";
 import { docHref, newDocHref, type ListSettings } from "@/components/list/listModel";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { useNewLayout } from "@/lib/ui/newLayout";
 
 const hasPrimaryAction = (settings: ListSettings) => typeof settings?.primary_action === "function";
+/** the New layout replaces Desk's "Create New DocType" dialog with Crema's guided start (components/doctype) */
+const guidedStart = (doctype: string, newLayout: boolean) => newLayout && doctype === "DocType";
 
 /**
  * Redirects decided while rendering (no wrong page flashes first):
@@ -19,21 +22,24 @@ const hasPrimaryAction = (settings: ListSettings) => typeof settings?.primary_ac
  */
 export function useListRedirects({ doctype, meta, settings, view, wantNew }: { doctype: string; meta: DocTypeMeta | undefined; settings: ListSettings; view: string | null; wantNew: boolean }) {
   const opened = useRef(false);
+  const guided = guidedStart(doctype, useNewLayout());
   useEffect(() => {
-    if (!wantNew || opened.current || !hasPrimaryAction(settings)) return;
+    if (!wantNew || guided || opened.current || !hasPrimaryAction(settings)) return;
     opened.current = true;
     (settings?.primary_action as () => unknown).call(settings);
-  }, [wantNew, settings]);
+  }, [wantNew, settings, guided]);
 
   if (meta?.issingle) redirect(docHref(doctype, doctype), RedirectType.replace);
   if (meta?.is_tree && view !== "list") redirect(`${doctypeUrl(doctype)}/view/tree`, RedirectType.replace);
-  if (wantNew && meta && settings !== undefined && !hasPrimaryAction(settings)) redirect(newDocHref(doctype), RedirectType.push);
+  if (wantNew && meta && settings !== undefined && (guided || !hasPrimaryAction(settings))) redirect(newDocHref(doctype), RedirectType.push);
 }
 
 /** Desk: the app's listview_settings.primary_action replaces New (e.g. DocType's "Create New DocType" dialog) */
 export function useAddAction(doctype: string, meta: DocTypeMeta | undefined, settings: ListSettings, openQuickEntry: () => void) {
   const router = useRouter();
+  const guided = guidedStart(doctype, useNewLayout());
   return () => {
+    if (guided) return router.push(newDocHref(doctype));
     if (hasPrimaryAction(settings)) {
       try {
         (settings?.primary_action as () => unknown).call(settings);

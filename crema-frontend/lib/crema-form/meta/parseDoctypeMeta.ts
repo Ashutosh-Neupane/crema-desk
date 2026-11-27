@@ -81,6 +81,8 @@ function enhanceField(f: DocField): CremaField {
     cssClass: typeof f.css_class === "string" ? f.css_class : undefined,
     compact: f.compact ? true : undefined,
     fullWidth: f.full_width ? true : undefined,
+    // Desk: label and value in bold (DocField `bold`)
+    bold: f.bold ? true : undefined,
     sortOrder: typeof f.idx === "number" ? f.idx : 0,
     
 
@@ -117,6 +119,8 @@ function buildLayout(allFields: DocField[], dataFields: CremaField[]): { section
       tab: currentTab,
       showLabel: !!f.label,
       collapsible: !!f.collapsible || !!opts.collapsed,
+      // Desk: DocField `hide_border` drops the line above the section
+      hideBorder: !!(f as { hide_border?: unknown }).hide_border,
       collapsible_depends_on: typeof f.collapsible_depends_on === "string" ? f.collapsible_depends_on : null,
       depends_on: typeof f.depends_on === "string" ? f.depends_on : null,
     };

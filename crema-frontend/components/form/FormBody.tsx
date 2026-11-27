@@ -11,6 +11,18 @@
  *    `parent` for child rows); script overrides (set_df_property) win
  */
 import { Fragment, useEffect, useMemo, useState } from "react";
+
+function tabFromHash(tabs: Array<{ fieldname: string; label?: string | null }>): string | null {
+  if (typeof window === "undefined" || !window.location.hash) return null;
+  let h: string;
+  try {
+    h = decodeURIComponent(window.location.hash.slice(1)).toLowerCase();
+  } catch {
+    return null;
+  }
+  const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-");
+  return tabs.find((t) => t.fieldname.toLowerCase() === h || (t.label && slug(t.label) === h))?.fieldname ?? null;
+}
 import { ChevronDown } from "lucide-react";
 import FormControl from "@/lib/crema-form/controls/FormControl";
 import { parseDoctypeMeta } from "@/lib/crema-form/meta/parseDoctypeMeta";
@@ -79,7 +91,8 @@ export default function FormBody({
   focusRequest,
 }: Props) {
   const layout = useMemo(() => parseDoctypeMeta(meta), [meta]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  // a #hash naming a tab (its fieldname, or its label as a slug: #form) opens on that tab
+  const [activeTab, setActiveTab] = useState<string | null>(() => tabFromHash(layout.tabs));
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const ctx = dependsCtx(values, parent);
 
@@ -176,7 +189,7 @@ export default function FormBody({
     };
 
     return (
-      <section key={section.fieldname} className={`${compact ? "py-field" : "p-section"} border-b border-zinc-200 last:border-b-0 dark:border-zinc-800`}>
+      <section key={section.fieldname} className={`${compact ? "py-field" : "p-section"} ${section.hideBorder ? "" : "border-b border-zinc-200 last:border-b-0 dark:border-zinc-800"}`}>
         {section.showLabel !== false && section.label && (
           section.collapsible ? (
             <button type="button" onClick={toggle} aria-expanded={!isCollapsed} className={`flex w-full items-center gap-2 text-left ${isCollapsed ? "" : "mb-field"}`}>

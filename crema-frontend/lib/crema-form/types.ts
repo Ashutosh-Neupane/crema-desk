@@ -9,6 +9,8 @@
 
 export interface CremaField {
   fieldname: string;
+  /** DocField `bold` */
+  bold?: boolean;
   label: string;
   fieldtype: string;
   required?: boolean;
@@ -215,6 +217,8 @@ export interface FormSection {
   showLabel?: boolean;
   /** Section Break `collapsible` flag — only these get a toggle */
   collapsible?: boolean;
+  /** Section Break `hide_border` */
+  hideBorder?: boolean;
   collapsible_depends_on?: string | null;
   depends_on?: string | null;
 }
