@@ -12,7 +12,7 @@ const SPOKEN: Record<string, string> = { "⌘": "Command", "⇧": "Shift", "⌥"
 
 const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-export function formatKeys(keys: string, mac = isMac()): string[] {
+function formatKeys(keys: string, mac = isMac()): string[] {
   return keys.split("+").map((k) => (mac ? (MAC_SYMBOL[k] ?? k) : k === "Mod" ? "Ctrl" : k));
 }
 
