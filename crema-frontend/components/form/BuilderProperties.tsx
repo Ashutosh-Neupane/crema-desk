@@ -27,7 +27,7 @@ function Check({
 }) {
   return (
     <label
-      className="flex cursor-pointer items-start gap-2 py-1 text-sm text-zinc-700 dark:text-zinc-200"
+      className="flex min-w-0 cursor-pointer items-center gap-2 py-1 text-sm whitespace-nowrap text-zinc-700 dark:text-zinc-200"
       title={hint}
     >
       <input
@@ -67,18 +67,22 @@ export interface MoveActions {
 
 function MoveButtons({ move }: { move: MoveActions }) {
   const btn =
-    "inline-flex min-h-8 items-center gap-1 rounded-md border border-zinc-200 px-2 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800";
+    "inline-flex h-8 flex-1 items-center justify-center gap-1 whitespace-nowrap px-2 text-xs text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-35 disabled:hover:bg-transparent dark:text-zinc-200 dark:hover:bg-zinc-800";
+  // one segmented row: left / right column, or a new column beside (the keyboard way to do what dragging does)
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Move field">
-      <button type="button" className={btn} disabled={!move.left} onClick={move.left}>
-        <ArrowLeftToLine className="h-3.5 w-3.5" /> Column to the left
-      </button>
-      <button type="button" className={btn} disabled={!move.right} onClick={move.right}>
-        Column to the right <ArrowRightToLine className="h-3.5 w-3.5" />
-      </button>
-      <button type="button" className={btn} disabled={!move.newColumn} onClick={move.newColumn}>
-        <Columns3 className="h-3.5 w-3.5" /> New column beside
-      </button>
+    <div className="space-y-1">
+      <span className="text-xs font-medium text-zinc-500">Move</span>
+      <div className="flex divide-x divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 dark:divide-zinc-700 dark:border-zinc-700" role="group" aria-label="Move field">
+        <button type="button" className={btn} disabled={!move.left} onClick={move.left} aria-label="Column to the left" title="Column to the left">
+          <ArrowLeftToLine className="h-3.5 w-3.5" aria-hidden="true" /> Left
+        </button>
+        <button type="button" className={btn} disabled={!move.newColumn} onClick={move.newColumn} aria-label="New column beside" title="New column beside">
+          <Columns3 className="h-3.5 w-3.5" aria-hidden="true" /> New column
+        </button>
+        <button type="button" className={btn} disabled={!move.right} onClick={move.right} aria-label="Column to the right" title="Column to the right">
+          Right <ArrowRightToLine className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

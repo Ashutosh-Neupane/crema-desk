@@ -841,3 +841,10 @@ a:focus-visible,
     overscroll-behavior: contain;
   }
 }
+
+/* DocType / Customize Form builder tab: the builder takes the whole width; the document sidebar and Activity step
+   aside while it is open, and the placeholder form_builder HTML section (Desk mounts its builder there) is hidden */
+.crema-form-layout:has(.crema-builder) { grid-template-columns: minmax(0, 1fr) !important; }
+.crema-form-layout:has(.crema-builder) > :is(.crema-form-side, .crema-form-activity) { display: none; }
+.crema-form-layout:has(.crema-builder) > .crema-form-body { grid-column: 1; grid-row: auto; }
+section:has([data-fieldname="form_builder"]):not(:has([data-fieldtype]:not([data-fieldname="form_builder"]))) { display: none; }

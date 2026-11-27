@@ -138,14 +138,14 @@ export default function FormBuilder({
       onDragCancel={act.cancelDrag}
     >
       <div
-        className={`grid grid-cols-1 gap-0 ${readOnly ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : "lg:grid-cols-[10rem_minmax(0,1fr)_19rem]"}`}
+        className={`grid grid-cols-1 gap-0 ${readOnly ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : "lg:grid-cols-[11.5rem_minmax(0,1fr)_21rem]"}`}
       >
         {!readOnly && (
           <div className="border-zinc-200 p-3 dark:border-zinc-800 lg:border-r">
             <BuilderPalette onAdd={act.addOfType} />
           </div>
         )}
-        <div className="min-w-0 border-zinc-200 p-4 dark:border-zinc-800 lg:border-r">
+        <div className="min-w-0 border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-950/40 lg:border-r">
           <ProblemList problems={problems} onPick={setSelected} />
           <div className="mb-4 flex flex-wrap items-center gap-1">
             {tabs.map((t, i) => (
@@ -197,14 +197,14 @@ export default function FormBuilder({
             <button
               type="button"
               onClick={act.addSection}
-              className="mt-4 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-300 py-2.5 text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-700 dark:hover:text-zinc-200"
+              className="mt-4 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-300 bg-white/60 py-2.5 text-sm text-zinc-500 transition-colors hover:border-zinc-400 hover:bg-white hover:text-zinc-800 dark:border-zinc-700 dark:bg-transparent dark:hover:text-zinc-200"
             >
               <Plus className="h-4 w-4" /> Add section
             </button>
           )}
         </div>
 
-        <aside className="p-4 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto">
+        <aside className="p-4 lg:sticky lg:top-14 lg:max-h-[calc(100vh-4.5rem)] lg:self-start lg:overflow-y-auto">
           {sel ? (
             <Properties
               key={sel.name}

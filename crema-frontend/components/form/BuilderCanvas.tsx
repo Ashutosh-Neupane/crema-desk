@@ -44,7 +44,7 @@ function NewColumnGap({ id, dragging }: { id: string; dragging: boolean }) {
     <div
       ref={setNodeRef}
       data-drop={id}
-      className={`flex min-h-16 items-center justify-center rounded-lg border-2 border-dashed text-xs transition-all ${isOver ? "w-28 border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300" : "w-6 border-zinc-300 text-transparent dark:border-zinc-700"}`}
+      className={`flex min-h-16 shrink-0 items-center justify-center rounded-lg border-2 border-dashed text-xs whitespace-nowrap transition-all ${isOver ? "w-28 border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300" : "w-6 border-zinc-300 text-transparent dark:border-zinc-700"}`}
     >
       {isOver ? "New column" : ""}
     </div>
@@ -184,7 +184,7 @@ export function SectionCard({
 }) {
   const gaps = !readOnly && dragging && s.columns.length < 4;
   return (
-    <div className="rounded-xl border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+    <div className="crema-rise rounded-xl border border-zinc-200 bg-white p-3 shadow-[var(--elevation-1)] dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mb-2 flex items-center gap-2">
         <button
           type="button"
