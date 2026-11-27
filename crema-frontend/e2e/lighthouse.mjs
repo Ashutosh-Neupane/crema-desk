@@ -20,11 +20,12 @@ const RUNS = Number(arg("runs") ?? 3);
 const PRESETS = (arg("preset") ?? "desktop,mobile").split(",");
 const wanted = process.argv.slice(2).find((a) => !a.startsWith("--"))?.split(",");
 
-async function login(base, hostHeader) {
-  const r = await fetch(`${base}/api/method/login`, {
+// Crema signs in at /api/auth/login ({email, password}); Desk at /api/method/login ({usr, pwd})
+async function login(base, hostHeader, crema = false) {
+  const r = await fetch(crema ? `${base}/api/auth/login` : `${base}/api/method/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(hostHeader ? { "X-Frappe-Site-Name": hostHeader } : {}) },
-    body: JSON.stringify({ usr: USER, pwd: PASS }),
+    body: JSON.stringify(crema ? { email: USER, password: PASS } : { usr: USER, pwd: PASS }),
     redirect: "manual",
   });
   const cookies = (r.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).filter((c) => !c.endsWith("="));
@@ -37,8 +38,7 @@ const json = (cookies, base) => async (method, data) => {
   return (await r.json()).message;
 };
 
-// Crema's login goes through its own proxy (/api/method/login → Frappe), so the cookies are Crema's
-const cremaCookies = await login(`${BASE}/api/frappe`);
+const cremaCookies = await login(BASE, undefined, true);
 const call = json(cremaCookies, `${BASE}/api/frappe`);
 if (process.env.NEW_LAYOUT !== undefined) {
   const on = process.env.NEW_LAYOUT === "1";
