@@ -86,6 +86,9 @@ function NumberCardValue({ data }: { data?: NumberCardResult }) {
   );
 }
 
+// Desk number_card_widget.js: the wording per stats interval
+const SINCE: Record<string, string> = { Daily: "since yesterday", Weekly: "since last week", Monthly: "since last month", Yearly: "since last year" };
+
 /** Percentage change against the previous interval */
 function NumberCardChange({ change, interval }: { change: number; interval: string }) {
   const up = change >= 0;
@@ -93,7 +96,7 @@ function NumberCardChange({ change, interval }: { change: number; interval: stri
     <span className={`inline-flex items-center text-xs font-medium ${up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
       {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
       {Math.abs(change).toFixed(1)}%
-      <span className="ml-1 font-normal text-muted-foreground">vs last {interval.toLowerCase().replace(/ly$/, "")}</span>
+      <span className="ml-1 font-normal text-muted-foreground">{SINCE[interval] ?? `since last ${interval.toLowerCase()}`}</span>
     </span>
   );
 }

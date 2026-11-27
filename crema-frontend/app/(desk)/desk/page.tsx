@@ -13,6 +13,8 @@ import { useNavigation } from "@/lib/hooks/useNavigation";
 import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { ModuleGrid } from "@/components/desk/ModuleGrid";
 import DynamicHome from "@/components/home/DynamicHome";
+import ProviderHome from "@/components/home/provider/ProviderHome";
+import { useHomeApi } from "@/components/home/provider/useProviderHome";
 import { useNewLayout } from "@/lib/ui/newLayout";
 import { getRecentDocs, type RecentDoc } from "@/lib/utils/recentDocs";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
@@ -43,9 +45,16 @@ function readRecent(): RecentDoc[] {
   return recentCache.list;
 }
 
-/** New layout: the dynamic, role-based home (docs/PHASE2_DESIGN.md § 4.1); classic: the apps grid below */
+/**
+ * An installed app that supplies a home (frappe.boot.home_api, components/home/provider) gets it in both layouts;
+ * otherwise New layout: the dynamic, role-based home (docs/PHASE2_DESIGN.md § 4.1); classic: the apps grid below.
+ */
 export default function DeskHomePage() {
-  return useNewLayout() ? <DynamicHome /> : <ClassicHome />;
+  const newLayout = useNewLayout();
+  const { api, ready } = useHomeApi();
+  const own = newLayout ? <DynamicHome /> : <ClassicHome />;
+  if (!ready) return null;
+  return api ? <ProviderHome api={api} fallback={own} /> : own;
 }
 
 function ClassicHome() {
