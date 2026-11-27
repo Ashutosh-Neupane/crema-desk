@@ -219,14 +219,24 @@ function DocFormMain({
   const shownDoc = (loaded?.doc ?? snap.doc) as Doc;
   const docinfo = loaded?.docinfo ?? {};
   return (
-    <div className="grid grid-cols-1 gap-stack xl:grid-cols-[minmax(0,1fr)_clamp(13rem,18vw,16rem)]">
-      <div className="min-w-0 space-y-4">
+    // body, activity and sidebar are placed by .crema-form-layout (globals.css): Desk's order (activity under the
+    // form, sidebar on the right) and, in the New layout from 1600 px, activity docked on the right under the sidebar
+    <div className="crema-form-layout grid grid-cols-1 gap-stack">
+      <div className="crema-form-body min-w-0">
         <DocFormBody doctype={doctype} meta={meta} childMetas={childMetas} ctl={ctl} snap={snap} readOnly={view.readOnly} focusRequest={focusRequest} />
-        {view.saved && <Timeline doc={shownDoc} docinfo={docinfo} meta={meta} childMetas={childMetas} user={desk.user} fullName={desk.fullName} onChanged={load} fieldPerm={ctl.fieldStatus} />}
       </div>
+      {view.saved && (
+        <div className="crema-form-activity min-w-0" data-pane="form-activity">
+          <Timeline doc={shownDoc} docinfo={docinfo} meta={meta} childMetas={childMetas} user={desk.user} fullName={desk.fullName} onChanged={load} fieldPerm={ctl.fieldStatus} />
+        </div>
+      )}
 
       {/* Form sidebar (Desk: assigned / attachments / tags / shared / follow / like) */}
-      {view.saved && <FormSidebar doc={shownDoc} docinfo={docinfo} user={desk.user} canWrite={view.can("write")} trackChanges={!!meta.track_changes} onChanged={load} />}
+      {view.saved && (
+        <div className="crema-form-side min-w-0">
+          <FormSidebar doc={shownDoc} docinfo={docinfo} user={desk.user} canWrite={view.can("write")} trackChanges={!!meta.track_changes} onChanged={load} />
+        </div>
+      )}
     </div>
   );
 }
