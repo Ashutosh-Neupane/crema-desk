@@ -8,6 +8,7 @@ import { useDeskContext } from "@/lib/hooks/useDeskContext";
 import { useUIStore } from "@/lib/stores/ui.store";
 import { useNavigation } from "@/lib/hooks/useNavigation";
 import AskClaude from "@/components/ai/AskClaude";
+import { useStaleBuildListener } from "@/lib/ui/staleBuild";
 import CommandPalette from "@/components/CommandPalette";
 import DeskSidebar from "@/components/DeskSidebar";
 import DialogHost from "@/components/desk/DialogHost";
@@ -306,6 +307,7 @@ function useSeedThemeFromDeskUser() {
 
 /** Desk's global shortcuts (frappe/public/js/frappe/ui/keyboard.js, desk.js, sidebar.js) */
 function useGlobalShortcuts(openShortcuts: () => void) {
+  useStaleBuildListener();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setTheme = useUIStore((s) => s.setTheme);
   const queryClient = useQueryClient();

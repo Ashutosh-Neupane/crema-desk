@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import { Button } from "@/components/shadcn/button";
 import { AlertCircle } from "lucide-react";
+import { useReloadOnStaleBuild } from "@/lib/ui/staleBuild";
 
 export default function DoctypeListError({ error, reset }: { error: Error; reset: () => void }) {
+  useReloadOnStaleBuild(error);
   useEffect(() => {
     console.error("Doctype list error:", error);
   }, [error]);
