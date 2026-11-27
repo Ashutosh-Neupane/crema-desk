@@ -17,14 +17,14 @@ export const OUT = process.env.OUT ?? "./smoke-shots";
  */
 const NEW_LAYOUT = process.env.NEW_LAYOUT === undefined ? undefined : process.env.NEW_LAYOUT === "1";
 
-async function applyLayoutSwitch(page, user) {
-  if (NEW_LAYOUT === undefined) return;
-  const prefs = { newLayout: NEW_LAYOUT, density: "comfortable" };
+async function applyLayoutSwitch(page, user, newLayout = NEW_LAYOUT) {
+  if (newLayout === undefined) return;
+  const prefs = { newLayout, density: "comfortable" };
   await page.request.post(`${BASE}/api/frappe/api/method/frappe.model.utils.user_settings.save`, {
     data: { doctype: "Crema UI", user_settings: JSON.stringify(prefs) },
   });
   await page.evaluate(([u, p]) => localStorage.setItem(`crema:ui-prefs:${u}`, JSON.stringify(p)), [user, prefs]);
-  await page.context().addCookies([{ name: "crema_ui", value: `${encodeURIComponent(user)}~${NEW_LAYOUT ? 1 : 0}~r`, url: BASE }]);
+  await page.context().addCookies([{ name: "crema_ui", value: `${encodeURIComponent(user)}~${newLayout ? 1 : 0}~r`, url: BASE }]);
   await page.reload({ waitUntil: "domcontentloaded" });
 }
 
@@ -32,7 +32,30 @@ async function applyLayoutSwitch(page, user) {
 let axeSource;
 const axeScript = () => (axeSource ??= fs.readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8"));
 
-export async function start() {
+/**
+ * Sign in through Crema's login page. A production build allows 5 sign-ins a minute per address
+ * (app/api/auth/login: CREMA_LOGIN_RATE_LIMIT raises it); run-all signs in once per suite, so a refused sign-in
+ * waits for the window to pass and tries again instead of timing out.
+ */
+async function signIn(page) {
+  for (let attempt = 1; ; attempt++) {
+    await page.goto(`${BASE}/login`);
+    await page.fill("input:not([type=password])", process.env.CREMA_USER ?? "Administrator");
+    await page.fill("input[type=password]", process.env.CREMA_PASS ?? "admin");
+    const reply = page.waitForResponse((r) => r.url().includes("/api/auth/login"), { timeout: 120000 });
+    await page.click("button[type=submit]");
+    const res = await reply;
+    if (res.status() !== 429 || attempt >= 8) break;
+    const reset = Number(res.headers()["x-ratelimit-reset"]) * 1000;
+    const wait = Math.min(65000, Math.max(3000, (reset || Date.now() + 15000) - Date.now() + 500));
+    console.log(`  (sign-in rate-limited; retrying in ${Math.round(wait / 1000)} s)`);
+    await page.waitForTimeout(wait);
+  }
+  await page.waitForURL(/\/desk/, { timeout: 120000 });
+}
+
+/** opts.newLayout: force the layout for a suite that tests one of them (overrides NEW_LAYOUT) */
+export async function start(opts = {}) {
   fs.mkdirSync(OUT, { recursive: true });
   // PW_CHANNEL=chrome uses the installed Google Chrome when Playwright's own Chromium isn't downloaded
   const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
@@ -48,12 +71,8 @@ export async function start() {
     } catch {}
     errors.push(`HTTP ${r.status()} ${r.request().method()} ${decodeURIComponent(r.url().replace(BASE, "")).slice(0, 140)} :: ${body}`);
   });
-  await page.goto(`${BASE}/login`);
-  await page.fill("input:not([type=password])", process.env.CREMA_USER ?? "Administrator");
-  await page.fill("input[type=password]", process.env.CREMA_PASS ?? "admin");
-  await page.click("button[type=submit]");
-  await page.waitForURL(/\/desk/, { timeout: 120000 });
-  await applyLayoutSwitch(page, process.env.CREMA_USER ?? "Administrator");
+  await signIn(page);
+  await applyLayoutSwitch(page, process.env.CREMA_USER ?? "Administrator", opts.newLayout ?? NEW_LAYOUT);
   let failures = 0;
   return {
     browser,
