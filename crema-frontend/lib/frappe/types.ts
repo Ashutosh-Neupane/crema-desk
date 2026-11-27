@@ -228,6 +228,8 @@ export interface DocField {
   read_only_depends_on?: string | null;
   description?: string | null;
   in_list_view?: boolean | 0 | 1;
+  /** shown in Desk's link preview (ui/link_preview.js) */
+  in_preview?: boolean | 0 | 1;
   in_standard_filter?: boolean | 0 | 1;
   in_filter?: boolean | 0 | 1;
   bold?: boolean | 0 | 1;

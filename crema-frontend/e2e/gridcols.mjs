@@ -53,11 +53,11 @@ r = await post("frappe.client.insert", {
 check(r.ok(), `parent DocType (${r.status()})`);
 await setGridView({ [OTHER]: [{ fieldname: "x", width: 100 }] });
 
-const headers = async () => (await page.getByRole("columnheader").allInnerTexts()).map((s) => s.replace("*", "").trim()).filter(Boolean);
+const headers = async () => (await page.locator("[data-grid-header] > [data-fieldname]").allInnerTexts()).map((s) => s.replace("*", "").trim()).filter(Boolean);
 async function openNew() {
   await page.goto(`${BASE}/desk/${slug(PARENT)}/new`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.getByRole("heading", { name: `New ${PARENT}` }).waitFor({ timeout: 90000 });
-  await page.getByRole("columnheader").first().waitFor({ timeout: 30000 });
+  await page.locator("[data-grid-header] > [data-fieldname]").first().waitFor({ timeout: 30000 });
   await page.waitForTimeout(500);
 }
 
@@ -89,8 +89,8 @@ console.log("  GridView:", JSON.stringify(us.GridView));
 check(JSON.stringify(mine.map((c) => c.fieldname)) === JSON.stringify(["notes", "item", "qty"]), "saved in Desk's GridView format");
 check(mine[0]?.width === 300, `Notes width 300 px (${mine[0]?.width})`);
 check(!!us.GridView?.[OTHER], "another table's entry kept");
-const wNotes = await page.locator('[role="columnheader"][data-fieldname="notes"]').evaluate((e) => e.getBoundingClientRect().width);
-const wQty = await page.locator('[role="columnheader"][data-fieldname="qty"]').evaluate((e) => e.getBoundingClientRect().width);
+const wNotes = await page.locator('[data-grid-header] > [data-fieldname="notes"]').evaluate((e) => e.getBoundingClientRect().width);
+const wQty = await page.locator('[data-grid-header] > [data-fieldname="qty"]').evaluate((e) => e.getBoundingClientRect().width);
 check(wNotes > wQty * 2, `Notes wider than Qty (${Math.round(wNotes)} vs ${Math.round(wQty)} px)`);
 await shot("gridcols_custom", false);
 

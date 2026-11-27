@@ -28,7 +28,7 @@ function CardHead({ icon: Icon, title, count }: { icon: typeof CheckCheck; title
     <div className="flex items-center gap-2 border-b border-[var(--outline-default)] px-4 py-3">
       <Icon className="h-4 w-4 text-[var(--ink-muted)]" aria-hidden="true" />
       <h3 className="text-sm font-semibold text-[var(--ink-default)]">{title}</h3>
-      {count ? <span className="tabular ml-auto rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs font-medium text-white">{count}</span> : null}
+      {count ? <span className="tabular ml-auto rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs font-medium text-[var(--accent-fg)]">{count}</span> : null}
     </div>
   );
 }
@@ -83,7 +83,7 @@ function ApprovalRow({ item, onDone }: { item: Approval; onDone: () => void }) {
               key={a}
               type="button"
               onClick={() => setAsking(a)}
-              className={i === 0 ? "rounded-md bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white hover:opacity-90" : "rounded-md border border-[var(--outline-default)] px-3 py-1 text-xs text-[var(--ink-default)] hover:bg-[var(--surface-hover)]"}
+              className={i === 0 ? "rounded-md bg-[var(--accent)] px-3 py-1 text-xs font-medium text-[var(--accent-fg)] hover:opacity-90" : "rounded-md border border-[var(--outline-default)] px-3 py-1 text-xs text-[var(--ink-default)] hover:bg-[var(--surface-hover)]"}
             >
               {a}
             </button>

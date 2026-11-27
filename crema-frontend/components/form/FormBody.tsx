@@ -10,20 +10,12 @@
  *  - depends_on / mandatory_depends_on / read_only_depends_on see `doc` (and
  *    `parent` for child rows); script overrides (set_df_property) win
  */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
+import { useFormBodyState } from "@/components/form/useFormBodyState";
 
-function tabFromHash(tabs: Array<{ fieldname: string; label?: string | null }>): string | null {
-  if (typeof window === "undefined" || !window.location.hash) return null;
-  let h: string;
-  try {
-    h = decodeURIComponent(window.location.hash.slice(1)).toLowerCase();
-  } catch {
-    return null;
-  }
-  const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-");
-  return tabs.find((t) => t.fieldname.toLowerCase() === h || (t.label && slug(t.label) === h))?.fieldname ?? null;
-}
-import { ChevronDown } from "lucide-react";
+import FormTabs from "@/components/form/FormTabs";
+import FormSection from "@/components/form/FormSection";
+import { planSection } from "@/lib/form/sectionPlan";
 import FormControl from "@/lib/crema-form/controls/FormControl";
 import { parseDoctypeMeta } from "@/lib/crema-form/meta/parseDoctypeMeta";
 import { evalDependsOn } from "@/lib/crema-form/dependsOn";
@@ -32,6 +24,8 @@ import { sysEnabled } from "@/lib/frappe/format";
 
 /** Desk keeps these when read-only and empty (plus Table / Check / Heading, which Crema renders on their own) */
 const KEEP_WHEN_EMPTY = new Set(["Table", "Check", "Heading", "HTML", "Button", "Image", "Geolocation", "Attachment Gallery"]);
+/** New layout: tabs past this many go into a "More" menu */
+const TABS_SHOWN = 4;
 
 type Values = Record<string, unknown>;
 
@@ -61,6 +55,11 @@ interface Props {
   tabExtras?: Record<string, React.ReactNode>;
   /** Ctrl+J "jump to field": switch to its tab, open its section, focus it */
   focusRequest?: { fieldname: string; n: number } | null;
+  /** New layout: each section is its own card; more than TABS_SHOWN tabs overflow into a menu */
+  cards?: boolean;
+  /** New layout, saved documents: empty optional sections start folded, and a section's empty optional fields fold
+   * into "More fields (n)" past MORE_AFTER (PHASE2_DESIGN § 4.3). A new document shows everything */
+  foldEmpty?: boolean;
 }
 
 const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
@@ -89,41 +88,12 @@ export default function FormBody({
   compact = false,
   tabExtras,
   focusRequest,
+  cards = false,
+  foldEmpty = false,
 }: Props) {
   const layout = useMemo(() => parseDoctypeMeta(meta), [meta]);
-  // a #hash naming a tab (its fieldname, or its label as a slug: #form) opens on that tab
-  const [activeTab, setActiveTab] = useState<string | null>(() => tabFromHash(layout.tabs));
-  const [toggled, setToggled] = useState<Set<string>>(new Set());
+  const { activeTab, setActiveTab, toggled, opened, flipToggled, flipOpened } = useFormBodyState(layout, overrides, overridePrefix, focusRequest);
   const ctx = dependsCtx(values, parent);
-
-  // a script's tab.set_active(): open the tab with the newest stamp (adjusted during render, no effect)
-  const activation = layout.tabs.reduce<{ tab: string; at: number } | null>((best, t) => {
-    const at = Number((overrides[`${overridePrefix}${t.fieldname}`] as { __activate?: unknown } | undefined)?.__activate ?? 0);
-    return at > (best?.at ?? 0) ? { tab: t.fieldname, at } : best;
-  }, null);
-  const [activated, setActivated] = useState(0);
-  if (activation && activation.at !== activated) {
-    setActivated(activation.at);
-    setActiveTab(activation.tab);
-  }
-
-  const [handled, setHandled] = useState(0);
-  if (focusRequest && focusRequest.n !== handled) {
-    // adjust state during render (no effect cascade): reveal the field's tab + section
-    setHandled(focusRequest.n);
-    const sec = layout.sections.find((s) => [...s.fields, ...s.childTables].some((f) => f.fieldname === focusRequest.fieldname));
-    if (sec?.tab) setActiveTab(sec.tab);
-    if (sec?.collapsible) setToggled((t) => new Set([...t, sec.fieldname]));
-  }
-  useEffect(() => {
-    if (!focusRequest) return;
-    const t = setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(`[id$="-${CSS.escape(focusRequest.fieldname)}"]`);
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
-      el?.focus({ preventScroll: true });
-    }, 60);
-    return () => clearTimeout(t);
-  }, [focusRequest]);
 
   const effective = (df: DocField): DocField & { _hidden: boolean } => {
     const o = (overrides[`${overridePrefix}${df.fieldname}`] ?? {}) as Partial<DocField>;
@@ -179,48 +149,47 @@ export default function FormBody({
     );
   };
 
+  // an empty field the user may fill but doesn't have to: what the New layout folds away on a saved document
+  const foldable = (f: DocField) => {
+    const df = effective(f);
+    return !df.reqd && !df.read_only && !KEEP_WHEN_EMPTY.has(df.fieldtype) && df.fieldtype !== "Table MultiSelect" && isEmpty(values[f.fieldname]) && !errors[f.fieldname];
+  };
+
   const sectionHasError = (fields: DocField[]) => fields.some((f) => errors[f.fieldname] || Object.keys(errors).some((k) => k.startsWith(`${f.fieldname}.`)));
 
-  const renderSection = (section: (typeof layout.sections)[number]) => {
+  /** `next`: the section after it in the same tab. An unlabelled one continues this section (Desk draws them as one) */
+  const renderSection = (section: (typeof layout.sections)[number], next?: (typeof layout.sections)[number]) => {
     if (section.depends_on && !evalWith(String(section.depends_on), ctx, parent)) return null;
-    const cols = (section.columnFields ?? [section.fields]).map((col) => col.filter((f) => !effective(f as DocField)._hidden));
+    const cols = (section.columnFields ?? [section.fields]).map((col) => (col as DocField[]).filter((f) => !effective(f)._hidden));
     if (!cols.some((c) => c.length)) return null;
-    const all = cols.flat() as DocField[];
-    const forced = !!section.collapsible_depends_on && evalWith(String(section.collapsible_depends_on), ctx, parent);
-    const collapsedByDefault = !!section.collapsible && !forced && !sectionHasError(all);
-    const isCollapsed = section.collapsible ? (toggled.has(section.fieldname) ? !collapsedByDefault : collapsedByDefault) : false;
-    const nonEmptyCols = cols.filter((c) => c.length);
-    // columns follow the form's own width (container queries), so an open sidebar or a dialog doesn't squeeze them
-    const grid = nonEmptyCols.length >= 3 ? "@xl:grid-cols-2 @4xl:grid-cols-3" : nonEmptyCols.length === 2 ? "@xl:grid-cols-2" : "";
-    const toggle = () => {
-      const next = new Set(toggled);
-      if (next.has(section.fieldname)) next.delete(section.fieldname);
-      else next.add(section.fieldname);
-      setToggled(next);
-    };
-
+    const plan = planSection({
+      fieldname: section.fieldname,
+      collapsible: !!section.collapsible,
+      forcedOpen: !!section.collapsible_depends_on && evalWith(String(section.collapsible_depends_on), ctx, parent),
+      hasError: sectionHasError(cols.flat()),
+      cols,
+      // an unlabelled next section continues this one (Sales Order's "Items" holds scan / warehouse fields and the
+      // grid follows in an unlabelled section), so this heading stays
+      continued: !!next && !next.label,
+      fold: foldEmpty && !readOnly,
+      isFoldable: foldable,
+      toggled: toggled.has(section.fieldname),
+      isOpened: (key) => opened.has(key),
+    });
+    const frame = cards
+      ? "rounded-xl border border-zinc-200 bg-white p-section dark:border-zinc-800 dark:bg-zinc-900"
+      : `${compact ? "py-field" : "p-section"} ${section.hideBorder ? "" : "border-b border-zinc-200 last:border-b-0 dark:border-zinc-800"}`;
     return (
-      <section key={section.fieldname} className={`${compact ? "py-field" : "p-section"} ${section.hideBorder ? "" : "border-b border-zinc-200 last:border-b-0 dark:border-zinc-800"}`}>
-        {section.showLabel !== false && section.label && (
-          section.collapsible ? (
-            <button type="button" onClick={toggle} aria-expanded={!isCollapsed} className={`flex w-full items-center gap-2 text-left ${isCollapsed ? "" : "mb-field"}`}>
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{section.label}</h3>
-              <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
-            </button>
-          ) : (
-            <h3 className="mb-field text-sm font-semibold text-zinc-900 dark:text-zinc-100">{section.label}</h3>
-          )
-        )}
-        {!isCollapsed && (
-          <div data-cols={nonEmptyCols.length} className={`crema-section-grid grid grid-cols-1 gap-x-column gap-y-field ${grid}`}>
-            {nonEmptyCols.map((col) => (
-              <div key={(col[0] as DocField).fieldname} className="crema-col flex min-w-0 flex-col gap-field">
-                {col.map((f) => renderField(f as DocField))}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <FormSection
+        key={section.fieldname}
+        label={section.showLabel !== false ? (section.label ?? "") : ""}
+        plan={plan}
+        frame={frame}
+        cards={cards}
+        onToggle={() => (plan.mode === "fold" ? flipOpened(section.fieldname) : flipToggled(section.fieldname))}
+        onMore={() => flipOpened(`${section.fieldname}:more`)}
+        renderField={renderField}
+      />
     );
   };
 
@@ -233,34 +202,13 @@ export default function FormBody({
   const tabs = layout.tabs.filter((t) => !tabHidden(t.fieldname) && (!t.depends_on || evalWith(String(t.depends_on), ctx, parent)) && (layout.sections.some((s) => s.tab === t.fieldname && [...s.fields, ...s.childTables].some((f) => !effective(f as DocField)._hidden)) || !!tabExtras?.[t.fieldname]));
   const current = tabs.find((t) => t.fieldname === activeTab)?.fieldname ?? tabs[0]?.fieldname;
   const shown = tabs.length ? layout.sections.filter((s) => s.tab === current) : layout.sections;
-  const tabHasError = (tab: string) => layout.sections.some((s) => s.tab === tab && sectionHasError([...s.fields, ...s.childTables] as DocField[]));
+  const tabErrors = (tab: string) => layout.sections.filter((s) => s.tab === tab).flatMap((s) => [...s.fields, ...s.childTables]).filter((f) => sectionHasError([f as DocField])).length;
 
   return (
-    <div className={compact ? "@container" : "@container overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}>
-      {tabs.length > 1 && (
-        <div className={`flex gap-1 overflow-x-auto border-b border-zinc-200 dark:border-zinc-800 ${compact ? "" : "px-3"}`} role="tablist">
-          {tabs.map((t) => (
-            <button
-              key={t.fieldname}
-              type="button"
-              role="tab"
-              aria-selected={t.fieldname === current}
-              onClick={() => setActiveTab(t.fieldname)}
-              className={[
-                "relative whitespace-nowrap px-3 py-3 text-sm transition-colors",
-                t.fieldname === current
-                  ? "font-medium text-zinc-900 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-zinc-900 dark:text-zinc-100 dark:after:bg-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
-              ].join(" ")}
-            >
-              {t.label}
-              {tabHasError(t.fieldname) && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" />}
-            </button>
-          ))}
-        </div>
-      )}
-      {shown.map((s) => (
-        <Fragment key={s.fieldname}>{renderSection(s)}</Fragment>
+    <div className={compact ? "@container" : cards ? "@container space-y-stack" : "@container overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}>
+      {tabs.length > 1 && <FormTabs tabs={tabs} current={current} onSelect={setActiveTab} errors={tabErrors} cards={cards} compact={compact} shown={TABS_SHOWN} />}
+      {shown.map((s, i) => (
+        <Fragment key={s.fieldname}>{renderSection(s, shown[i + 1])}</Fragment>
       ))}
       {current && tabExtras?.[current]}
     </div>

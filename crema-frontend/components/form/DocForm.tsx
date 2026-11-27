@@ -21,6 +21,8 @@ import Connections from "@/components/form/Connections";
 import HtmlHost from "@/components/form/HtmlHost";
 import FormDashboard, { FormHeadlines } from "@/components/form/FormDashboard";
 import WorkflowBar from "@/components/form/WorkflowBar";
+import SummaryCard from "@/components/form/SummaryCard";
+import { useNewLayout } from "@/lib/ui/newLayout";
 import { getHtmlWidget } from "@/components/form/widgets";
 import { LinksDialog, ReminderDialog, RenameDialog } from "@/components/form/FormDialogs";
 import {
@@ -113,6 +115,7 @@ function DocFormView({
   const { data: ctx } = useDeskContext();
   const desk = deskInfo(ctx);
   const phone = useIsPhone();
+  const newLayout = useNewLayout();
   const { loaded, load, ctlRef } = form;
   const doc = snap.doc;
   const roles = desk.roles;
@@ -190,6 +193,7 @@ function DocFormView({
         dirty={snap.dirty}
         user={desk.user}
       />
+      {newLayout && <SummaryCard meta={meta} doc={doc} visible={(df) => ctl.fieldStatus(df) !== "None"} />}
       <FormDashboard state={snap.dashboard} />
       {view.docstatus === 2 && (
         <p className="text-xs text-zinc-500">Cancelled. Use Amend to create a corrected copy.</p>
@@ -502,6 +506,8 @@ function DocFormBody({
   focusRequest: { fieldname: string; n: number } | null;
 }) {
   const doc = snap.doc;
+  // New layout: sections as cards; a saved document folds away its empty optional fields (PHASE2_DESIGN § 4.3)
+  const newLayout = useNewLayout();
   const tabExtras: Record<string, React.ReactNode> = {};
   const connectionsTab = connectionsTabOf(meta);
   if (connectionsTab) tabExtras[connectionsTab] = <Connections meta={meta} doc={doc} />;
@@ -568,6 +574,8 @@ function DocFormBody({
       }}
       tabExtras={tabExtras}
       focusRequest={focusRequest}
+      cards={newLayout}
+      foldEmpty={newLayout && !isNewDoc(doc)}
     />
   );
 }

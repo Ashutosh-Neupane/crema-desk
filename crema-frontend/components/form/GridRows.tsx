@@ -147,13 +147,13 @@ export function GridTable({
   return (
     <div className="overflow-x-auto">
       <div ref={bodyRef} className="min-w-[640px]" onKeyDown={onKeyDown} onPaste={onPaste}>
-        <div className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
+        <div data-grid-header className="grid items-center border-b border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60" style={{ gridTemplateColumns: template }}>
           <div className="flex justify-center py-2">
             {!readOnly && <input type="checkbox" aria-label="Select all rows" checked={allSelected} onChange={() => onToggleAll(!allSelected)} className="h-3.5 w-3.5 accent-zinc-900 dark:accent-zinc-100" />}
           </div>
           <div className="py-2 text-center">No.</div>
           {cols.map((c) => (
-            <div key={c.fieldname} role="columnheader" data-fieldname={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
+            <div key={c.fieldname} data-fieldname={c.fieldname} className={`truncate px-2 py-2 ${NUMERIC.has(c.fieldtype) ? "text-right" : c.fieldtype === "Check" ? "text-center" : ""}`} title={c.label ?? undefined}>
               {c.label}
               {!!(ov(c)?.reqd ?? c.reqd) && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
             </div>
