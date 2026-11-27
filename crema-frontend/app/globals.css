@@ -251,8 +251,8 @@ a:focus-visible,
   box-shadow: var(--focus-default);
 }
 
-/* Smooth transitions for theme changes */
-* {
+/* Smooth transitions for theme changes: only while the theme switches (lib/stores/ui.store.ts applyTheme) */
+:root[data-theme-switching] * {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 

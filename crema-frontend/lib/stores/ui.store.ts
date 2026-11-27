@@ -32,8 +32,17 @@ function applyTheme(theme: ThemeChoice) {
   } else {
     resolved = theme;
   }
+  // colours fade only while the theme changes on a page already shown (globals.css [data-theme-switching]); a
+  // transition on every element all the time made big updates slow (1000 rows checked at once: ~1 s of style work)
+  const before = root.getAttribute("data-theme");
+  if (before && before !== resolved && document.readyState === "complete") {
+    root.setAttribute("data-theme-switching", "");
+    clearTimeout(switching);
+    switching = setTimeout(() => root.removeAttribute("data-theme-switching"), 300);
+  }
   root.setAttribute("data-theme", resolved);
 }
+let switching: ReturnType<typeof setTimeout> | undefined;
 
 /** Desk's localStorage.container_fullwidth is a JSON boolean string */
 function readFullWidth(): boolean {
