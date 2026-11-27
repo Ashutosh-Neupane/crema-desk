@@ -794,3 +794,6 @@ a:focus-visible,
   animation-duration: var(--duration-base);
   animation-timing-function: var(--ease-standard);
 }
+
+/* DocField `bold`: label and value in semibold (Desk form/controls bold) */
+.crema-bold > label, .crema-bold :is(input, textarea, select, [data-value]) { font-weight: 600; }
