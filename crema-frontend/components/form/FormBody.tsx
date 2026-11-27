@@ -96,6 +96,17 @@ export default function FormBody({
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const ctx = dependsCtx(values, parent);
 
+  // a script's tab.set_active(): open the tab with the newest stamp (adjusted during render, no effect)
+  const activation = layout.tabs.reduce<{ tab: string; at: number } | null>((best, t) => {
+    const at = Number((overrides[`${overridePrefix}${t.fieldname}`] as { __activate?: unknown } | undefined)?.__activate ?? 0);
+    return at > (best?.at ?? 0) ? { tab: t.fieldname, at } : best;
+  }, null);
+  const [activated, setActivated] = useState(0);
+  if (activation && activation.at !== activated) {
+    setActivated(activation.at);
+    setActiveTab(activation.tab);
+  }
+
   const [handled, setHandled] = useState(0);
   if (focusRequest && focusRequest.n !== handled) {
     // adjust state during render (no effect cascade): reveal the field's tab + section
@@ -137,7 +148,7 @@ export default function FormBody({
     if (df._hidden) return null;
     if ((df.fieldtype === "Table" || df.fieldtype === "Table MultiSelect") && renderTable) {
       return (
-        <div key={df.fieldname} className="flex flex-col gap-1.5">
+        <div key={df.fieldname} data-fieldtype={df.fieldtype} className="flex min-w-0 flex-col gap-1.5">
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             {df.label}
             {!!df.reqd && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
@@ -201,9 +212,9 @@ export default function FormBody({
           )
         )}
         {!isCollapsed && (
-          <div className={`grid grid-cols-1 gap-x-column gap-y-field ${grid}`}>
+          <div data-cols={nonEmptyCols.length} className={`crema-section-grid grid grid-cols-1 gap-x-column gap-y-field ${grid}`}>
             {nonEmptyCols.map((col) => (
-              <div key={(col[0] as DocField).fieldname} className="flex min-w-0 flex-col gap-field">
+              <div key={(col[0] as DocField).fieldname} className="crema-col flex min-w-0 flex-col gap-field">
                 {col.map((f) => renderField(f as DocField))}
               </div>
             ))}
@@ -213,8 +224,13 @@ export default function FormBody({
     );
   };
 
-  // tabs: visible when they have something to render
-  const tabs = layout.tabs.filter((t) => (!t.depends_on || evalWith(String(t.depends_on), ctx, parent)) && (layout.sections.some((s) => s.tab === t.fieldname && [...s.fields, ...s.childTables].some((f) => !effective(f as DocField)._hidden)) || !!tabExtras?.[t.fieldname]));
+  // tabs: visible when not hidden (meta or a script: frm.set_df_property / field.tab.toggle) and with something to render
+  const tabHidden = (fieldname: string) => {
+    const o = overrides[`${overridePrefix}${fieldname}`] as { hidden?: unknown } | undefined;
+    const df = meta.fields?.find((f) => f.fieldname === fieldname);
+    return !!(o && "hidden" in o ? o.hidden : df?.hidden);
+  };
+  const tabs = layout.tabs.filter((t) => !tabHidden(t.fieldname) && (!t.depends_on || evalWith(String(t.depends_on), ctx, parent)) && (layout.sections.some((s) => s.tab === t.fieldname && [...s.fields, ...s.childTables].some((f) => !effective(f as DocField)._hidden)) || !!tabExtras?.[t.fieldname]));
   const current = tabs.find((t) => t.fieldname === activeTab)?.fieldname ?? tabs[0]?.fieldname;
   const shown = tabs.length ? layout.sections.filter((s) => s.tab === current) : layout.sections;
   const tabHasError = (tab: string) => layout.sections.some((s) => s.tab === tab && sectionHasError([...s.fields, ...s.childTables] as DocField[]));
