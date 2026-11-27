@@ -28,11 +28,13 @@ export function useRecentlyOpened(): RecentDoc[] {
 function useSession() {
   const { data: ctx, isError } = useDeskContext();
   const canRead = useMemo(() => new Set(ctx?.perms?.can_read ?? []), [ctx]);
+  const canCreate = useMemo(() => new Set(ctx?.perms?.can_create ?? []), [ctx]);
+  const canSubmit = useMemo(() => new Set(ctx?.perms?.can_submit ?? []), [ctx]);
   const visited = useMemo(() => {
-    const links = (ctx?.boot?.frequently_visited_links ?? []) as Array<{ route?: string }>;
-    return links.map((l) => parseDeskRoute(String(l.route ?? "")));
+    const links = (ctx?.boot?.frequently_visited_links ?? []) as Array<{ route?: string; count?: number }>;
+    return links.map((l) => ({ ...parseDeskRoute(String(l.route ?? "")), count: Number(l.count) || 1 }));
   }, [ctx]);
-  return { user: ctx?.user ?? "", fullName: ctx?.full_name ?? "", canRead, visited, failed: isError };
+  return { user: ctx?.user ?? "", fullName: ctx?.full_name ?? "", canRead, canCreate, canSubmit, visited, failed: isError };
 }
 
 export function useWaitingOnMe(user: string, canRead: ReadonlySet<string>) {
@@ -41,7 +43,8 @@ export function useWaitingOnMe(user: string, canRead: ReadonlySet<string>) {
     enabled: !!user,
     queryFn: async () => {
       const [approvals, todos] = await Promise.all([fetchWorkflowActions(canRead), fetchAssignments(user, canRead)]);
-      return dedupeByDoc([...approvals, ...todos]);
+      // overdue first, then newest, whatever the kind (§ 4.1.5): an assignment isn't buried behind old approvals
+      return dedupeByDoc([...approvals, ...todos]).sort((x, y) => Number(!!y.overdue) - Number(!!x.overdue) || byRecent(x, y));
     },
     staleTime: 30_000,
   });
@@ -101,7 +104,7 @@ export function useMyWork() {
       at: o.at,
     }));
     const fromDesk: WorkItem[] = visited
-      .filter((v): v is { doctype: string; name: string } => !!v.doctype && !!v.name && canRead.has(v.doctype))
+      .filter((v): v is { doctype: string; name: string; count: number } => !!v.doctype && !!v.name && canRead.has(v.doctype))
       .map((v) => ({ key: `visit:${v.doctype}:${v.name}`, kind: "viewed", doctype: v.doctype, name: v.name, title: v.name, href: docHref(v.doctype, v.name), detail: "Viewed" }));
     return dedupeByDoc([...viewed, ...(mine.data?.edited ?? [])].sort(byRecent).concat(fromDesk));
   }, [opened, visited, canRead, mine.data]);

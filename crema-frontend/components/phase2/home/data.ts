@@ -61,6 +61,11 @@ export function parseFrappeDate(s: unknown): number | undefined {
   return Number.isNaN(t) ? undefined : t;
 }
 
+/** YYYY-MM-DD in the browser's timezone, n days from today (toISOString() would be the UTC day) */
+export function localDay(n = 0): string {
+  return new Date(Date.now() + n * 86_400_000).toLocaleDateString("en-CA");
+}
+
 export function timeAgo(ts: number | undefined, now = Date.now()): string {
   if (!ts) return "";
   const s = Math.max(0, Math.floor((now - ts) / 1000));

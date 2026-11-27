@@ -16,7 +16,7 @@ import { frappeMethod } from "@/lib/frappe/client";
 import { fetchDoctypeMetaClient } from "@/lib/frappe/doctype";
 import { sidebarItemHref } from "@/lib/navigation";
 import type { WorkspaceSidebarItem } from "@/lib/frappe/types";
-import { docHref, parseFrappeDate, stripHtml, type Shortcut, type WorkItem } from "./data";
+import { docHref, localDay, parseFrappeDate, stripHtml, type Shortcut, type WorkItem } from "./data";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
 
 type Row = Record<string, unknown>;
@@ -60,7 +60,7 @@ export async function fetchAssignments(user: string, canRead: ReadonlySet<string
     order_by: "modified desc",
     limit_page_length: limit,
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   return rows.map((r) => {
     const ref = !!(r.reference_type && r.reference_name);
     const doctype = ref ? String(r.reference_type) : "ToDo";
