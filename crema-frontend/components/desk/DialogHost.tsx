@@ -99,7 +99,7 @@ function DialogView({ d }: { d: DeskDialog; version: number }) {
             </button>
           )}
           {d.opts.primary_action && (
-            <button type="button" onClick={() => void primary()} disabled={busy || d.primaryDisabled} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900">
+            <button type="button" data-primary-action onClick={() => void primary()} disabled={busy || d.primaryDisabled} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {d.opts.primary_action_label ?? "Submit"}
             </button>

@@ -16,6 +16,7 @@ import { timeAgo } from "@/lib/list/format";
 import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import type { FieldStatus } from "@/lib/form/perm";
 import EmailComposer from "@/components/form/EmailComposer";
+import { useDocumentEvent } from "@/lib/ui/useDocumentEvent";
 
 type Entry =
   | { kind: "comment"; at: string; by: string; html: string; name: string; email?: string }
@@ -117,6 +118,8 @@ export default function Timeline({
   const [suggest, setSuggest] = useState<{ q: string; items: Array<{ value: string; description?: string }> } | null>(null);
   const [editing, setEditing] = useState<{ name: string; text: string } | null>(null);
   const [composing, setComposing] = useState(false);
+  // Ctrl+E on the form (useDocActions) opens the composer, like Desk's toolbar Email
+  useDocumentEvent("crema:email", () => setComposing(true));
   const box = useRef<HTMLTextAreaElement>(null);
 
   const entries = useMemo<Entry[]>(() => {

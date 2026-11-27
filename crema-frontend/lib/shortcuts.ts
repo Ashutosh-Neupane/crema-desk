@@ -12,10 +12,14 @@ export interface Shortcut {
   /** e.g. "mod+j", "shift+mod+d", "shift+r", "shift+?" */
   keys: string;
   description: string;
-  group: "Global" | "Form" | "List";
+  group: "Global" | "Form" | "Grid" | "List";
   action: (e: KeyboardEvent) => void;
   /** run even while typing in an input (Desk: ignore_inputs: false) */
   allowInInput?: boolean;
+  /** run only when this holds (Desk: condition); otherwise the key does what it normally does */
+  when?: (e: KeyboardEvent) => boolean;
+  /** listed in the Shift+? dialog only: the key is handled elsewhere (grid cells, dialogs) */
+  info?: boolean;
 }
 
 const registry = new Map<string, Shortcut>();
@@ -39,10 +43,21 @@ function matches(keys: string, e: KeyboardEvent): boolean {
   // "?" and "/" are the same physical key; Shift is implied by "?"
   if (key === "?") return e.key === "?" || (e.shiftKey && e.key === "/");
   if (wantShift !== e.shiftKey) return false;
+  if (key === "space") return e.key === " ";
   // "<" / ">" are Shift+, / Shift+. ; with Ctrl/Cmd held some browsers report the unshifted key
   if (key === "<" || key === ">") return e.key === key || e.key === (key === "<" ? "," : ".");
   return e.key.toLowerCase() === key;
 }
+
+/** the topmost open modal dialog, if any (a page's own shortcuts wait while one is open, as in Desk). Date / time /
+ * colour pickers are non-modal <dialog open> popovers and don't count. */
+export function openDialog(): HTMLElement | null {
+  const all = [...document.querySelectorAll<HTMLElement>("dialog:modal, [aria-modal=true], [role=alertdialog]")].filter((d) => d.getClientRects().length > 0);
+  return all.at(-1) ?? null;
+}
+
+/** Desk keyboard.js ctrl+s → trigger_primary_action: inside a dialog, its primary button */
+const dialogPrimary = (dlg: HTMLElement) => dlg.querySelector<HTMLButtonElement>("[data-primary-action]:not([disabled]), button[type=submit]:not([disabled])");
 
 function isTyping(e: KeyboardEvent) {
   const el = e.target as HTMLElement | null;
@@ -58,8 +73,21 @@ function install() {
     (e) => {
       // most specific (form/list) first, then global
       const order = [...registry.values()].sort((a, b) => (a.group === "Global" ? 1 : 0) - (b.group === "Global" ? 1 : 0));
+      const dlg = openDialog();
+      if (dlg && matches("mod+s", e)) {
+        const btn = dialogPrimary(dlg);
+        if (btn) {
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur();
+          btn.click();
+        }
+        return;
+      }
       for (const s of order) {
-        if (!matches(s.keys, e)) continue;
+        if (s.info || !matches(s.keys, e)) continue;
+        // Form / List shortcuts belong to the page under a dialog
+        if (dlg && s.group !== "Global") continue;
+        if (s.when && !s.when(e)) continue;
         // plain-key shortcuts never fire while typing; modifier ones only if allowed
         const plain = !s.keys.includes("mod") && !s.keys.includes("alt");
         if (isTyping(e) && (plain || !s.allowInInput)) continue;
@@ -98,6 +126,8 @@ export function useRegisteredShortcuts(): Shortcut[] {
   );
 }
 
+const ARROWS: Record<string, string> = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→" };
+
 /** "shift+mod+d" → "⇧⌘D" on Mac, "Shift+Ctrl+D" elsewhere */
 export function formatKeys(keys: string): string {
   const mac = isMac();
@@ -107,6 +137,10 @@ export function formatKeys(keys: string): string {
       if (p === "mod") return mac ? "⌘" : "Ctrl";
       if (p === "shift") return mac ? "⇧" : "Shift";
       if (p === "alt") return mac ? "⌥" : "Alt";
+      if (p in ARROWS) return ARROWS[p];
+      if (p === "enter") return mac ? "↩" : "Enter";
+      if (p === "escape") return "Esc";
+      if (p === "space") return "Space";
       return p.length === 1 ? p.toUpperCase() : p;
     })
     .join(mac ? "" : "+");

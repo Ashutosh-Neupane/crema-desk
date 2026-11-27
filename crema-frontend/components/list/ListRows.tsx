@@ -316,7 +316,9 @@ const TableRow = memo(function TableRow({
       onClick={onRowClick}
       aria-current={active || undefined}
       data-row={r.name}
-      className={`group cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${active ? "bg-[var(--surface-selected)] shadow-[inset_3px_0_0_var(--focus-color)]" : checked ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
+      // focusable like Desk's .list-row-container, for ↑ / ↓ / Enter / Space (useListKeys)
+      tabIndex={-1}
+      className={`group cursor-pointer border-b border-zinc-100 outline-none last:border-0 hover:bg-zinc-50 focus-visible:bg-[var(--surface-selected)] focus-visible:shadow-[inset_3px_0_0_var(--focus-color)] dark:border-zinc-800/70 dark:hover:bg-zinc-800/40 ${active ? "bg-[var(--surface-selected)] shadow-[inset_3px_0_0_var(--focus-color)]" : checked ? "bg-zinc-50 dark:bg-zinc-800/40" : ""}`}
     >
       <td className="px-3 py-2.5">
         <SelectRow name={r.name} checked={checked} onToggle={onToggle} />

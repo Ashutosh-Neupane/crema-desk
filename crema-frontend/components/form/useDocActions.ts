@@ -21,6 +21,27 @@ import { META_EDITORS, copyForNew } from "@/components/form/docFormRules";
 import type { ConfirmKind } from "@/components/form/DocFormDialogs";
 import type { Loaded } from "@/components/form/useDocForm";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import type { Shortcut } from "@/lib/shortcuts";
+
+/** the editor keeps its own undo (rich text, code), or the form builder is open (Desk: !is_form_builder()) */
+function canUndo(e: KeyboardEvent) {
+  const t = e.target as HTMLElement | null;
+  if (t?.isContentEditable || t?.closest(".cm-editor, .ql-editor, [data-code-editor]")) return false;
+  return !document.querySelector(".crema-builder");
+}
+
+/** Desk form.js grid_shortcut_keys: listed in Shift+? and handled by the grid cells (useGridKeys) */
+const GRID_KEYS: Shortcut[] = [
+  ["arrowup", "Move to the row above"],
+  ["arrowdown", "Move to the row below"],
+  ["tab", "Next column"],
+  ["shift+tab", "Previous column"],
+  ["mod+arrowup", "Add a row above"],
+  ["mod+arrowdown", "Add a row below"],
+  ["shift+mod+arrowup", "Add a row at the top"],
+  ["shift+mod+arrowdown", "Add a row at the bottom"],
+  ["shift+alt+arrowdown", "Duplicate the row"],
+].map(([keys, description]) => ({ keys, description, group: "Grid", info: true, action: () => {} }));
 
 const enc = encodeURIComponent;
 type Busy = null | "save" | "submit" | "cancel" | "delete";
@@ -154,6 +175,10 @@ export function useDocActions({
   const [jumpOpen, setJumpOpen] = useState(false);
   const docstatusNow = () => Number(ctlRef.current?.getDoc().docstatus ?? 0);
   const savedDoc = () => (ctlRef.current && !isNewDoc(ctlRef.current.getDoc()) ? ctlRef.current : null);
+  const undoStep = async (redo: boolean) => {
+    const c = ctlRef.current;
+    if (c && !(await (redo ? c.redo() : c.undo()))) toast(redo ? "Nothing left to redo" : "Nothing left to undo", { duration: 3000 });
+  };
   // Desk form shortcuts (frappe/public/js/frappe/form/toolbar.js, form.js)
   useShortcuts(
     [
@@ -164,6 +189,14 @@ export function useDocActions({
       { keys: "shift+r", description: "Reload", group: "Form", action: () => void load() },
       { keys: "shift+mod+>", description: "Next document", group: "Form", action: () => void navigate(false) },
       { keys: "shift+mod+<", description: "Previous document", group: "Form", action: () => void navigate(true) },
+      // Desk toolbar.js Undo / Redo (Ctrl+Z, Ctrl+Y; form.js Shift+Ctrl+Z); not in rich-text or code editors, which
+      // keep their own undo, and not in the form builder
+      { keys: "mod+z", description: "Undo last change", group: "Form", allowInInput: true, when: canUndo, action: () => void undoStep(false) },
+      { keys: "mod+y", description: "Redo last change", group: "Form", allowInInput: true, when: canUndo, action: () => void undoStep(true) },
+      { keys: "shift+mod+z", description: "Redo last change", group: "Form", allowInInput: true, when: canUndo, action: () => void undoStep(true) },
+      // Desk toolbar.js Email (Ctrl+E, not on a cancelled document): the Activity's email composer
+      { keys: "mod+e", description: "Email", group: "Form", when: () => !!savedDoc() && docstatusNow() < 2, action: () => document.dispatchEvent(new CustomEvent("crema:email")) },
+      ...GRID_KEYS,
       {
         keys: "mod+p",
         description: "Print",

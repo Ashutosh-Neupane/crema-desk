@@ -38,6 +38,7 @@ import { ListLayoutDialogs, type LayoutDialogState } from "@/components/list/Lis
 import { ListFacetsPane } from "@/components/list/ListFacetsPane";
 import { ListPreviewPane } from "@/components/list/ListPreviewPane";
 import { useListPreview } from "@/components/list/useListPreview";
+import { useListKeys } from "@/components/list/useListKeys";
 import { usePane } from "@/lib/ui/pane";
 import { ListPanes, PreviewModeButton, ShowFiltersButton } from "@/components/list/ListPaneButtons";
 
@@ -158,6 +159,12 @@ function ListPage({
   const pane = usePane("list-filters", 1920);
   // wide screens: a row click previews the record on the right (§ 3.8)
   const preview = useListPreview(rows);
+  useListKeys({
+    rows,
+    preview,
+    toggle,
+    hrefOf: (name) => rowHref(settings, doctype, rows.find((r) => r.name === name) ?? { name }),
+  });
   const previewing = preview.current;
   const onPreview = preview.onPreview;
   const rowCtx = useMemo<RowContext>(

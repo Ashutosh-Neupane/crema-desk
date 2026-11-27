@@ -120,6 +120,7 @@ export default function QuickEntry({
           </button>
           <button
             type="button"
+            data-primary-action
             onClick={() => void onSave()}
             disabled={busy}
             className="ml-auto inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
