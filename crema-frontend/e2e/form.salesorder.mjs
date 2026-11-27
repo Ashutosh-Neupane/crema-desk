@@ -2,7 +2,7 @@
 // new → customer (get_party_details) → item (get_item_details: rate) → qty →
 // live totals → mandatory check → save (server totals) → submit → cancel → amend → delete.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/form.salesorder.mjs
-import { start, BASE } from "./lib.mjs";
+import { start, BASE, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -49,7 +49,7 @@ check((await field("Customer Name").textContent().catch(() => "")) !== null, "cu
 step("delivery date");
 const dd = page.getByRole("textbox", { name: /^Delivery Date/ }).first();
 await dd.click();
-await dd.fill(new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10));
+await dd.fill(localDate(5));
 await dd.press("Enter");
 await page.waitForTimeout(800);
 const rowDate = await page.getByRole("textbox", { name: "Delivery Date", exact: true }).nth(1).inputValue().catch(() => "");
@@ -69,7 +69,7 @@ const itemCell = page.locator("[aria-label^='Select row']").first().locator("xpa
 await itemCell.click();
 await itemCell.fill(ITEM);
 await page.waitForTimeout(800);
-await page.getByRole("button", { name: new RegExp(esc(ITEM)) }).first().click();
+await page.getByRole("option", { name: new RegExp(esc(ITEM)) }).first().click();
 await page.waitForTimeout(3000);
 const rateText = await page.getByLabel("Rate", { exact: true }).first().inputValue().catch(() => "");
 check(rateText.includes(money(RATE)), `rate ${money(RATE)} fetched from the price list (${rateText})`);

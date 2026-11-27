@@ -79,8 +79,8 @@ const msl = dlg.getByRole("button", { name: "Cities" });
 await msl.click();
 await page.getByRole("button", { name: "Select All" }).first().click();
 check((await dlg.locator('[data-fieldname="msl"] [data-status]').innerText()) === "3 values selected", "3 values selected");
-await page.getByRole("listbox", { name: "Cities options" }).getByRole("button", { name: "Pokhara" }).click();
-await page.getByRole("listbox", { name: "Cities options" }).getByRole("button", { name: "Lalitpur" }).click();
+await page.getByRole("listbox", { name: "Cities options" }).getByRole("option", { name: "Pokhara" }).click();
+await page.getByRole("listbox", { name: "Cities options" }).getByRole("option", { name: "Lalitpur" }).click();
 check((await dlg.locator('[data-fieldname="msl"] [data-status]').innerText()) === "Kathmandu", "one value → its label");
 await dlg.getByRole("heading", { name: "Multi" }).click();
 

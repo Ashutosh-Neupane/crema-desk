@@ -9,6 +9,7 @@
  * Framework-free on purpose: the React hooks live in ./newLayout.ts.
  */
 import { frappeMethod } from "@/lib/frappe/client";
+import { parseUiCookie, UI_COOKIE, writeUiCookie } from "./prefsCookie";
 
 export type Density = "comfortable" | "compact";
 
@@ -50,6 +51,12 @@ let cachedRaw: string | null | undefined;
 let cachedUser: string | undefined;
 let cachedPrefs: UiPrefs = DEFAULT_UI_PREFS;
 
+// no local copy (cleared storage): keep what the server rendered from the cookie
+function cookiePrefs(user: string): UiPrefs | null {
+  const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${UI_COOKIE}=([^;]*)`));
+  return parseUiCookie(m?.[1], user);
+}
+
 export function readPrefs(): UiPrefs {
   if (typeof window === "undefined") return DEFAULT_UI_PREFS;
   const user = currentUser();
@@ -63,7 +70,7 @@ export function readPrefs(): UiPrefs {
   cachedRaw = raw;
   cachedUser = user;
   try {
-    cachedPrefs = raw ? normalizePrefs(JSON.parse(raw)) : DEFAULT_UI_PREFS;
+    cachedPrefs = raw ? normalizePrefs(JSON.parse(raw)) : (cookiePrefs(user) ?? DEFAULT_UI_PREFS);
   } catch {
     cachedPrefs = DEFAULT_UI_PREFS;
   }
@@ -108,6 +115,7 @@ function writeLocal(p: UiPrefs) {
   cachedUser = currentUser();
   cachedPrefs = p;
   applyPrefsToDocument(p);
+  writeUiCookie(currentUser(), p); // the server renders the next page in this layout
   emit();
 }
 
@@ -150,4 +158,8 @@ export function updatePrefs(patch: Partial<UiPrefs>): void {
  */
 export const UI_PREFS_BOOT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|;\\s*)user_id=([^;]*)/);var u=(m&&decodeURIComponent(m[1]))||"Guest";var p=JSON.parse(localStorage.getItem("${STORAGE_PREFIX}"+u)||"{}");var r=document.documentElement;r.setAttribute("data-layout",p.newLayout===true?"new":"classic");r.setAttribute("data-density",p.density==="compact"?"compact":"comfortable");}catch(e){}})();`;
 
-if (typeof window !== "undefined") applyPrefsToDocument(readPrefs());
+if (typeof window !== "undefined") {
+  applyPrefsToDocument(readPrefs());
+  // prefs saved before the cookie existed (or in another tab) reach the server on the next page load
+  writeUiCookie(currentUser(), readPrefs());
+}

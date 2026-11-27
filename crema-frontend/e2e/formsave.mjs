@@ -3,7 +3,7 @@
 // place from the savedocs response (no getdoc, no remount). The timeline follows version_timeline_content_builder.js:
 // "submitted this document", no raw HTML, hidden fields left out.
 //   BASE=http://localhost:3001 node e2e/formsave.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, api } = t;
@@ -19,7 +19,7 @@ for (const o of (await post("frappe.client.get_list", { doctype: "Sales Order", 
   await post("frappe.client.delete", { doctype: "Sales Order", name: o.name });
 }
 const PO = `PO-CREMA-${Date.now()}`;
-const day = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+const day = localDate(5);
 const order = async () =>
   (await api("api/resource/Sales Order", { data: { company, customer, delivery_date: day, taxes_and_charges: template, taxes, items: [{ item_code: item, qty: 1, delivery_date: day }] } })).data?.name;
 

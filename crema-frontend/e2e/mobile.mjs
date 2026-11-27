@@ -2,7 +2,7 @@
 // row cards that open the row form, and the form's actions sit in a bottom bar; no horizontal page scroll.
 // At 1280px the table, inline grid and header actions are back.
 //   BASE=http://localhost:3001 OUT=/tmp/shots node e2e/mobile.mjs
-import { start, BASE, defaultCompany } from "./lib.mjs";
+import { start, BASE, defaultCompany, localDate } from "./lib.mjs";
 
 const t = await start();
 const { page, check, step, shot, api } = t;
@@ -14,7 +14,7 @@ for (const d of (await post("frappe.client.get_list", { doctype: "Sales Order", 
 const company = await defaultCompany(page);
 const customer = (await post("frappe.client.get_list", { doctype: "Customer", fields: ["name"], limit_page_length: 1 }))?.[0]?.name;
 const items = (await post("frappe.client.get_list", { doctype: "Item", filters: { is_sales_item: 1, disabled: 0, has_variants: 0 }, fields: ["name"], limit_page_length: 2 })) ?? [];
-const day = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+const day = localDate(5);
 const so = (await api("api/resource/Sales Order", { data: { company, customer, po_no: `PO-CREMA-MOBILE-${Date.now()}`, delivery_date: day, items: items.map((i) => ({ item_code: i.name, qty: 3, delivery_date: day })) } })).data?.name;
 check(!!so, `draft Sales Order ${so} with ${items.length} items`);
 

@@ -7,18 +7,25 @@
  *   return newLayout ? <NewOrderForm /> : <DocForm />;
  *
  * Stored per user in Frappe (user_settings "Crema UI") with a localStorage cache; see ./prefs.ts.
- * SSR and the first client render return the defaults (classic layout, comfortable), then the stored value.
+ * The server renders with the prefs mirrored in the `crema_ui` cookie (./prefsCookie.ts, read by app/layout.tsx and
+ * passed to <UiPrefsProvider>), and hydration uses the same value, so the first HTML already has the chosen layout.
  */
-import { useEffect, useSyncExternalStore } from "react";
+import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { DEFAULT_UI_PREFS, loadServerPrefs, readPrefs, subscribePrefs, updatePrefs, type Density, type UiPrefs } from "./prefs";
 
 export type { Density, UiPrefs };
 
-const getServerSnapshot = () => DEFAULT_UI_PREFS;
+const ServerPrefs = createContext<UiPrefs>(DEFAULT_UI_PREFS);
+
+/** the prefs the server rendered with (from the cookie); the root layout wraps the app in it */
+export function UiPrefsProvider({ initial, children }: { initial: UiPrefs; children: ReactNode }) {
+  return createElement(ServerPrefs.Provider, { value: initial }, children);
+}
 
 /** All UI prefs; fetches the user's server copy once per page session */
 export function useUiPrefs(): UiPrefs {
-  const prefs = useSyncExternalStore(subscribePrefs, readPrefs, getServerSnapshot);
+  const initial = useContext(ServerPrefs);
+  const prefs = useSyncExternalStore(subscribePrefs, readPrefs, () => initial);
   useEffect(() => {
     void loadServerPrefs();
   }, []);
