@@ -62,7 +62,12 @@ try {
   const amount = page.getByRole("textbox", { name: "Amount" });
   await amount.waitFor({ timeout: 60000 });
   check((await amount.inputValue()) === "₨ 12,34,567.50", `Amount input shows ${await amount.inputValue()}`);
-  if (expectAt) check((await page.getByLabel("At time").inputValue()) === "11:45", "Datetime input in the user's time zone");
+  if (expectAt) {
+    // the picker shows Desk's default HH:mm:ss until the site's settings have loaded
+    const at = page.getByLabel("At time");
+    const settled = await page.waitForFunction((el) => el.value === "11:45", await at.elementHandle(), { timeout: 10000 }).then(() => true, () => false);
+    check(settled, `Datetime input in the user's time zone (${await at.inputValue()})`);
+  }
   const desc = await page.getByText(/^fc=/).innerText();
   check(desc.includes("fc=₨ 12,34,567.50"), `format_currency in a site script (${desc.split(" | ")[0]})`);
   if (expectAt) check(desc.includes(`fmt=${expectAt}`), "frappe.format(Datetime) in a site script");
