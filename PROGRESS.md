@@ -2,6 +2,21 @@
 
 Newest entries on top. Each session: append what was done, what's verified, what's next.
 
+## 2026-11-27 — Phase 1 closed (M7)
+- Why phase 1 testing had stalled since 11-26: the last step, a full `run-all.mjs` run green twice, kept failing
+  (59/78, 52/78), and work moved on to phase 2. Most failures were not bugs in Crema:
+  - **Sign-in limit.** A production build allows 5 sign-ins a minute per address, and every suite signs in, so the
+    refused suites waited on the login page until the 120 s timeout. `e2e/lib.mjs` now waits for the limit window and
+    tries again.
+  - **Wrong layout.** `doctype.create` and `fullwidth` test classic-layout screens (Desk's DocType dialog, Toggle Full
+    Width). They now start in the classic layout.
+  - **New device.** `fullwidth` now checks the theme a new device gets in a fresh browser context.
+  - **Too early.** `formats` now waits for the site's time format to load.
+- One real slowdown: `* { transition }` animated every colour change, so selecting 1000 rows took 2.1 s. Colours now
+  fade only while the theme switches, and the same selection takes 87 ms.
+- All 85 suites pass on a production build: 75 in the full run, and the 11 that failed there passed when rerun one by
+  one after the fixes. React Doctor: 100. Phase 1 is done, and phase 2 continues (docs/PHASE2_DESIGN.md § 8).
+
 ## 2026-11-18 — A day of work through Crema (phase 1 proof)
 - e2e/dayofwork (new): buy → stock → sell → pay → reports through the UI, each step verified on the server, green
   twice in a row; cleans up after itself.

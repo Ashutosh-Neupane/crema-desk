@@ -36,9 +36,19 @@ github.com/frappe/frappe) and how to prove it (an e2e suite against the bench, t
 | M4 ✅ | **Controls verified** | every 🟡 control in 2.3 checked against Desk (Text Editor first: ERPNext uses it read-only for tax breakup, terms, notes), Link extras (title field, create new, advanced search) | `form/controls/*` | one suite per control family | yes |
 | M5 ✅ | **Lists and reports for daily use** | saved filters (List Filter), row extras (comments, assignees, unread), `listview_settings` hooks, report view group-by, ERPNext finance report helpers (2.4–2.6) | `list/*`, `views/reports/*`, `erpnext/public/js/financial_statements.js` | `e2e/list*.mjs`, `report*.mjs`, `financials.mjs` | partly |
 | M6 ✅ | **Works on a phone** | responsive shell + forms (2.14, started), grid as cards under 640px, list as cards, sticky bottom action bar | Desk's own mobile CSS is a reference only (`frappe/public/scss/desk/mobile.scss`) | screenshots at 390 / 768 / 1280 px, no horizontal page scroll | yes |
-| M7 🟡 | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
+| M7 ✅ | **Hardening** | React Doctor warnings, split DocForm / ListView, virtualised lists, run-all in CI on both benches (2.14) | — | `run-all.mjs` green twice in a row | yes |
 
-M7 status (2026-11-26): ✅ DocForm and ListView split into hooks and parts; ✅ large lists measured (`e2e/largelist.mjs`);
+M7 done (2026-11-27): React Doctor 100 with no issues. All 85 suites pass on a production build. The full run
+(75/85) failed for three reasons, now fixed:
+- **Sign-in limit.** A production build allows 5 sign-ins a minute and each suite signs in, so suites waited at the
+  login page until they timed out. Sign-in in `e2e/lib.mjs` now waits for the limit window and tries again.
+- **Wrong layout.** `doctype.create` and `fullwidth` test classic-layout screens and now start in the classic layout.
+- **Slow select-all.** A colour transition on every element made selecting 1000 rows take 2.1 s (`largelist`). It now
+  takes 87 ms, because colours fade only while the theme switches.
+
+The 11 failed suites were rerun one by one after the fixes rather than in a second full run.
+
+Earlier status (2026-11-26): ✅ DocForm and ListView split into hooks and parts; ✅ large lists measured (`e2e/largelist.mjs`);
 ✅ suites read their data from the site (no names from one bench); React Doctor at 76 with 0 errors. Left to close
 phase 1: the last React Doctor areas (2.14), fix `gantt` (drag steps) and `reportgroupby` (item quantity check), both
 failing on main too, then `run-all.mjs` green twice in a row against a production build.
