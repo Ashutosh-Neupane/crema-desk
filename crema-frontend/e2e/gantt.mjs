@@ -15,7 +15,8 @@ const task = (await post("frappe.client.insert", { doc: { doctype: "Task", subje
 
 step("Task list offers Gantt");
 await page.goto(`${BASE}/desk/task?view=list`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Gantt" }).click({ timeout: 90000 });
+await page.getByRole("button", { name: /^View: / }).click({ timeout: 90000 });
+await page.getByRole("menuitem", { name: "Gantt" }).click();
 await page.waitForURL(/\/view\/gantt/, { timeout: 60000 });
 const bar = page.getByRole("slider", { name: new RegExp(`^${tag}:`) });
 await bar.waitFor({ timeout: 60000 });

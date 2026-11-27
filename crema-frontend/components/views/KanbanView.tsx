@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DndContext, DragOverlay, closestCorners, pointerWithin, useDroppable, type CollisionDetection } from "@dnd-kit/core";
@@ -30,6 +30,7 @@ import type { DocField, DocTypeMeta } from "@/lib/frappe/types";
 import { FilterButton, FilterPills } from "./parts/FilterBar";
 import { PAGE, useKanbanBoard, type Board, type BoardColumn, type Card } from "./parts/kanban/useKanbanBoard";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 const enc = encodeURIComponent;
 const btn = "inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800";
@@ -56,8 +57,10 @@ export function KanbanBoards({ doctype }: { doctype: string }) {
     queryKey: ["kanban-boards", doctype],
     queryFn: async () => ((await deskCall("frappe.desk.doctype.kanban_board.kanban_board.get_kanban_boards", { doctype })).env.message as Array<{ name: string }>) ?? [],
   });
-  const [creating, setCreating] = useState(false);
-  const only = boards?.length === 1 ? boards[0].name : null;
+  // ?new=1 (the view menu's "New Kanban board"): open the create dialog and stay on the picker
+  const asked = useSearchParams().get("new") === "1";
+  const [creating, setCreating] = useState(asked);
+  const only = boards?.length === 1 && !asked ? boards[0].name : null;
 
   // one board → open it straight away (Desk remembers the last board); the skeleton below stays up meanwhile
   useEffect(() => {
@@ -259,17 +262,7 @@ function BoardHeader({
         </div>
         <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{board.name}</h1>
       </div>
-      <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-        <Link href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-          List
-        </Link>
-        <Link href={`${doctypeUrl(doctype)}/view/report`} className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-          Report
-        </Link>
-        <span aria-current="page" className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-          Kanban
-        </span>
-      </nav>
+      <ViewMenu meta={meta} doctype={doctype} current="kanban" label={board.name} />
       <FilterButton meta={meta} filters={filters} setFilters={setFilters} className={btn} />
       <button type="button" className={btn} onClick={onRefresh} aria-label="Refresh">
         <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} aria-hidden />

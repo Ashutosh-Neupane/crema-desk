@@ -26,9 +26,10 @@ check(names.length === 2, `created ${names.join(", ")}`);
 
 step("create a board from the Kanban view");
 await page.goto(`${BASE}/desk/todo`, { waitUntil: "domcontentloaded", timeout: 180000 });
-await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Kanban" }).click();
+// the view menu lists the boards that exist and "New Kanban board", which opens the create dialog
+await page.getByRole("button", { name: /^View: / }).click({ timeout: 90000 });
+await page.getByRole("menuitem", { name: "New Kanban board" }).click();
 await page.waitForURL(/\/view\/kanban/, { timeout: 30000 });
-await page.getByRole("button", { name: "New Kanban Board" }).click({ timeout: 30000 });
 await page.getByLabel("Kanban Board Name").fill(BOARD);
 await page.getByLabel("Column Based On").selectOption("status");
 await page.getByRole("button", { name: "Create" }).click();

@@ -22,6 +22,7 @@ import { CalendarGrid } from "./parts/calendar/CalendarGrid";
 import { useCalendarEvents, useCalendarRange } from "./parts/calendar/useCalendarEvents";
 import { DAY, btn, ymd, type CalendarMode } from "./parts/calendar/shared";
 import { doctypeUrl } from "@/lib/navigation/deskUrl";
+import { ViewMenu } from "@/components/views/ViewMenu";
 
 const startOfToday = () => new Date(new Date().setHours(0, 0, 0, 0));
 
@@ -118,21 +119,7 @@ function CalendarTitle({ doctype, heading, meta }: { doctype: string; heading: s
         </div>
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{heading}</h1>
       </div>
-      <nav aria-label="Views" className="flex rounded-md border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-        <Link
-          href={`${doctypeUrl(doctype)}${meta.is_tree ? "?view=list" : ""}`}
-          prefetch={false}
-          className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        >
-          List
-        </Link>
-        <span
-          aria-current="page"
-          className="rounded bg-zinc-100 px-2.5 py-1 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-        >
-          Calendar
-        </span>
-      </nav>
+      <ViewMenu meta={meta} doctype={doctype} current="calendar" />
     </>
   );
 }
