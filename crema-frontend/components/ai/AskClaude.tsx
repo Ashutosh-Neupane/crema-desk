@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Header ✦ (⌘I): "Ask in Claude" (docs/PHASE2_DESIGN.md § 5.17 hand-off, § 5.19). A website can't send messages into
+ * The ✦ chat button at the bottom right (⌘I): "Ask in Claude" (docs/PHASE2_DESIGN.md § 5.17 hand-off, § 5.19). A website can't send messages into
  * a person's Claude subscription, so Crema hands the question over: the desktop app opens with the prompt filled in
  * (claude://claude.ai/new?q=, documented, ~14,000 characters), and on the web the prompt is copied and claude.ai
  * opens. The prompt names this page so Claude can read it through the connector.
  */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleCheck, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { CircleCheck, Copy, ExternalLink, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/popover";
 import { useCremaApp, useMyApps } from "./useConnectClaude";
@@ -41,9 +42,17 @@ function Body({ onDone }: { onDone: () => void }) {
   };
   return (
     <div className="space-y-3">
-      <label htmlFor="ask-claude-q" className="block text-sm font-medium text-[var(--ink-default)]">
-        Ask in Claude
-      </label>
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)]">
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+        <label htmlFor="ask-claude-q" className="flex-1 text-sm font-semibold text-[var(--ink-default)]">
+          Ask in Claude
+        </label>
+        <button type="button" onClick={onDone} aria-label="Close" className="rounded-md p-1 text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink-default)]">
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
       <textarea
         id="ask-claude-q"
         ref={field}
@@ -79,23 +88,35 @@ function Body({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** full-screen tools and the print page have their own controls in that corner */
+const HIDDEN_ON = ["/desk/print-format-builder", "/desk/print/"];
+
 export default function AskClaude() {
   const { installed } = useCremaApp();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const toggle = () => setOpen((o) => !o);
     document.addEventListener("crema:ask-claude", toggle);
     return () => document.removeEventListener("crema:ask-claude", toggle);
   }, []);
-  if (!installed) return null;
+  if (!installed || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger aria-label="Ask in Claude" title="Ask in Claude (⌘I)" aria-expanded={open} className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink-default)]">
-        <Sparkles className="h-4 w-4" aria-hidden="true" />
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[22rem] max-w-[calc(100vw-1.5rem)]">
-        {open && <Body onDone={() => setOpen(false)} />}
-      </PopoverContent>
-    </Popover>
+    <div className="fixed right-4 bottom-4 z-40 print:hidden sm:right-6 sm:bottom-6">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          aria-label="Ask in Claude"
+          title="Ask in Claude (⌘I)"
+          aria-expanded={open}
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)] shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Sparkles className="h-5 w-5" aria-hidden="true" />}
+        </PopoverTrigger>
+        {/* opens upward from the button, like a chat window */}
+        <PopoverContent align="end" className="bottom-full mt-0 mb-3 w-[24rem] max-w-[calc(100vw-2rem)] rounded-xl">
+          {open && <Body onDone={() => setOpen(false)} />}
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
