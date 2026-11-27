@@ -33,10 +33,15 @@ const showAll = async (p = page) => {
 };
 const cardIds = (p = page) => p.locator('[aria-label="Home cards"] > li[data-card]').evaluateAll((els) => els.map((e) => e.getAttribute("data-card")));
 
+// the user's own layout choice and home edits, put back at the end
+const savedUi = (await (await post("frappe.model.utils.user_settings.get", { doctype: "Crema UI" })).json()).message;
+const savedHome = (await (await post("frappe.model.utils.user_settings.get", { doctype: "Crema Home" })).json()).message;
+
 async function cleanup() {
   await post("frappe.client.delete", { doctype: "User", name: STOCK_USER }).catch(() => {});
-  await resetHome().catch(() => {});
-  await setLayout(false).catch(() => {});
+  await post("frappe.model.utils.user_settings.save", { doctype: "Crema Home", user_settings: savedHome || JSON.stringify({ pinned: [], hidden: [] }) }).catch(() => {});
+  const ui = JSON.parse(savedUi || "{}");
+  await setLayout(!!ui.newLayout).catch(() => {});
 }
 
 try {
